@@ -86,4 +86,3 @@ android/                 # native Kotlin app (ARCore pipeline)
 
 - **iOS**: `npx cap sync ios` after `npm run build` (see `capacitor.config.ts`)
 - **Android**: standalone app under `android/`
-# Fitsense-AI

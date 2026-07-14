@@ -1,0 +1,564 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * FitSense embed mode · CSS variable scaffolding
+ *
+ * Every visible surface in EmbedApp.tsx references one of these tokens so
+ * the host can re-theme the widget without touching React.
+ *
+ * Defaults map to the FitSense brand colours; partner overrides come in
+ * via `?theme=<base64>` on the iframe URL or `fitsense:configure` postMessage.
+ * ─────────────────────────────────────────────────────────────────────── */
+
+:root[data-fs-embed] {
+  --fs-primary: #0a84ff;
+  --fs-primary-contrast: #ffffff;
+  --fs-bg: #ffffff;
+  --fs-text: #111827;
+  --fs-text-muted: #6b7280;
+  --fs-surface: #f3f4f6;
+  --fs-border: rgba(0, 0, 0, 0.08);
+  --fs-radius: 14px;
+  --fs-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --fs-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.18);
+
+  color-scheme: light dark;
+  font-family: var(--fs-font);
+  background: var(--fs-bg);
+  color: var(--fs-text);
+  height: 100%;
+}
+
+:root[data-fs-embed][data-fs-mode="dark"] {
+  --fs-bg: #0a0f1c;
+  --fs-text: #e8ecf7;
+  --fs-text-muted: #8b93ae;
+  --fs-surface: #161d33;
+  --fs-border: rgba(255, 255, 255, 0.08);
+  --fs-shadow: 0 18px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+html[data-fs-embed],
+html[data-fs-embed] body,
+html[data-fs-embed] #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: var(--fs-bg);
+  color: var(--fs-text);
+}
+
+/* The host app's index.css applies a phone-frame max-width to #root > *.
+   Cancel that when we're embedded. */
+html[data-fs-embed] #root {
+  display: block !important;
+  background: var(--fs-bg) !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+}
+
+html[data-fs-embed] #root > * {
+  max-width: none !important;
+  min-height: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Reusable embed primitives — kept utility-light so partners can layer in. */
+.fs-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 600;
+  border-radius: var(--fs-radius);
+  padding: 14px 18px;
+  transition: transform 0.08s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+}
+.fs-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.fs-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.fs-btn-primary {
+  background: var(--fs-primary);
+  color: var(--fs-primary-contrast);
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--fs-primary) 60%, transparent);
+}
+.fs-btn-ghost {
+  background: transparent;
+  color: var(--fs-text);
+  border: 1px solid var(--fs-border);
+}
+
+.fs-card {
+  background: var(--fs-surface);
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius);
+}
+
+/* ─── Layout ─────────────────────────────────────────────────────────── */
+
+.fs-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--fs-bg);
+  color: var(--fs-text);
+}
+
+.fs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--fs-border);
+  gap: 12px;
+}
+
+.fs-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.fs-brand-name { letter-spacing: 0.01em; }
+
+.fs-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fs-primary) 14%, transparent);
+  color: var(--fs-primary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fs-icon-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--fs-text);
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  transition: background 0.15s ease;
+}
+.fs-icon-btn:hover {
+  background: var(--fs-surface);
+}
+
+.fs-main {
+  flex: 1;
+  padding: 24px 20px 20px;
+}
+
+.fs-step {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fs-footer {
+  padding: 10px 16px 14px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--fs-text-muted);
+  border-top: 1px solid var(--fs-border);
+}
+
+/* ─── Typography ─────────────────────────────────────────────────────── */
+
+.fs-h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.fs-muted {
+  color: var(--fs-text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.fs-small { font-size: 12px; }
+
+/* ─── Stacks & dividers ──────────────────────────────────────────────── */
+
+.fs-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fs-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.fs-divider {
+  position: relative;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fs-text-muted);
+  margin: 4px 0;
+}
+.fs-divider::before,
+.fs-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: calc(50% - 38px);
+  height: 1px;
+  background: var(--fs-border);
+}
+.fs-divider::before { left: 0; }
+.fs-divider::after { right: 0; }
+.fs-divider span {
+  background: var(--fs-bg);
+  padding: 0 6px;
+  position: relative;
+}
+
+.fs-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: var(--fs-text-muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.fs-list li { margin-bottom: 2px; }
+
+/* ─── Buttons (extends earlier primitives) ───────────────────────────── */
+
+.fs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  font-size: 15px;
+}
+
+/* ─── Scanning ───────────────────────────────────────────────────────── */
+
+.fs-scanning {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.fs-spinner-wrap {
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fs-primary) 12%, transparent);
+  color: var(--fs-primary);
+  display: grid;
+  place-items: center;
+}
+
+.fs-spin {
+  animation: fs-spin 0.9s linear infinite;
+}
+
+@keyframes fs-spin {
+  to { transform: rotate(360deg); }
+}
+
+.fs-progress {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--fs-surface);
+  overflow: hidden;
+}
+.fs-progress-bar {
+  height: 100%;
+  background: var(--fs-primary);
+  transition: width 0.15s ease;
+}
+
+/* ─── Result ─────────────────────────────────────────────────────────── */
+
+.fs-result-hero {
+  text-align: center;
+  padding: 18px 12px 8px;
+}
+.fs-result-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fs-text-muted);
+  margin-bottom: 4px;
+}
+.fs-result-value {
+  font-size: 52px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--fs-primary);
+  margin-bottom: 4px;
+}
+
+.fs-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.fs-stat {
+  padding: 10px;
+  text-align: center;
+}
+.fs-stat-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fs-text-muted);
+  margin-bottom: 2px;
+}
+.fs-stat-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fs-size-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.fs-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 6px;
+  border-radius: var(--fs-radius);
+  border: 1px solid var(--fs-border);
+  background: var(--fs-bg);
+}
+.fs-chip-active {
+  border-color: var(--fs-primary);
+  background: color-mix(in srgb, var(--fs-primary) 8%, transparent);
+}
+.fs-chip-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--fs-text-muted);
+  text-transform: uppercase;
+}
+.fs-chip-value {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* ─── Handoff ────────────────────────────────────────────────────────── */
+
+.fs-handoff {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+
+.fs-qr-wrap {
+  padding: 10px;
+  background: #ffffff;
+  border-radius: var(--fs-radius);
+  border: 1px solid var(--fs-border);
+  display: inline-block;
+  line-height: 0;
+}
+
+.fs-qr canvas {
+  display: block;
+}
+
+.fs-qr-fallback {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  word-break: break-all;
+  padding: 8px;
+  color: #0a0f1c;
+  background: #ffffff;
+}
+
+.fs-handoff-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--fs-text-muted);
+  padding: 8px 14px;
+  background: var(--fs-surface);
+  border-radius: 999px;
+  border: 1px solid var(--fs-border);
+}
+
+.fs-link {
+  color: var(--fs-primary);
+  text-decoration: none;
+  word-break: break-all;
+}
+.fs-link:hover { text-decoration: underline; }
+
+.fs-warn {
+  color: var(--fs-text-muted);
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: var(--fs-radius);
+  background: color-mix(in srgb, var(--fs-primary) 5%, transparent);
+  border: 1px dashed var(--fs-border);
+}
+
+.fs-error {
+  color: #c0392b;
+  font-size: 13px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--fs-radius);
+  background: color-mix(in srgb, #ff5252 10%, transparent);
+  border: 1px solid color-mix(in srgb, #ff5252 30%, transparent);
+}
+
+.fs-handoff-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.fs-tick {
+  width: 72px;
+  height: 72px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fs-primary) 14%, transparent);
+  color: var(--fs-primary);
+  display: grid;
+  place-items: center;
+}
+
+/* ── Live scanner (real measurement, #10) ────────────────────────────── */
+
+.fs-live {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fs-video {
+  width: 100%;
+  height: 360px;
+  object-fit: cover;
+  border-radius: var(--fs-radius);
+  background: #000;
+}
+
+.fs-live-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.fs-live-hint {
+  align-self: center;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
+
+.fs-live-error {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(240, 80, 60, 0.95);
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--fs-radius);
+}
+
+.fs-live-busy {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 12px;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+
+.fs-live-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.fs-scan-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: var(--fs-text-muted);
+}
+
+.fs-camera-icon {
+  margin: 0 auto 12px;
+  color: var(--fs-primary);
+}
+
+@media (max-width: 380px) {
+  .fs-main {
+    padding: 16px 12px 12px;
+  }
+  .fs-h2 {
+    font-size: 1.125rem;
+  }
+  .fs-result-value {
+    font-size: 2.5rem;
+  }
+  .fs-size-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .fs-video {
+    height: min(50vh, 320px);
+  }
+}
+
+@media (min-width: 480px) {
+  .fs-root {
+    max-width: 28rem;
+    margin-inline: auto;
+  }
+}

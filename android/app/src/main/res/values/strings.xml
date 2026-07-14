@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">FitSense AI</string>
+    <string name="app_tagline">AR-powered foot sizing</string>
+
+    <!-- Splash -->
+    <string name="splash_loading">Calibrating vision&#8230;</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_1">Scan once. Fit perfectly.</string>
+    <string name="onboarding_body_1">FitSense uses AR + computer vision to measure your foot from a single scan — no tape measure, no guesswork.</string>
+    <string name="onboarding_title_2">Precision powered by ARCore</string>
+    <string name="onboarding_body_2">We map a horizontal plane under your foot and convert pixels to millimetres in real time.</string>
+    <string name="onboarding_title_3">Shoes that actually fit</string>
+    <string name="onboarding_body_3">Get personalised recommendations across Nike, Adidas, Puma and local brands — with fit and comfort scores.</string>
+    <string name="onboarding_get_started">Get started</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_skip">Skip</string>
+
+    <!-- Home -->
+    <string name="home_hello">Hello,</string>
+    <string name="home_guest">Guest</string>
+    <string name="home_subtitle">Ready to scan?</string>
+    <string name="home_action_scan">Start scan</string>
+    <string name="home_action_measurements">My measurements</string>
+    <string name="home_action_recommendations">Recommendations</string>
+    <string name="home_action_settings">Settings</string>
+    <string name="home_section_recent">Recent scans</string>
+    <string name="home_section_recent_empty">No scans yet — start your first measurement.</string>
+
+    <!-- Scan -->
+    <string name="scan_title">Foot scan</string>
+    <string name="scan_status_searching">Looking for floor plane&#8230;</string>
+    <string name="scan_status_place_foot">Place your foot inside the guide</string>
+    <string name="scan_status_hold_still">Hold still — capturing&#8230;</string>
+    <string name="scan_status_ready">Tap capture when ready</string>
+    <string name="scan_status_calibrating">Calibrating with %1$s</string>
+    <string name="scan_capture">Capture</string>
+    <string name="scan_calibration_label">Calibration</string>
+    <string name="scan_calibration_a4">A4 paper</string>
+    <string name="scan_calibration_card">Bank card</string>
+    <string name="scan_calibration_arcore">AR plane</string>
+    <string name="scan_permission_required">Camera permission is required to scan your foot.</string>
+    <string name="scan_permission_request">Grant camera access</string>
+    <string name="scan_error_no_arcore">AR not available — falling back to reference-card calibration.</string>
+
+    <!-- Results -->
+    <string name="results_title">Scan results</string>
+    <string name="results_length">Length</string>
+    <string name="results_width">Width</string>
+    <string name="results_size_uk">UK</string>
+    <string name="results_size_us">US</string>
+    <string name="results_size_eu">EU</string>
+    <string name="results_wide_foot">Wide-foot detected</string>
+    <string name="results_save">Save measurement</string>
+    <string name="results_see_shoes">See matching shoes</string>
+    <string name="results_redo">Re-scan</string>
+    <string name="results_confidence">Confidence: %1$d%%</string>
+
+    <!-- Recommendations -->
+    <string name="recommendations_title">Recommended for you</string>
+    <string name="recommendations_empty">Run a scan first to unlock recommendations.</string>
+    <string name="recommendations_fit_score">Fit %1$d%%</string>
+    <string name="recommendations_comfort_score">Comfort %1$d%%</string>
+
+    <!-- Measurements -->
+    <string name="measurements_title">Saved measurements</string>
+    <string name="measurements_empty">No saved scans yet.</string>
+    <string name="measurements_delete">Delete</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_units">Measurement units</string>
+    <string name="settings_units_mm">Millimetres</string>
+    <string name="settings_units_in">Inches</string>
+    <string name="settings_calibration">Default calibration</string>
+    <string name="settings_dark_mode">Dark mode</string>
+    <string name="settings_analytics">Share anonymous analytics</string>
+    <string name="settings_sign_out">Sign out</string>
+    <string name="settings_version">Version %1$s</string>
+
+    <!-- Common -->
+    <string name="common_retry">Retry</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="common_continue">Continue</string>
+    <string name="common_ok">OK</string>
+    <string name="common_loading">Loading&#8230;</string>
+    <string name="common_error_generic">Something went wrong. Please try again.</string>
+</resources>

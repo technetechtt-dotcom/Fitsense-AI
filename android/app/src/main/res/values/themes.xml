@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Compose-driven runtime theme. The XML theme only needs to set up the splash
+         look (handled by androidx.core.splashscreen) and a transparent system bar. -->
+    <style name="Theme.FitSenseAI" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
+    </style>
+
+    <!-- Animated splash screen handled via Core Splash Screen library. -->
+    <style name="Theme.FitSenseAI.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/surface_0</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenAnimationDuration">600</item>
+        <item name="postSplashScreenTheme">@style/Theme.FitSenseAI</item>
+    </style>
+</resources>
