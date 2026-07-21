@@ -86,20 +86,14 @@ export function extractFeatures(
   v[idx("categoryRunning")] = product.category === "running" ? 1 : 0;
   v[idx("categorySneaker")] = product.category === "sneaker" ? 1 : 0;
 
-  v[idx("preferredBrand")] = preferredBrandsLc.has(product.brand.toLowerCase())
-    ? 1
-    : 0;
+  v[idx("preferredBrand")] = preferredBrandsLc.has(product.brand.toLowerCase()) ? 1 : 0;
 
   v[idx("brandSizeDelta")] = clamp(brandDelta.euSizeDelta / 1.5, -1, 1);
 
   v[idx("comfortRelaxed")] = profile?.comfortFit === "relaxed" ? 1 : 0;
   v[idx("comfortSnug")] = profile?.comfortFit === "snug" ? 1 : 0;
 
-  v[idx("tightnessShift")] = clamp(
-    (insights?.meanTightness ?? 0) / 2,
-    -1,
-    1,
-  );
+  v[idx("tightnessShift")] = clamp((insights?.meanTightness ?? 0) / 2, -1, 1);
 
   v[idx("wantsWiderToeBox")] = insights?.prefersWiderToeBox ? 1 : 0;
   v[idx("wantsSofterMidsole")] = insights?.prefersSofterMidsole ? 1 : 0;

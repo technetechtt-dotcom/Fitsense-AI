@@ -17,9 +17,7 @@ export function ensureSignedIn(): Promise<string | null> {
   signInPromise = (async () => {
     const fb = await tryGetFirebase();
     if (!fb) return null;
-    const { signInAnonymously, onAuthStateChanged } = await import(
-      "firebase/auth"
-    );
+    const { signInAnonymously, onAuthStateChanged } = await import("firebase/auth");
     // If we're already signed in this browser, use that uid.
     const existing = fb.auth.currentUser;
     if (existing) return existing.uid;
@@ -66,6 +64,47 @@ export async function getIdToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export interface LinkedAccount {
+  uid: string;
+  displayName?: string;
+  email?: string;
+}
+
+/**
+ * Upgrade the current anonymous identity to Google without changing its uid,
+ * preserving cloud data already written under that user.
+ */
+export async function linkGoogleAccount(): Promise<LinkedAccount> {
+  const fb = await tryGetFirebase();
+  if (!fb) throw new Error("Firebase authentication is not configured.");
+  await ensureSignedIn();
+  const current = fb.auth.currentUser;
+  if (!current) throw new Error("No current FitSense identity.");
+
+  const { GoogleAuthProvider, linkWithPopup, signInWithPopup } =
+    await import("firebase/auth");
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  const credential = current.isAnonymous
+    ? await linkWithPopup(current, provider)
+    : await signInWithPopup(fb.auth, provider);
+  signInPromise = Promise.resolve(credential.user.uid);
+  return {
+    uid: credential.user.uid,
+    displayName: credential.user.displayName ?? undefined,
+    email: credential.user.email ?? undefined,
+  };
+}
+
+export async function signOutCloudAccount(): Promise<void> {
+  const fb = await tryGetFirebase();
+  if (fb) {
+    const { signOut } = await import("firebase/auth");
+    await signOut(fb.auth);
+  }
+  resetAuthCache();
 }
 
 /** Force a re-auth on next call. Used by the erase flow. */

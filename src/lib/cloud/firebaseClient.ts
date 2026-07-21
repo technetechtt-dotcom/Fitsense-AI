@@ -67,9 +67,7 @@ export function tryGetFirebase(): Promise<FirebaseHandle | null> {
         import("firebase/auth"),
         import("firebase/firestore"),
       ]);
-    const app =
-      getApps().find((a) => a.name === "[DEFAULT]") ??
-      initializeApp(config);
+    const app = getApps().find((a) => a.name === "[DEFAULT]") ?? initializeApp(config);
     const auth = getAuth(app);
     const db = getFirestore(app);
     return { app, auth, db };

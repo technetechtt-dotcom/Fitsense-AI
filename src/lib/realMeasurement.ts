@@ -38,18 +38,14 @@ const REFERENCE_DIMENSIONS_MM: Record<
 };
 
 /**
- * Heel-pad compression offset, in millimetres.
- *
- * Adult feet measured unweighted (e.g. seated, foot flat next to a piece
- * of A4) are 3–5 mm shorter than the same foot measured while standing,
- * because the heel-pad fat layer compresses under bodyweight. Production
- * shoe-fitting tools therefore add this offset before mapping to a shoe
- * size — otherwise we systematically recommend shoes that are too small.
- *
- * Default value of 4 mm is a population mid-point. Users can opt out
- * (e.g. for children or already-standing scans) via Settings.
+ * A validated weight-bearing scan measures the loaded foot directly, so the
+ * default correction is zero. Population-average offsets must never be added
+ * silently to a value presented as a real measurement.
  */
-export const DEFAULT_HEEL_PAD_OFFSET_MM = 4;
+export const DEFAULT_HEEL_PAD_OFFSET_MM = 0;
+
+/** Development/experimental seated-scan estimate; not launch-validated. */
+export const EXPERIMENTAL_UNWEIGHTED_OFFSET_MM = 4;
 
 /** All points the user taps on the captured frame. */
 export interface TapPoints {
@@ -111,10 +107,8 @@ export interface ReferenceSanity {
  */
 export interface ComputeRealMeasurementOptions {
   /**
-   * mm added to the raw length measurement to compensate for heel-pad
-   * squish when scanning the foot under load. Defaults to
-   * {@link DEFAULT_HEEL_PAD_OFFSET_MM}. Set to `0` if the user explicitly
-   * scanned without weight on the foot.
+   * Explicit millimetres added to the raw measurement for an experimental
+   * non-weight-bearing protocol. Validated standing scans must use `0`.
    */
   heelPadOffsetMm?: number;
 }
@@ -135,19 +129,28 @@ export function computeRealMeasurement(
   }
 
   const ordered = sortCornersTL(taps.refCorners);
+  const topEdgePx = distance(ordered[0], ordered[1]);
+  const rightEdgePx = distance(ordered[1], ordered[2]);
+  const bottomEdgePx = distance(ordered[3], ordered[2]);
+  const leftEdgePx = distance(ordered[0], ordered[3]);
+  const horizontalPx = (topEdgePx + bottomEdgePx) / 2;
+  const verticalPx = (leftEdgePx + rightEdgePx) / 2;
+  const longMm = Math.max(dims.widthMm, dims.heightMm);
+  const shortMm = Math.min(dims.widthMm, dims.heightMm);
+  const worldWidthMm = horizontalPx >= verticalPx ? longMm : shortMm;
+  const worldHeightMm = horizontalPx >= verticalPx ? shortMm : longMm;
   const dst: Point[] = [
     { x: 0, y: 0 },
-    { x: dims.widthMm, y: 0 },
-    { x: dims.widthMm, y: dims.heightMm },
-    { x: 0, y: dims.heightMm },
+    { x: worldWidthMm, y: 0 },
+    { x: worldWidthMm, y: worldHeightMm },
+    { x: 0, y: worldHeightMm },
   ];
   const H = computeHomography(ordered, dst);
 
   const heelMm = applyHomography(H, taps.heel);
   const toeMm = applyHomography(H, taps.toe);
   const rawLengthMm = distance(heelMm, toeMm);
-  const heelPadOffsetMm =
-    options.heelPadOffsetMm ?? DEFAULT_HEEL_PAD_OFFSET_MM;
+  const heelPadOffsetMm = options.heelPadOffsetMm ?? DEFAULT_HEEL_PAD_OFFSET_MM;
   const lengthMm = rawLengthMm + heelPadOffsetMm;
 
   let widthMm: number;
@@ -167,22 +170,34 @@ export function computeRealMeasurement(
   // pixels-per-mm is computed from the average edge length of the
   // reference quad — a stable scale value useful for downstream tooling
   // (e.g. drawing overlays in image space at a given mm size).
-  const topEdgePx = distance(ordered[0], ordered[1]);
-  const rightEdgePx = distance(ordered[1], ordered[2]);
-  const bottomEdgePx = distance(ordered[3], ordered[2]);
-  const leftEdgePx = distance(ordered[0], ordered[3]);
-  const pxPerMmTop = topEdgePx / dims.widthMm;
-  const pxPerMmBottom = bottomEdgePx / dims.widthMm;
-  const pxPerMmLeft = leftEdgePx / dims.heightMm;
-  const pxPerMmRight = rightEdgePx / dims.heightMm;
-  const pixelsPerMm =
-    (pxPerMmTop + pxPerMmBottom + pxPerMmLeft + pxPerMmRight) / 4;
+  const pxPerMmTop = topEdgePx / worldWidthMm;
+  const pxPerMmBottom = bottomEdgePx / worldWidthMm;
+  const pxPerMmLeft = leftEdgePx / worldHeightMm;
+  const pxPerMmRight = rightEdgePx / worldHeightMm;
+  const pixelsPerMm = (pxPerMmTop + pxPerMmBottom + pxPerMmLeft + pxPerMmRight) / 4;
 
-  const sanity = computeSanity(
+  const referenceSanity = computeSanity(
     [pxPerMmTop, pxPerMmBottom, pxPerMmLeft, pxPerMmRight],
     [topEdgePx, bottomEdgePx, leftEdgePx, rightEdgePx],
-    dims,
+    { widthMm: worldWidthMm, heightMm: worldHeightMm },
+    {
+      widthPx: taps.imageWidthPx ?? 0,
+      heightPx: taps.imageHeightPx ?? 0,
+      areaPx: quadArea(ordered),
+      fullyVisible: referenceHasFrameMargin(
+        ordered,
+        taps.imageWidthPx ?? 0,
+        taps.imageHeightPx ?? 0,
+      ),
+    },
   );
+  const dimensionIssue = validateDimensions(lengthMm, widthMm, widthSource);
+  const issue = referenceSanity.issue ?? dimensionIssue;
+  const sanity: ReferenceSanity = {
+    ...referenceSanity,
+    ok: issue === null,
+    issue,
+  };
 
   const confidence = computeConfidence({
     pixelsPerMm,
@@ -200,6 +215,10 @@ export function computeRealMeasurement(
       lengthMm,
       widthMm,
       confidence,
+      dimensionConfidence: {
+        length: confidence,
+        width: widthSource === "measured" ? confidence : 0,
+      },
       foot: taps.foot ?? "right",
       calibration,
       pixelsPerMm,
@@ -225,17 +244,20 @@ function computeSanity(
   pxPerMm: [number, number, number, number],
   edgesPx: [number, number, number, number],
   dims: { widthMm: number; heightMm: number },
+  image: {
+    widthPx: number;
+    heightPx: number;
+    areaPx: number;
+    fullyVisible: boolean;
+  },
 ): ReferenceSanity {
   const expectedAspect = dims.heightMm / dims.widthMm;
   // Aspect of tapped quad — orientation-invariant.
   const horiz = (edgesPx[0] + edgesPx[1]) / 2;
   const vert = (edgesPx[2] + edgesPx[3]) / 2;
   const observedAspect =
-    horiz === 0 || vert === 0
-      ? 0
-      : Math.max(horiz, vert) / Math.min(horiz, vert);
-  const expected =
-    expectedAspect >= 1 ? expectedAspect : 1 / expectedAspect;
+    horiz === 0 || vert === 0 ? 0 : Math.max(horiz, vert) / Math.min(horiz, vert);
+  const expected = expectedAspect >= 1 ? expectedAspect : 1 / expectedAspect;
   const aspectDelta = Math.abs(observedAspect - expected) / expected;
   const aspectScore = clamp01(1 - aspectDelta / 0.25);
 
@@ -249,16 +271,26 @@ function computeSanity(
       issue: "Reference quad has zero size — please re-tap the corners.",
     };
   }
-  const variance =
-    pxPerMm.reduce((s, v) => s + (v - mean) ** 2, 0) / pxPerMm.length;
+  const variance = pxPerMm.reduce((s, v) => s + (v - mean) ** 2, 0) / pxPerMm.length;
   const cv = Math.sqrt(variance) / mean;
-  const scaleConsistencyScore = clamp01(1 - cv / 0.20);
+  const scaleConsistencyScore = clamp01(1 - cv / 0.2);
 
   let issue: string | null = null;
-  if (aspectScore < 0.55) {
+  const frameArea = image.widthPx * image.heightPx;
+  const frameFraction = frameArea > 0 ? image.areaPx / frameArea : 0;
+  if (!Number.isFinite(mean) || mean < 0.5 || mean > 100) {
+    issue =
+      "The reference produced an impossible scale. Reposition it and retap all four corners.";
+  } else if (!image.fullyVisible) {
+    issue =
+      "The reference touches or leaves the frame. Retake with all four edges visible and a clear margin.";
+  } else if (frameArea <= 0 || frameFraction < 0.05) {
+    issue =
+      "The reference is too small in the photo. Move the phone closer while keeping the whole foot visible.";
+  } else if (aspectScore < 0.7) {
     issue =
       "The corners you tapped don't match the chosen reference's shape — make sure you've picked A4 or a bank card correctly.";
-  } else if (scaleConsistencyScore < 0.55) {
+  } else if (scaleConsistencyScore < 0.7) {
     issue =
       "The camera angle looks steep, which hurts accuracy. Try shooting from straight above for a sharper result.";
   }
@@ -268,6 +300,43 @@ function computeSanity(
     ok: issue === null,
     issue,
   };
+}
+
+function referenceHasFrameMargin(
+  corners: Point[],
+  widthPx: number,
+  heightPx: number,
+): boolean {
+  if (widthPx <= 0 || heightPx <= 0) return false;
+  const margin = Math.max(4, Math.min(widthPx, heightPx) * 0.01);
+  return corners.every(
+    (point) =>
+      point.x >= margin &&
+      point.y >= margin &&
+      point.x <= widthPx - margin &&
+      point.y <= heightPx - margin,
+  );
+}
+
+function validateDimensions(
+  lengthMm: number,
+  widthMm: number,
+  widthSource: "measured" | "estimated",
+): string | null {
+  if (!Number.isFinite(lengthMm) || lengthMm < 120 || lengthMm > 360) {
+    return "Heel-to-toe length is implausible. Check the heel and longest-toe points.";
+  }
+  if (widthSource !== "measured") {
+    return "Ball width must be measured for a valid scan. Mark both sides of the widest forefoot.";
+  }
+  if (!Number.isFinite(widthMm) || widthMm < 45 || widthMm > 160) {
+    return "Ball width is implausible. Check both ball-of-foot landmarks.";
+  }
+  const ratio = widthMm / lengthMm;
+  if (ratio < 0.25 || ratio > 0.55) {
+    return "The measured width-to-length ratio is implausible. Correct the foot landmarks and try again.";
+  }
+  return null;
 }
 
 /**

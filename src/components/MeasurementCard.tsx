@@ -12,12 +12,7 @@ interface Props {
 }
 
 /** Compact row showing one persisted scan with its sizing recommendation. */
-export function MeasurementCard({
-  scan,
-  onClick,
-  index = 0,
-  units = "mm",
-}: Props) {
+export function MeasurementCard({ scan, onClick, index = 0, units = "mm" }: Props) {
   const length = averageLengthMm(scan);
   const width = averageWidthMm(scan);
   const lengthFmt = length != null ? splitLength(length, units) : null;

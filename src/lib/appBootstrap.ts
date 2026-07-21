@@ -30,8 +30,7 @@ export async function bootstrapApp(): Promise<void> {
         consent.anonymousAnalytics === "unset"
       ) {
         acknowledgePolicy({
-          cloudSync:
-            consent.cloudSync === "unset" ? "denied" : consent.cloudSync,
+          cloudSync: consent.cloudSync === "unset" ? "denied" : consent.cloudSync,
           aiPersonalization:
             consent.aiPersonalization === "unset"
               ? "granted"
@@ -40,8 +39,7 @@ export async function bootstrapApp(): Promise<void> {
         });
       }
       if (parsed.preferences && "analyticsOptIn" in parsed.preferences) {
-        const { analyticsOptIn: _removed, ...rest } = parsed.preferences;
-        parsed.preferences = rest as typeof parsed.preferences;
+        delete parsed.preferences.analyticsOptIn;
         localStorage.setItem("fitsense:profile", JSON.stringify(parsed));
       }
     } catch {

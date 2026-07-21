@@ -40,9 +40,7 @@ export async function logScreenView(screenName: string): Promise<void> {
   const fb = await tryGetFirebase();
   if (!fb) return;
   try {
-    const { getAnalytics, isSupported, logEvent } = await import(
-      "firebase/analytics"
-    );
+    const { getAnalytics, isSupported, logEvent } = await import("firebase/analytics");
     if (!(await isSupported())) return;
     const analytics = getAnalytics(fb.app);
     logEvent(analytics, "screen_view", {
@@ -63,9 +61,7 @@ export async function logAnalyticsEvent(
   const fb = await tryGetFirebase();
   if (!fb) return;
   try {
-    const { getAnalytics, isSupported, logEvent } = await import(
-      "firebase/analytics"
-    );
+    const { getAnalytics, isSupported, logEvent } = await import("firebase/analytics");
     if (!(await isSupported())) return;
     const analytics = getAnalytics(fb.app);
     logEvent(analytics, name, params);

@@ -24,8 +24,8 @@ export function PrimaryButton({
     variant === "gradient"
       ? "bg-scan-grad text-surface-0 shadow-neon hover:shadow-glow"
       : variant === "solid"
-      ? "bg-ink text-surface-0"
-      : "bg-surface-2 text-ink border border-white/5 hover:bg-surface-3";
+        ? "bg-ink text-surface-0"
+        : "bg-surface-2 text-ink border border-white/5 hover:bg-surface-3";
 
   return (
     <motion.button
@@ -35,7 +35,9 @@ export function PrimaryButton({
       className={`${base} ${styles} disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       {...(rest as any)}
     >
-      {leadingIcon ? <span className="h-5 w-5 grid place-items-center">{leadingIcon}</span> : null}
+      {leadingIcon ? (
+        <span className="h-5 w-5 grid place-items-center">{leadingIcon}</span>
+      ) : null}
       <span className="tracking-wide">{children}</span>
     </motion.button>
   );

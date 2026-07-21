@@ -192,6 +192,21 @@ private fun ScanControls(
         ) {
             CalibrationSelector(selected = state.calibration, onSelected = onCalibrationChange)
 
+            state.errorMessage?.let { message ->
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = FitSenseColors.Coral.copy(alpha = 0.18f),
+                    ),
+                ) {
+                    Text(
+                        text = message,
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(12.dp),
+                    )
+                }
+            }
+
             if (state.capturing) {
                 LinearProgressIndicator(
                     progress = { state.captureProgress },

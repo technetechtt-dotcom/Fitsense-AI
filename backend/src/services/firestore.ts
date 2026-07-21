@@ -1,43 +1,61 @@
 import { readFileSync } from "node:fs";
-import admin from "firebase-admin";
+import {
+  applicationDefault,
+  cert,
+  getApps,
+  initializeApp,
+  type ServiceAccount,
+} from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
 import { config } from "../config.js";
 
-let db: admin.firestore.Firestore | null = null;
+let db: Firestore | null = null;
 
 export function isFirestoreReady(): boolean {
   return db !== null;
 }
 
-export function initFirestore(): void {
-  if (db) return;
+export function isFirebaseAdminReady(): boolean {
+  return getApps().length > 0;
+}
 
-  if (admin.apps.length > 0) {
-    db = admin.firestore();
-    return;
+export function initFirebaseAdmin(): boolean {
+  if (getApps().length > 0) {
+    return true;
   }
 
   const inline = config.firebase.serviceAccountJson;
-  if (inline) {
-    const cred = admin.credential.cert(JSON.parse(inline) as admin.ServiceAccount);
-    admin.initializeApp({ credential: cred });
-    db = admin.firestore();
-    return;
-  }
-
   try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
+    if (inline) {
+      const credential = cert(JSON.parse(inline) as ServiceAccount);
+      initializeApp({ credential });
+      return true;
+    }
+
+    initializeApp({
+      credential: applicationDefault(),
     });
-    db = admin.firestore();
+    return true;
   } catch (err) {
     console.warn(
-      "[fitsense-api] Firebase Admin not configured — sync routes disabled.",
+      "[fitsense-api] Firebase Admin not configured.",
       err instanceof Error ? err.message : err,
     );
+    return false;
   }
 }
 
-export function getDb(): admin.firestore.Firestore {
+export function initFirestore(): void {
+  if (db) return;
+  if (!initFirebaseAdmin()) {
+    console.warn("[fitsense-api] Firestore sync routes disabled.");
+    return;
+  }
+  db = getFirestore();
+}
+
+export function getDb(): Firestore {
   if (!db) {
     throw new Error("Firestore is not initialized");
   }
@@ -55,10 +73,20 @@ export async function verifyIdToken(
   }
   const token = authorization.slice("Bearer ".length).trim();
   if (!token) throw new Error("Empty Bearer token");
-  initFirestore();
-  if (!db) throw new Error("Auth unavailable — Firebase not configured");
-  const decoded = await admin.auth().verifyIdToken(token);
+  if (!initFirebaseAdmin()) {
+    throw new Error("Auth unavailable - Firebase Admin not configured");
+  }
+  const decoded = await getAuth().verifyIdToken(token);
   return decoded.uid;
+}
+
+export async function deleteAuthUser(uid: string): Promise<void> {
+  if (!initFirebaseAdmin()) return;
+  try {
+    await getAuth().deleteUser(uid);
+  } catch {
+    // User may already be deleted.
+  }
 }
 
 /** Firestore paths mirror `src/lib/cloud/sync.ts` on the web client. */
@@ -113,19 +141,17 @@ export async function eraseUserData(uid: string): Promise<void> {
   batch.delete(userDoc);
   await batch.commit();
 
-  try {
-    await admin.auth().deleteUser(uid);
-  } catch {
-    // User may already be deleted
-  }
+  await deleteAuthUser(uid);
 }
 
-/** Optional helper for local dev — load project id from service account file. */
+/** Optional helper for local dev: load project id from service account file. */
 export function readProjectIdFromCredentials(): string | undefined {
   const path = process.env.GOOGLE_APPLICATION_CREDENTIALS;
   if (!path) return undefined;
   try {
-    const json = JSON.parse(readFileSync(path, "utf8")) as { project_id?: string };
+    const json = JSON.parse(readFileSync(path, "utf8")) as {
+      project_id?: string;
+    };
     return json.project_id;
   } catch {
     return undefined;

@@ -22,6 +22,11 @@ export interface FootMeasurement {
   archHeightMm?: number;
   /** 0..1 — combined contour + calibration confidence. */
   confidence: number;
+  /** Per-dimension quality; never substitute one dimension for another. */
+  dimensionConfidence?: {
+    length: number;
+    width: number;
+  };
   foot: Foot;
   calibration: CalibrationReference;
   pixelsPerMm: number;
@@ -44,6 +49,8 @@ export interface SizeRecommendation {
   us: string;
   eu: string;
   mondopointMm: number;
+  /** 0..1 — measurement quality capped by product/catalogue evidence. */
+  recommendationConfidence: number;
   matches: ShoeMatch[];
 }
 
@@ -56,24 +63,27 @@ export interface ScanResult {
   recommendation?: SizeRecommendation;
   deviceModel?: string;
   arcoreUsed: boolean;
+  provenance?: {
+    measurementKind: "measured" | "simulated";
+    method: "reference" | "webxr" | "native-arkit" | "native-arcore" | "demo";
+    algorithmVersion: string;
+    widthSource: "measured" | "estimated";
+    qualityStatus: "accepted" | "rejected";
+    pairedFeet: boolean;
+  };
 }
 
 export type FitType = "narrow" | "standard" | "wide" | "extra_wide";
 
 export const FIT_TYPE_RATIO: Record<FitType, number> = {
   narrow: 0.36,
-  standard: 0.40,
+  standard: 0.4,
   wide: 0.44,
   extra_wide: 0.48,
 };
 
 export type ShoeCategory =
-  | "sneaker"
-  | "running"
-  | "casual"
-  | "formal"
-  | "boot"
-  | "sandal";
+  "sneaker" | "running" | "casual" | "formal" | "boot" | "sandal";
 
 export interface SizeRange {
   min: number;
@@ -94,6 +104,8 @@ export interface Product {
   colorways: string[];
   /** Optional merchant product page for “View in store”. */
   storeUrl?: string;
+  /** Only retailer/manufacturer-verified product data may raise confidence. */
+  dataQuality?: "verified" | "unverified";
 }
 
 export interface UserPreferences {
@@ -101,9 +113,8 @@ export interface UserPreferences {
   defaultCalibration: CalibrationReference;
   preferredBrands: string[];
   /**
-   * Whether to add the standard heel-pad load offset (≈ 4 mm) to scanned
-   * lengths. Default `true` for adults scanning while standing — children
-   * or seated scans should turn this off.
+   * Development-only seated-scan estimate. Valid weight-bearing production
+   * scans do not add a population-average offset.
    */
   applyHeelPadOffset: boolean;
 }
@@ -133,6 +144,9 @@ export function isWide(m: FootMeasurement): boolean {
 }
 
 export function primaryFoot(s: ScanResult): FootMeasurement | undefined {
+  if (s.leftFoot && s.rightFoot) {
+    return s.leftFoot.lengthMm >= s.rightFoot.lengthMm ? s.leftFoot : s.rightFoot;
+  }
   return s.rightFoot ?? s.leftFoot;
 }
 
@@ -154,7 +168,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   units: "mm",
   defaultCalibration: "a4_paper",
   preferredBrands: [],
-  applyHeelPadOffset: true,
+  applyHeelPadOffset: false,
 };
 
 // ─── Fit Profile (the persistent "Portable Fit Identity") ──────────────────
@@ -184,12 +198,7 @@ export type ArchHeight = "low" | "medium" | "high" | "unknown";
  *   - Rounded:  rounded silhouette without a clear protrusion.
  */
 export type ToeShape =
-  | "egyptian"
-  | "greek"
-  | "roman"
-  | "square"
-  | "rounded"
-  | "unknown";
+  "egyptian" | "greek" | "roman" | "square" | "rounded" | "unknown";
 
 /** Comfort fit preference, mapped onto extra mm of headroom over the longest toe. */
 export type ComfortFit = "snug" | "standard" | "relaxed";
@@ -322,13 +331,7 @@ export interface FitEventRating extends FitEventBase {
  *  - size:    overall summary axis — −2 = too small, +2 = too big
  */
 export type FitDimension =
-  | "size"
-  | "length"
-  | "width"
-  | "toeBox"
-  | "heel"
-  | "arch"
-  | "instep";
+  "size" | "length" | "width" | "toeBox" | "heel" | "arch" | "instep";
 
 export type FitDimensionScore = -2 | -1 | 0 | 1 | 2;
 

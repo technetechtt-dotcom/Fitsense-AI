@@ -78,8 +78,7 @@ export function createHttpTransport(
   pollMs: number = POLL_DEFAULT_MS,
 ): HandoffTransport {
   const trimmed = baseUrl.replace(/\/+$/, "");
-  const url = (id: string) =>
-    `${trimmed}/v1/handoff/${encodeURIComponent(id)}`;
+  const url = (id: string) => `${trimmed}/v1/handoff/${encodeURIComponent(id)}`;
 
   return {
     kind: "http",
@@ -106,9 +105,9 @@ export function createHttpTransport(
           });
           if (cancelled) return;
           if (res.ok) {
-            const body = (await res.json().catch(() => null)) as
-              | { payload?: HandoffPayload }
-              | null;
+            const body = (await res.json().catch(() => null)) as {
+              payload?: HandoffPayload;
+            } | null;
             if (body?.payload && isValidPayload(body.payload)) {
               onPayload(body.payload);
               // Best-effort cleanup; ignore errors.
@@ -141,9 +140,7 @@ interface BroadcastFrame {
 export function createBroadcastTransport(): HandoffTransport {
   const CHANNEL = "fitsense:handoff";
   const safeChannel = () =>
-    typeof BroadcastChannel !== "undefined"
-      ? new BroadcastChannel(CHANNEL)
-      : null;
+    typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(CHANNEL) : null;
 
   return {
     kind: "broadcast",
@@ -162,10 +159,7 @@ export function createBroadcastTransport(): HandoffTransport {
       // on the same origin can still pick it up.
       try {
         const key = `fitsense:handoff:${sessionId}`;
-        localStorage.setItem(
-          key,
-          JSON.stringify({ payload, ts: Date.now() }),
-        );
+        localStorage.setItem(key, JSON.stringify({ payload, ts: Date.now() }));
         // Self-clean after 5 minutes.
         setTimeout(() => localStorage.removeItem(key), 5 * 60 * 1000);
       } catch {
@@ -213,9 +207,7 @@ export function createBroadcastTransport(): HandoffTransport {
 
 // ─── Auto selection ──────────────────────────────────────────────────────
 
-export function createHandoffTransport(
-  cfg?: HandoffConfig,
-): HandoffTransport {
+export function createHandoffTransport(cfg?: HandoffConfig): HandoffTransport {
   const baseUrl = resolveHandoffBaseUrl(cfg?.baseUrl);
   const preferred = cfg?.transport ?? "auto";
   if (preferred === "http") {

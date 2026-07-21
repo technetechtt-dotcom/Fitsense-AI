@@ -44,9 +44,7 @@ export function ShoeCard({ match, index = 0, onClick }: Props) {
         </div>
       </div>
 
-      {onClick ? (
-        <ChevronRight className="w-5 h-5 text-ink-muted shrink-0" />
-      ) : null}
+      {onClick ? <ChevronRight className="w-5 h-5 text-ink-muted shrink-0" /> : null}
     </>
   );
 

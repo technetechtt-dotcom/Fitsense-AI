@@ -68,11 +68,7 @@ export function QrCode({
       }}
     >
       <canvas ref={canvasRef} width={size} height={size} />
-      <div
-        ref={fallbackRef}
-        className="fs-qr-fallback"
-        style={{ display: "none" }}
-      >
+      <div ref={fallbackRef} className="fs-qr-fallback" style={{ display: "none" }}>
         {value}
       </div>
     </div>

@@ -1,12 +1,5 @@
 import { useState } from "react";
-import {
-  Check,
-  MessageSquareDashed,
-  Ruler,
-  Star,
-  ThumbsDown,
-  X,
-} from "lucide-react";
+import { Check, MessageSquareDashed, Ruler, Star, ThumbsDown, X } from "lucide-react";
 import {
   appendFitEvent,
   getOrCreateFitProfile,
@@ -15,11 +8,7 @@ import {
   persistInsights,
 } from "../lib/fitProfile";
 import { deriveInsights } from "../lib/fitLearning";
-import type {
-  FitDimension,
-  FitDimensionScore,
-  FitEventReturn,
-} from "../types";
+import type { FitDimension, FitDimensionScore, FitEventReturn } from "../types";
 
 interface Props {
   productId: string;
@@ -32,13 +21,7 @@ interface Props {
   compact?: boolean;
 }
 
-type Stage =
-  | "idle"
-  | "kept"
-  | "return-reason"
-  | "fit-rate"
-  | "wear-tag"
-  | "done";
+type Stage = "idle" | "kept" | "return-reason" | "fit-rate" | "wear-tag" | "done";
 
 /**
  * Per-shoe feedback widget — wires Kept / Returned / Rate (per-dimension) /
@@ -59,9 +42,9 @@ export function FitFeedback({
 }: Props) {
   const [stage, setStage] = useState<Stage>("idle");
   const [stars, setStars] = useState(0);
-  const [dims, setDims] = useState<
-    Partial<Record<FitDimension, FitDimensionScore>>
-  >({});
+  const [dims, setDims] = useState<Partial<Record<FitDimension, FitDimensionScore>>>(
+    {},
+  );
 
   const log = (event: Parameters<typeof appendFitEvent>[0]) => {
     appendFitEvent(event);
@@ -301,9 +284,7 @@ export function FitFeedback({
 
       {stage === "wear-tag" ? (
         <>
-          <div className={`${titleSize} font-semibold`}>
-            How are they wearing in?
-          </div>
+          <div className={`${titleSize} font-semibold`}>How are they wearing in?</div>
           <div className="grid grid-cols-1 gap-1.5">
             <button
               onClick={() => onWear(-1, "tight")}
@@ -370,13 +351,7 @@ const FIT_RATE_ROWS: FitRateRow[] = [
   {
     key: "width",
     label: "Width",
-    scale: [
-      "Way too narrow",
-      "Bit narrow",
-      "Perfect",
-      "Bit wide",
-      "Way too wide",
-    ],
+    scale: ["Way too narrow", "Bit narrow", "Perfect", "Bit wide", "Way too wide"],
   },
   {
     key: "toeBox",
@@ -423,8 +398,8 @@ function FitRateStage({
         Rate the fit
       </div>
       <p className="text-[10px] text-ink-muted leading-snug">
-        Tap any axis. Skip the ones you don't care about — even one signal
-        helps the AI learn this brand.
+        Tap any axis. Skip the ones you don't care about — even one signal helps the AI
+        learn this brand.
       </p>
       <div className="space-y-2.5 pt-1">
         {FIT_RATE_ROWS.map((row) => (
@@ -432,9 +407,7 @@ function FitRateStage({
             key={row.key}
             row={row}
             value={dims[row.key]}
-            onChange={(v) =>
-              setDim(row.key, v === dims[row.key] ? undefined : v)
-            }
+            onChange={(v) => setDim(row.key, v === dims[row.key] ? undefined : v)}
           />
         ))}
       </div>
@@ -472,18 +445,12 @@ function DimensionRow({ row, value, onChange }: DimensionRowProps) {
       <div className="flex items-center justify-between mb-1">
         <div className="text-[11px] font-semibold text-ink">{row.label}</div>
         {value !== undefined ? (
-          <div className="text-[10px] text-neon">
-            {row.scale[value + 2]}
-          </div>
+          <div className="text-[10px] text-neon">{row.scale[value + 2]}</div>
         ) : (
           <div className="text-[10px] text-ink-muted">Tap to rate</div>
         )}
       </div>
-      <div
-        role="radiogroup"
-        aria-label={row.label}
-        className="grid grid-cols-5 gap-1"
-      >
+      <div role="radiogroup" aria-label={row.label} className="grid grid-cols-5 gap-1">
         {scores.map((score, i) => {
           const active = value === score;
           return (

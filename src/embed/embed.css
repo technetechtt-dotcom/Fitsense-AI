@@ -17,8 +17,9 @@
   --fs-surface: #f3f4f6;
   --fs-border: rgba(0, 0, 0, 0.08);
   --fs-radius: 14px;
-  --fs-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
+  --fs-font:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
   --fs-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.18);
 
   color-scheme: light dark;
@@ -71,7 +72,10 @@ html[data-fs-embed] #root > * {
   font-weight: 600;
   border-radius: var(--fs-radius);
   padding: 14px 18px;
-  transition: transform 0.08s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
 }
 .fs-btn:disabled {
   opacity: 0.5;
@@ -79,6 +83,26 @@ html[data-fs-embed] #root > * {
 }
 .fs-btn:active:not(:disabled) {
   transform: translateY(1px);
+}
+
+.fs-demo-watermark {
+  background: #991b1b;
+  color: #ffffff;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.fs-pair-status {
+  background: var(--fs-primary);
+  color: var(--fs-primary-contrast);
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
 }
 .fs-btn-primary {
   background: var(--fs-primary);
@@ -123,7 +147,9 @@ html[data-fs-embed] #root > * {
   font-weight: 600;
   font-size: 14px;
 }
-.fs-brand-name { letter-spacing: 0.01em; }
+.fs-brand-name {
+  letter-spacing: 0.01em;
+}
 
 .fs-pill {
   display: inline-block;
@@ -189,7 +215,9 @@ html[data-fs-embed] #root > * {
   margin: 0;
 }
 
-.fs-small { font-size: 12px; }
+.fs-small {
+  font-size: 12px;
+}
 
 /* ─── Stacks & dividers ──────────────────────────────────────────────── */
 
@@ -223,8 +251,12 @@ html[data-fs-embed] #root > * {
   height: 1px;
   background: var(--fs-border);
 }
-.fs-divider::before { left: 0; }
-.fs-divider::after { right: 0; }
+.fs-divider::before {
+  left: 0;
+}
+.fs-divider::after {
+  right: 0;
+}
 .fs-divider span {
   background: var(--fs-bg);
   padding: 0 6px;
@@ -238,7 +270,9 @@ html[data-fs-embed] #root > * {
   font-size: 12.5px;
   line-height: 1.5;
 }
-.fs-list li { margin-bottom: 2px; }
+.fs-list li {
+  margin-bottom: 2px;
+}
 
 /* ─── Buttons (extends earlier primitives) ───────────────────────────── */
 
@@ -276,7 +310,9 @@ html[data-fs-embed] #root > * {
 }
 
 @keyframes fs-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .fs-progress {
@@ -415,7 +451,9 @@ html[data-fs-embed] #root > * {
   text-decoration: none;
   word-break: break-all;
 }
-.fs-link:hover { text-decoration: underline; }
+.fs-link:hover {
+  text-decoration: underline;
+}
 
 .fs-warn {
   color: var(--fs-text-muted);

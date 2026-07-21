@@ -2,17 +2,115 @@ import "dotenv/config";
 
 function parseOrigins(raw: string | undefined): string[] | true {
   if (!raw || raw === "*") return true;
-  return raw.split(",").map((s) => s.trim()).filter(Boolean);
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
+function parseNumber(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function parseChoice<const T extends string>(
+  raw: string | undefined,
+  allowed: readonly T[],
+  fallback: T,
+  label: string,
+): T {
+  if (!raw) return fallback;
+  const trimmed = raw.trim();
+  if ((allowed as readonly string[]).includes(trimmed)) return trimmed as T;
+  throw new Error(`${label} must be one of: ${allowed.join(", ")}`);
+}
+
+function parseBoolean(raw: string | undefined, fallback: boolean): boolean {
+  if (raw === undefined) return fallback;
+  return raw === "true";
+}
+
+const nodeEnv = process.env.NODE_ENV ?? "development";
+const isProduction = nodeEnv === "production";
+const corsOrigin = parseOrigins(process.env.CORS_ORIGIN);
+const databaseUrl = process.env.DATABASE_URL?.trim();
+const upstashRedisRestUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
+const upstashRedisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+const syncStore = parseChoice(
+  process.env.SYNC_STORE?.trim(),
+  ["firestore", "postgres"],
+  databaseUrl ? "postgres" : "firestore",
+  "SYNC_STORE",
+);
+const handoffStore = parseChoice(
+  process.env.HANDOFF_STORE?.trim(),
+  ["memory", "upstash", "postgres"],
+  databaseUrl
+    ? "postgres"
+    : upstashRedisRestUrl && upstashRedisRestToken
+      ? "upstash"
+      : "memory",
+  "HANDOFF_STORE",
+);
+const databaseSsl = parseBoolean(
+  process.env.DATABASE_SSL,
+  Boolean(databaseUrl?.includes("sslmode=require")) || isProduction,
+);
+
 export const config = {
-  port: Number(process.env.PORT) || 8787,
-  nodeEnv: process.env.NODE_ENV ?? "development",
-  corsOrigin: parseOrigins(process.env.CORS_ORIGIN),
-  handoffTtlMs: Number(process.env.HANDOFF_TTL_MS) || 5 * 60 * 1000,
+  port: parseNumber(process.env.PORT, 8787),
+  nodeEnv,
+  isProduction,
+  trustProxy: process.env.TRUST_PROXY === "true" || isProduction,
+  corsOrigin,
+  jsonLimit: process.env.JSON_LIMIT ?? "64kb",
+  handoffTtlMs: parseNumber(process.env.HANDOFF_TTL_MS, 5 * 60 * 1000),
+  handoffStore,
+  allowMemoryHandoff: process.env.ALLOW_MEMORY_HANDOFF_IN_PRODUCTION === "true",
+  upstashRedisRestUrl,
+  upstashRedisRestToken,
+  syncStore,
+  database: {
+    url: databaseUrl,
+    ssl: databaseSsl,
+    sslRejectUnauthorized: parseBoolean(
+      process.env.DATABASE_SSL_REJECT_UNAUTHORIZED,
+      true,
+    ),
+  },
+  rateLimit: {
+    windowMs: parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60_000),
+    globalMax: parseNumber(process.env.RATE_LIMIT_GLOBAL_MAX, 300),
+    handoffReadMax: parseNumber(process.env.RATE_LIMIT_HANDOFF_READ_MAX, 60),
+    handoffWriteMax: parseNumber(process.env.RATE_LIMIT_HANDOFF_WRITE_MAX, 20),
+    syncMax: parseNumber(process.env.RATE_LIMIT_SYNC_MAX, 120),
+  },
   skipAuth: process.env.SKIP_AUTH === "true",
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID,
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
   },
 } as const;
+
+export function assertProductionConfig(): void {
+  if (!config.isProduction) return;
+  if (config.corsOrigin === true) {
+    throw new Error("CORS_ORIGIN must be restricted in production.");
+  }
+  if (config.skipAuth) {
+    throw new Error("SKIP_AUTH must never be enabled in production.");
+  }
+  if (config.handoffStore === "memory" && !config.allowMemoryHandoff) {
+    throw new Error(
+      "Production handoff requires HANDOFF_STORE=upstash, HANDOFF_STORE=postgres, or ALLOW_MEMORY_HANDOFF_IN_PRODUCTION=true.",
+    );
+  }
+  if (config.handoffStore === "postgres" && !config.database.url) {
+    throw new Error("HANDOFF_STORE=postgres requires DATABASE_URL.");
+  }
+  if (config.syncStore === "postgres" && !config.database.url) {
+    throw new Error("SYNC_STORE=postgres requires DATABASE_URL.");
+  }
+}
+
+assertProductionConfig();

@@ -1,11 +1,6 @@
 import { SHOE_CATALOG } from "../../data/catalog";
 import { hasAiPersonalizationConsent } from "../consent";
-import type {
-  FitEvent,
-  FitProfile,
-  FootMeasurement,
-  Product,
-} from "../../types";
+import type { FitEvent, FitProfile, FootMeasurement, Product } from "../../types";
 import {
   emptyVector,
   extractFeatures,
@@ -197,8 +192,7 @@ export function eventToTuple(
         if (typeof v === "number") scores.push(v);
       }
       if (scores.length === 0) return null;
-      const meanAbs =
-        scores.reduce((s, v) => s + Math.abs(v), 0) / scores.length;
+      const meanAbs = scores.reduce((s, v) => s + Math.abs(v), 0) / scores.length;
       const label = meanAbs <= 0.7 ? 1 : meanAbs >= 1.3 ? 0 : 0.5;
       return { product, label, weight: 0.6 };
     }
@@ -239,12 +233,7 @@ export function trainFromEvents(
   for (const e of chronological) {
     const tuple = eventToTuple(e);
     if (!tuple) continue;
-    const features = extractFeatures(
-      foot,
-      tuple.product,
-      profile,
-      preferredBrandsLc,
-    );
+    const features = extractFeatures(foot, tuple.product, profile, preferredBrandsLc);
     current = trainStep(current, features, tuple.label, tuple.weight);
   }
   return current;
@@ -264,12 +253,7 @@ export function trainOnEvent(
   if (!foot) return null;
   const tuple = eventToTuple(event);
   if (!tuple) return null;
-  const features = extractFeatures(
-    foot,
-    tuple.product,
-    profile,
-    preferredBrandsLc,
-  );
+  const features = extractFeatures(foot, tuple.product, profile, preferredBrandsLc);
   const next = trainStep(loadRanker(), features, tuple.label, tuple.weight);
   saveRanker(next);
   return next;

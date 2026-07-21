@@ -1,4 +1,5 @@
 import { resolveHandoffBaseUrl } from "../lib/api/config";
+import type { HandoffConfig } from "../lib/api/handoffTypes";
 
 /**
  * FitSense AI · Embed protocol
@@ -66,20 +67,7 @@ export interface EmbedConfig extends EmbedProductContext {
  * Cross-device handoff (QR code → phone scan → result posted back).
  * Detailed protocol lives in `src/embed/handoff.ts`.
  */
-export interface EmbedHandoffConfig {
-  /** Base URL of the relay server. If unset, falls back to BroadcastChannel. */
-  baseUrl?: string;
-  /** Force a transport — defaults to `auto`. */
-  transport?: "http" | "broadcast" | "auto";
-  /** Poll interval (ms) for HTTP short-polling. Default 1500. */
-  pollMs?: number;
-  /**
-   * Pre-existing session id. When the iframe URL contains
-   * `?session=<id>` the iframe enters phone mode and posts its result
-   * to that session instead of returning it via postMessage to the host.
-   */
-  sessionId?: string;
-}
+export type EmbedHandoffConfig = HandoffConfig;
 
 /** Final size recommendation surfaced to the host. */
 export interface EmbedSizeResult {
@@ -89,6 +77,8 @@ export interface EmbedSizeResult {
   mondopointMm: number;
   /** 0..1, how well the recommended shoe maps to the foot. */
   fitScore: number;
+  /** 0..1, accepted measurement quality capped by catalogue evidence. */
+  recommendationConfidence: number;
   /** Which system the host should prefer (echo of {@link EmbedConfig.sizeSystem}). */
   preferred: SizeSystem;
 }
@@ -97,14 +87,14 @@ export interface EmbedScanSummary {
   scanId: string;
   lengthMm: number;
   widthMm: number;
+  measurementConfidence: number;
   widthToLengthRatio: number;
   capturedAtEpochMs: number;
 }
 
 // ─── Parent → iframe ──────────────────────────────────────────────────────
 export type HostToEmbedMessage =
-  | { type: "fitsense:configure"; config: EmbedConfig }
-  | { type: "fitsense:close-ack" };
+  { type: "fitsense:configure"; config: EmbedConfig } | { type: "fitsense:close-ack" };
 
 // ─── iframe → Parent ──────────────────────────────────────────────────────
 export type EmbedToHostMessage =
@@ -186,12 +176,9 @@ export function readEmbedConfigFromUrl(href: string): EmbedConfig {
   const themeRaw = url.searchParams.get("theme");
   const session = url.searchParams.get("session") ?? undefined;
   const handoffBase =
-    url.searchParams.get("handoffBase") ??
-    resolveHandoffBaseUrl(undefined);
+    url.searchParams.get("handoffBase") ?? resolveHandoffBaseUrl(undefined);
   const handoffMode = url.searchParams.get("handoffMode") as
-    | "http"
-    | "broadcast"
-    | null;
+    "http" | "broadcast" | null;
   const handoff: EmbedConfig["handoff"] =
     session || handoffBase || handoffMode
       ? {
@@ -204,8 +191,7 @@ export function readEmbedConfigFromUrl(href: string): EmbedConfig {
     productId: url.searchParams.get("productId") ?? undefined,
     brand: url.searchParams.get("brand") ?? undefined,
     category: url.searchParams.get("category") ?? undefined,
-    sizeSystem:
-      (url.searchParams.get("sizeSystem") as SizeSystem | null) ?? undefined,
+    sizeSystem: (url.searchParams.get("sizeSystem") as SizeSystem | null) ?? undefined,
     storeName: url.searchParams.get("storeName") ?? undefined,
     locale: url.searchParams.get("locale") ?? undefined,
     apiKey: url.searchParams.get("apiKey") ?? undefined,

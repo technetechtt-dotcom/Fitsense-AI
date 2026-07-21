@@ -24,6 +24,9 @@ export function Privacy() {
   const [erasing, setErasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
+  const controllerName =
+    import.meta.env.VITE_PRIVACY_CONTROLLER_NAME?.trim() || "FitSense AI";
+  const privacyContactUrl = import.meta.env.VITE_PRIVACY_CONTACT_URL?.trim() || null;
 
   useEffect(() => onConsentChange(setState), []);
 
@@ -61,8 +64,8 @@ export function Privacy() {
       <div className="pt-5 space-y-5 pb-[max(2.5rem,env(safe-area-inset-bottom))]">
         <Section label="Consent choices">
           <p className="text-xs text-ink-muted leading-relaxed">
-            Cloud sync, AI personalisation, and anonymous analytics are managed
-            on the Settings page under{" "}
+            Cloud sync, AI personalisation, and anonymous analytics are managed on the
+            Settings page under{" "}
             <span className="text-ink font-medium">Your data, your choice</span>.
           </p>
           <button
@@ -90,9 +93,7 @@ export function Privacy() {
               }}
             />
           ) : null}
-          {restoreMsg ? (
-            <p className="text-xs text-neon">{restoreMsg}</p>
-          ) : null}
+          {restoreMsg ? <p className="text-xs text-neon">{restoreMsg}</p> : null}
           <ActionRow
             icon={<Download className="w-4 h-4 text-neon" />}
             title="Export everything"
@@ -108,8 +109,8 @@ export function Privacy() {
               erasing
                 ? "Deleting…"
                 : confirmingErase
-                ? "Tap again to confirm"
-                : "Delete"
+                  ? "Tap again to confirm"
+                  : "Delete"
             }
             destructive
             disabled={erasing}
@@ -127,45 +128,54 @@ export function Privacy() {
         <Section label="Privacy policy">
           <div className="text-xs text-ink-muted leading-relaxed space-y-3">
             <p>
-              <strong className="text-ink">Controller.</strong> FitSense AI
-              (demo build). Contact your store operator for production
-              deployments.
+              <strong className="text-ink">Controller.</strong> This deployment is
+              operated by <span className="text-ink">{controllerName}</span>
+              {privacyContactUrl ? (
+                <>
+                  {" "}
+                  (
+                  <a href={privacyContactUrl} className="text-neon hover:underline">
+                    privacy contact
+                  </a>
+                  )
+                </>
+              ) : null}
+              .
             </p>
             <p>
-              <strong className="text-ink">What we process.</strong> Foot
-              measurements derived from camera frames (processed on-device),
-              fit preferences, scan history, and optional anonymous usage
-              events. Raw camera frames are not uploaded.
+              <strong className="text-ink">What we process.</strong> Foot measurements
+              derived from camera frames (processed on-device), fit preferences, scan
+              history, and optional anonymous usage events. Raw camera frames are not
+              uploaded.
             </p>
             <p>
-              <strong className="text-ink">Legal bases.</strong> Consent for
-              cloud sync, AI personalisation, and analytics. Contractual
-              necessity for core sizing when you request a recommendation.
+              <strong className="text-ink">Legal bases.</strong> Consent for cloud sync,
+              AI personalisation, and analytics. Contractual necessity for core sizing
+              when you request a recommendation.
             </p>
             <p>
-              <strong className="text-ink">Retention.</strong> Local data
-              remains until you delete it or sign out. Cloud copies follow
-              your Firebase project retention rules when sync is enabled.
+              <strong className="text-ink">Retention.</strong> Local data remains until
+              you delete it or sign out. Cloud copies follow your Firebase project
+              retention rules when sync is enabled.
             </p>
             <p>
-              <strong className="text-ink">Your rights.</strong> Export,
-              delete, and withdraw consent at any time via Settings and this
-              page (GDPR Arts. 15–17, 20–21).
+              <strong className="text-ink">Your rights.</strong> Export, delete, and
+              withdraw consent at any time via Settings and this page (GDPR Arts. 15–17,
+              20–21).
             </p>
           </div>
         </Section>
 
         <Section label="Disclosure">
           <p className="text-xs text-ink-muted leading-relaxed">
-            FitSense AI processes foot measurements locally in your browser
-            unless you turn on cloud sync. We never upload raw camera
-            frames. The on-device learned ranker only runs when you enable
-            AI personalisation — no labels leave your device.
+            FitSense AI processes foot measurements locally in your browser unless you
+            turn on cloud sync. We never upload raw camera frames. The on-device learned
+            ranker only runs when you enable AI personalisation — no labels leave your
+            device.
           </p>
           {state.acceptedAtEpochMs ? (
             <p className="text-[10px] text-ink-muted mt-2">
-              Last reviewed{" "}
-              {new Date(state.acceptedAtEpochMs).toLocaleString()} (policy
+              Last reviewed {new Date(state.acceptedAtEpochMs).toLocaleString()} (policy
               v{state.acceptedPolicyVersion}).
             </p>
           ) : null}
@@ -183,9 +193,7 @@ interface SectionProps {
 function Section({ label, children }: SectionProps) {
   return (
     <section className="space-y-2">
-      <h2 className="text-[10px] uppercase tracking-widest text-ink-muted">
-        {label}
-      </h2>
+      <h2 className="text-[10px] uppercase tracking-widest text-ink-muted">{label}</h2>
       <div className="rounded-3xl bg-card-grad border border-white/8 p-4 space-y-3">
         {children}
       </div>
@@ -219,9 +227,7 @@ function ActionRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold">{title}</div>
-        <p className="text-[11px] text-ink-muted leading-relaxed mt-0.5">
-          {body}
-        </p>
+        <p className="text-[11px] text-ink-muted leading-relaxed mt-0.5">{body}</p>
       </div>
       <button
         onClick={onClick}

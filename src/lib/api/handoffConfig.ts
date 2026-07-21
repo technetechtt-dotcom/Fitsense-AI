@@ -1,13 +1,13 @@
-import type { EmbedHandoffConfig } from "../../embed/types";
 import { resolveHandoffBaseUrl } from "./config";
+import type { HandoffConfig } from "./handoffTypes";
 
 /** Merge embed handoff options with app-wide API defaults. */
 export function resolveEmbedHandoffConfig(
-  cfg?: EmbedHandoffConfig,
-): EmbedHandoffConfig | undefined {
+  cfg?: HandoffConfig,
+): HandoffConfig | undefined {
   const baseUrl = resolveHandoffBaseUrl(cfg?.baseUrl);
   if (!cfg && baseUrl === undefined) return undefined;
-  const merged: EmbedHandoffConfig = { ...(cfg ?? {}) };
+  const merged: HandoffConfig = { ...(cfg ?? {}) };
   if (baseUrl !== undefined) {
     merged.baseUrl = baseUrl;
     merged.transport = merged.transport ?? "auto";

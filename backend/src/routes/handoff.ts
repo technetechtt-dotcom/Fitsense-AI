@@ -1,46 +1,62 @@
 import { Router } from "express";
 import { config } from "../config.js";
-import type { HandoffPayload } from "../types.js";
-import { HandoffStore } from "../services/handoffStore.js";
+import { rateLimit } from "../middleware/rateLimit.js";
+import { createHandoffStore } from "../services/handoffStore.js";
+import { handoffPayloadSchema, sessionIdSchema } from "../validation/schemas.js";
 
-const store = new HandoffStore(config.handoffTtlMs);
-
-function isHandoffPayload(value: unknown): value is HandoffPayload {
-  if (!value || typeof value !== "object") return false;
-  const p = value as HandoffPayload;
-  return (
-    p.v === 1 &&
-    typeof p.completedAtEpochMs === "number" &&
-    !!p.size &&
-    typeof p.size.uk === "string" &&
-    !!p.scan &&
-    typeof p.scan.scanId === "string"
-  );
-}
+const store = createHandoffStore();
 
 export const handoffRouter = Router();
 
-handoffRouter.put("/handoff/:sessionId", (req, res) => {
-  const body = req.body as { payload?: unknown };
-  const candidate = body?.payload ?? req.body;
-  if (!isHandoffPayload(candidate)) {
-    res.status(400).json({ error: "invalid_payload" });
-    return;
-  }
-  store.set(req.params.sessionId, candidate);
-  res.status(204).end();
+const readLimit = rateLimit({
+  name: "handoff:read",
+  max: config.rateLimit.handoffReadMax,
+  key: (req) => `${req.ip}:${req.params.sessionId ?? ""}`,
 });
 
-handoffRouter.get("/handoff/:sessionId", (req, res) => {
-  const payload = store.get(req.params.sessionId);
-  if (!payload) {
-    res.json({});
-    return;
-  }
-  res.json({ payload });
+const writeLimit = rateLimit({
+  name: "handoff:write",
+  max: config.rateLimit.handoffWriteMax,
+  key: (req) => `${req.ip}:${req.params.sessionId ?? ""}`,
 });
 
-handoffRouter.delete("/handoff/:sessionId", (req, res) => {
-  store.delete(req.params.sessionId);
-  res.status(204).end();
+handoffRouter.put("/handoff/:sessionId", writeLimit, async (req, res, next) => {
+  try {
+    const sessionId = sessionIdSchema.parse(req.params.sessionId);
+    const body = req.body as { payload?: unknown };
+    const candidate = body?.payload ?? req.body;
+    const payload = handoffPayloadSchema.parse(candidate);
+    const result = await store.set(sessionId, payload);
+    if (result === "exists") {
+      res.status(409).json({ error: "handoff_already_published" });
+      return;
+    }
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+handoffRouter.get("/handoff/:sessionId", readLimit, async (req, res, next) => {
+  try {
+    const sessionId = sessionIdSchema.parse(req.params.sessionId);
+    const payload = await store.get(sessionId);
+    if (!payload) {
+      res.json({ payload: null });
+      return;
+    }
+    res.json({ payload });
+  } catch (err) {
+    next(err);
+  }
+});
+
+handoffRouter.delete("/handoff/:sessionId", writeLimit, async (req, res, next) => {
+  try {
+    const sessionId = sessionIdSchema.parse(req.params.sessionId);
+    await store.delete(sessionId);
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
 });

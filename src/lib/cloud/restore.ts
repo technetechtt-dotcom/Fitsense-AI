@@ -94,9 +94,10 @@ export async function restoreFromCloud(): Promise<{
 
   const remoteProfile = pulled.fitProfile
     ? (() => {
-        const { _syncedAtEpochMs: _s, ...rest } = pulled.fitProfile as FitProfile & {
+        const rest = { ...pulled.fitProfile } as FitProfile & {
           _syncedAtEpochMs?: number;
         };
+        delete rest._syncedAtEpochMs;
         return { ...rest, userId: user.userId } as FitProfile;
       })()
     : null;

@@ -66,7 +66,7 @@ export function Home() {
         <h2 className="text-fluid-hero font-black font-display relative leading-tight">
           Scan once.
           <br />
-          Fit perfectly.
+          Find a better-informed size.
         </h2>
         <PrimaryButton
           className="w-full"
@@ -89,9 +89,7 @@ export function Home() {
           icon={Store}
           label="Recommendations"
           disabled={!latestScanId}
-          onClick={() =>
-            latestScanId && nav(`/recommendations/${latestScanId}`)
-          }
+          onClick={() => latestScanId && nav(`/recommendations/${latestScanId}`)}
         />
         <QuickAction
           icon={History}

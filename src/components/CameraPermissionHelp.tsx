@@ -30,9 +30,7 @@ export function CameraPermissionHelp({
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold">Camera access blocked</h2>
-            <p className="text-xs text-ink-muted leading-relaxed mt-0.5">
-              {message}
-            </p>
+            <p className="text-xs text-ink-muted leading-relaxed mt-0.5">{message}</p>
           </div>
           {onClose ? (
             <button
@@ -71,10 +69,7 @@ export function CameraPermissionHelp({
   );
 }
 
-const STEPS_BY_PLATFORM: Record<
-  ReturnType<typeof detectPlatform>,
-  string[]
-> = {
+const STEPS_BY_PLATFORM: Record<ReturnType<typeof detectPlatform>, string[]> = {
   ios: [
     "Open Settings → Safari → Camera",
     "Set FitSense's URL to “Allow”",

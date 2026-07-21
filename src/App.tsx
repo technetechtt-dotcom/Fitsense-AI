@@ -1,11 +1,5 @@
 import { Suspense, useEffect } from "react";
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-} from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Splash } from "./pages/Splash";
 import { Onboarding } from "./pages/Onboarding";
@@ -73,21 +67,102 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait" initial={false}>
       <Routes location={location} key={location.pathname}>
         <Route path="/" element={<Navigate to="/splash" replace />} />
-        <Route path="/splash" element={<RouteShell><Splash /></RouteShell>} />
-        <Route path="/onboarding" element={<RouteShell><Onboarding /></RouteShell>} />
-        <Route path="/home" element={<RouteShell><Home /></RouteShell>} />
-        <Route path="/scan" element={<RouteShell><Scan /></RouteShell>} />
-        <Route path="/results/:scanId" element={<RouteShell><Results /></RouteShell>} />
+        <Route
+          path="/splash"
+          element={
+            <RouteShell>
+              <Splash />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            <RouteShell>
+              <Onboarding />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/home"
+          element={
+            <RouteShell>
+              <Home />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/scan"
+          element={
+            <RouteShell>
+              <Scan />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/results/:scanId"
+          element={
+            <RouteShell>
+              <Results />
+            </RouteShell>
+          }
+        />
         <Route
           path="/recommendations/:scanId"
-          element={<RouteShell><Recommendations /></RouteShell>}
+          element={
+            <RouteShell>
+              <Recommendations />
+            </RouteShell>
+          }
         />
-        <Route path="/measurements" element={<RouteShell><Measurements /></RouteShell>} />
-        <Route path="/settings" element={<RouteShell><Settings /></RouteShell>} />
-        <Route path="/integrations" element={<RouteShell><Integrations /></RouteShell>} />
-        <Route path="/products/:productId" element={<RouteShell><ProductDetail /></RouteShell>} />
-        <Route path="/fit-profile" element={<RouteShell><FitProfile /></RouteShell>} />
-        <Route path="/privacy" element={<RouteShell><Privacy /></RouteShell>} />
+        <Route
+          path="/measurements"
+          element={
+            <RouteShell>
+              <Measurements />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RouteShell>
+              <Settings />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/integrations"
+          element={
+            <RouteShell>
+              <Integrations />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/products/:productId"
+          element={
+            <RouteShell>
+              <ProductDetail />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/fit-profile"
+          element={
+            <RouteShell>
+              <FitProfile />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/privacy"
+          element={
+            <RouteShell>
+              <Privacy />
+            </RouteShell>
+          }
+        />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </AnimatePresence>

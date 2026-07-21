@@ -6,11 +6,14 @@ export interface HandoffPayload {
     eu: string;
     mondopointMm: number;
     fitScore?: number;
+    recommendationConfidence?: number;
+    preferred?: "uk" | "us" | "eu" | "mondopoint";
   };
   scan: {
     scanId: string;
     lengthMm: number;
     widthMm: number;
+    measurementConfidence?: number;
     widthToLengthRatio?: number;
     capturedAtEpochMs: number;
   };

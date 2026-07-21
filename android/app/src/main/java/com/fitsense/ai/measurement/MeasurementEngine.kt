@@ -1,7 +1,6 @@
 package com.fitsense.ai.measurement
 
 import android.graphics.Bitmap
-import com.fitsense.ai.models.CalibrationReference
 import com.fitsense.ai.models.Foot
 import com.fitsense.ai.models.FootMeasurement
 import com.fitsense.ai.utils.AppError
@@ -64,20 +63,4 @@ class MeasurementEngine @Inject constructor(
         return l to r
     }
 
-    /**
-     * Mock pathway used for offline demos / device emulators where ARCore + a
-     * real foot contour aren't available.  Returns plausible numbers for the
-     * demo flow so investors can see the full UX end-to-end.
-     */
-    fun simulatedMeasurement(
-        seedMm: Double = 264.0,
-        calibration: CalibrationReference = CalibrationReference.ARCORE_PLANE,
-    ): FootMeasurement = FootMeasurement(
-        lengthMm = seedMm,
-        widthMm = seedMm * 0.39,
-        confidence = 0.82f,
-        foot = Foot.RIGHT,
-        calibration = calibration,
-        pixelsPerMm = 12.0,
-    )
 }

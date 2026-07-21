@@ -73,13 +73,15 @@ export function useCamera(options: UseCameraOptions = {}): UseCameraApi {
         if (!navigator.mediaDevices?.getUserMedia) {
           setState({
             kind: "unavailable",
-            message:
-              "Your browser doesn't support live camera access (getUserMedia).",
+            message: "Your browser doesn't support live camera access (getUserMedia).",
           });
           return;
         }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { ...DEFAULT_CONSTRAINTS, ...(constraintsOverride ?? options.videoConstraints) },
+          video: {
+            ...DEFAULT_CONSTRAINTS,
+            ...(constraintsOverride ?? options.videoConstraints),
+          },
           audio: false,
         });
         // Stop the previous stream after the new one is up to avoid black frames.

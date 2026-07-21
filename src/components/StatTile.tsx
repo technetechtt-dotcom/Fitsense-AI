@@ -20,9 +20,7 @@ export function StatTile({ label, value, unit, accent = false }: Props) {
         <span className="text-2xl sm:text-3xl font-extrabold font-display leading-none truncate">
           {value}
         </span>
-        {unit ? (
-          <span className="text-sm text-ink-muted mb-1">{unit}</span>
-        ) : null}
+        {unit ? <span className="text-sm text-ink-muted mb-1">{unit}</span> : null}
       </span>
     </div>
   );

@@ -1,9 +1,4 @@
-import type {
-  FitEvent,
-  FitInsights,
-  FitProfile,
-  ScanResult,
-} from "../types";
+import type { FitEvent, FitInsights, FitProfile, ScanResult } from "../types";
 import { FIT_PROFILE_DEFAULT, primaryFoot } from "../types";
 import { getOrCreateProfile } from "./storage";
 import { pushFitEvent, pushFitProfile } from "./cloud/sync";
@@ -81,7 +76,12 @@ export function updateFitProfile(patch: Partial<FitProfile>): FitProfile {
  */
 export function applyScanToFitProfile(scan: ScanResult): FitProfile {
   const profile = getOrCreateFitProfile();
-  const foot = primaryFoot(scan);
+  const foot =
+    scan.leftFoot && scan.rightFoot
+      ? scan.leftFoot.lengthMm >= scan.rightFoot.lengthMm
+        ? scan.leftFoot
+        : scan.rightFoot
+      : primaryFoot(scan);
   if (!foot) return profile;
   const lengthMm = foot.lengthMm;
   const widthMm = foot.widthMm;
@@ -111,7 +111,7 @@ function classifyWidth(
   if (lengthMm === 0) return "regular";
   const ratio = widthMm / lengthMm;
   if (ratio < 0.36) return "narrow";
-  if (ratio < 0.40) return "regular";
+  if (ratio < 0.4) return "regular";
   if (ratio < 0.44) return "wide";
   return "extra_wide";
 }

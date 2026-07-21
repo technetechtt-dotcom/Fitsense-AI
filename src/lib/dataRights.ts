@@ -1,9 +1,5 @@
 import { loadConsent, resetConsent } from "./consent";
-import {
-  clearFitProfile,
-  getOrCreateFitProfile,
-  listFitEvents,
-} from "./fitProfile";
+import { clearFitProfile, getOrCreateFitProfile, listFitEvents } from "./fitProfile";
 import { listScans } from "./storage";
 import { getOrCreateProfile } from "./storage";
 import type { FitEvent, FitProfile, ScanResult, UserProfile } from "../types";

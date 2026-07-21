@@ -10,18 +10,18 @@ length & width using ARCore + OpenCV, then maps those measurements to UK / US
 
 ## Tech stack
 
-| Layer            | Technology                                                |
-|------------------|-----------------------------------------------------------|
-| Language         | Kotlin 1.9                                                |
-| UI               | Jetpack Compose + Material 3 + Navigation Compose         |
-| Architecture     | MVVM + Clean (Repository ports / adapters)                |
-| Async            | Coroutines + StateFlow                                    |
-| DI               | Hilt (Dagger)                                             |
-| Camera           | CameraX 1.3.x (PreviewView + ImageAnalysis + ImageCapture)|
-| AR               | ARCore 1.42 (plane detection + camera intrinsics)         |
-| Computer Vision  | OpenCV 4.9 (Maven Central artifact `org.opencv:opencv`)   |
-| Backend          | Firebase Auth (anon), Firestore, Storage                  |
-| Build            | AGP 8.4 + Kotlin DSL + Version Catalog                    |
+| Layer           | Technology                                                 |
+| --------------- | ---------------------------------------------------------- |
+| Language        | Kotlin 1.9                                                 |
+| UI              | Jetpack Compose + Material 3 + Navigation Compose          |
+| Architecture    | MVVM + Clean (Repository ports / adapters)                 |
+| Async           | Coroutines + StateFlow                                     |
+| DI              | Hilt (Dagger)                                              |
+| Camera          | CameraX 1.3.x (PreviewView + ImageAnalysis + ImageCapture) |
+| AR              | ARCore 1.42 (plane detection + camera intrinsics)          |
+| Computer Vision | OpenCV 4.9 (Maven Central artifact `org.opencv:opencv`)    |
+| Backend         | Firebase Auth (anon), Firestore, Storage                   |
+| Build           | AGP 8.4 + Kotlin DSL + Version Catalog                     |
 
 ---
 
@@ -68,6 +68,7 @@ android/
 ## Setup
 
 ### 1. Prerequisites
+
 - **Android Studio Hedgehog (2023.1.1) or newer** with the Android SDK 34
   installed.
 - **JDK 17+** for Gradle (bundled with Android Studio as `jbr`). AGP 8.4 will
@@ -78,30 +79,35 @@ android/
   ARCore-supported devices: <https://developers.google.com/ar/devices>.
 
 ### 2. Clone & open
+
 ```bash
 git clone <your-fork>.git
 cd Fitsense\ AI/android
 ```
+
 Open `android/` in Android Studio and let Gradle sync.
 
 The Gradle wrapper jar is intentionally omitted from source control. On first
 sync Android Studio will download it automatically. If you want to build from
 the command line first, run:
+
 ```bash
 gradle wrapper --gradle-version 8.7
 ./gradlew :app:assembleDebug
 ```
 
 ### 3. Firebase
+
 1. Create a Firebase project at <https://console.firebase.google.com>.
 2. Add an Android app with package id `com.fitsense.ai` (and a second one,
    `com.fitsense.ai.debug`, for the debug build flavour).
 3. Enable **Anonymous Authentication**, **Cloud Firestore** (start in
-   *production* mode and apply the rules below), and **Storage**.
+   _production_ mode and apply the rules below), and **Storage**.
 4. Download `google-services.json` and drop it into `android/app/`.
    A template lives at `android/app/google-services.example.json`.
 
 Suggested Firestore rules (read/write only your own scans):
+
 ```
 rules_version = '2';
 service cloud.firestore {
@@ -118,18 +124,21 @@ service cloud.firestore {
 ```
 
 ### 4. Run
+
 - Connect an ARCore-capable device.
 - Select the `app` configuration and hit **Run** (▶︎).
 
 The app launches into the in-app splash → onboarding (first launch only) →
-home screen.  Tap **Start scan** to enter the AR scan flow.
+home screen. Tap **Start scan** to enter the AR scan flow.
 
 ---
 
 ## Architecture notes
 
 ### MVVM + Clean
+
 Each feature screen has:
+
 - **Composable screen** (`ui/screens/<feature>/<Feature>Screen.kt`) — pure UI.
 - **Hilt ViewModel** (`viewmodel/<Feature>ViewModel.kt`) — owns `StateFlow`s
   and orchestrates repository calls.
@@ -141,6 +150,7 @@ throwing across coroutine boundaries, so the ViewModels can map errors into
 typed UI states cleanly.
 
 ### Vision + measurement pipeline
+
 1. **CameraX** streams the live preview into Compose via `PreviewView` inside
    an `AndroidView`. `FootImageAnalyzer` (an `ImageAnalysis` analyzer)
    produces ~10 Hz downsampled bitmaps.
@@ -156,7 +166,9 @@ typed UI states cleanly.
 5. **`MeasurementEngine`** combines the above into a `FootMeasurement`.
 
 ### Recommendation engine
+
 `RecommendationEngine`:
+
 - Maps foot length (+ heel-margin) → UK / US / EU / Mondopoint sizes via
   `SizeMappingTable`.
 - For each product in the catalogue, snaps the user's EU size to the product's
@@ -170,6 +182,7 @@ Adidas (Ultraboost, Samba), Puma (Velocity Nitro, Suede), New Balance, and
 two local brands (Bata Power, North Star).
 
 ### Firebase model
+
 ```
 users/{uid}
   ├── userId, displayName, email, isAnonymous

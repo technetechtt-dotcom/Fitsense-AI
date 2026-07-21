@@ -52,9 +52,7 @@ function pickContrast(color?: string): string | null {
   if (!rgb) return null;
   const [r, g, b] = rgb;
   const luminance =
-    0.2126 * srgbToLinear(r) +
-    0.7152 * srgbToLinear(g) +
-    0.0722 * srgbToLinear(b);
+    0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
   return luminance > 0.42 ? "#0a0f1c" : "#ffffff";
 }
 

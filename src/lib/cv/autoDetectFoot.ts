@@ -32,9 +32,7 @@ let landmarkerPromise: Promise<PoseLandmarker> | null = null;
 async function getLandmarker(): Promise<PoseLandmarker> {
   if (landmarkerPromise) return landmarkerPromise;
   landmarkerPromise = (async () => {
-    const { FilesetResolver, PoseLandmarker } = await import(
-      "@mediapipe/tasks-vision"
-    );
+    const { FilesetResolver, PoseLandmarker } = await import("@mediapipe/tasks-vision");
     const fileset = await FilesetResolver.forVisionTasks(WASM_BASE_URL);
     return PoseLandmarker.createFromOptions(fileset, {
       baseOptions: {
@@ -101,13 +99,17 @@ export async function autoDetectFoot(
   };
 }
 
-function sourceWidth(s: HTMLCanvasElement | HTMLImageElement | HTMLVideoElement): number {
+function sourceWidth(
+  s: HTMLCanvasElement | HTMLImageElement | HTMLVideoElement,
+): number {
   if (s instanceof HTMLCanvasElement) return s.width;
   if (s instanceof HTMLImageElement) return s.naturalWidth || s.width;
   return s.videoWidth || 0;
 }
 
-function sourceHeight(s: HTMLCanvasElement | HTMLImageElement | HTMLVideoElement): number {
+function sourceHeight(
+  s: HTMLCanvasElement | HTMLImageElement | HTMLVideoElement,
+): number {
   if (s instanceof HTMLCanvasElement) return s.height;
   if (s instanceof HTMLImageElement) return s.naturalHeight || s.height;
   return s.videoHeight || 0;

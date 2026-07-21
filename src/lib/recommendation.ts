@@ -66,7 +66,10 @@ const FIT_SIGNATURE_FULL_TRUST = 3;
 function learnedSignatureFor(
   profile: FitProfile | undefined,
   brand: string,
-): { dims: Partial<Record<import("../types").FitDimension, number>>; weight: number } | null {
+): {
+  dims: Partial<Record<import("../types").FitDimension, number>>;
+  weight: number;
+} | null {
   const insights = profile?.insights;
   if (!insights?.brandFitSignature) return null;
   const key = brand.toLowerCase();
@@ -104,14 +107,11 @@ export function recommend(
 
   // ── Step 1: target length with profile-derived adjustments ─────────
   // Comfort headroom replaces the old fixed 8 mm heel margin.
-  const headroom =
-    COMFORT_HEADROOM_MM[profile?.comfortFit ?? "standard"];
+  const headroom = COMFORT_HEADROOM_MM[profile?.comfortFit ?? "standard"];
   // Foot-asymmetry: if the recorded asymmetry is positive (left longer),
   // the user's effective length is the longer foot — assume +|asym|/2 over
   // primary scan.
-  const asymBump = profile?.asymmetryMm
-    ? Math.abs(profile.asymmetryMm) / 2
-    : 0;
+  const asymBump = profile?.asymmetryMm ? Math.abs(profile.asymmetryMm) / 2 : 0;
   // Learned tightness pref: positive = "I always size up". Each unit of
   // mean tightness is worth ~3 mm in shoe-fit terms.
   const tightnessBump = (insights?.meanTightness ?? 0) * 3;
@@ -121,10 +121,7 @@ export function recommend(
   // when the projection actually kicks in.
   const growthBump =
     insights?.projectedLengthMm && measurement.lengthMm > 0
-      ? Math.max(
-          0,
-          Math.min(8, insights.projectedLengthMm - measurement.lengthMm),
-        )
+      ? Math.max(0, Math.min(8, insights.projectedLengthMm - measurement.lengthMm))
       : 0;
 
   const effectiveLengthMm =
@@ -143,19 +140,26 @@ export function recommend(
 
   // ── Step 2: build matches with per-brand size delta + learned signals ──
   const matches = products
-    .map((p) =>
-      buildMatch(p, measurement, euSize, preferredSet, profile, ranker),
-    )
+    .map((p) => buildMatch(p, measurement, euSize, preferredSet, profile, ranker))
     // Drop products whose size range can't accommodate the adjusted size.
     .filter((m): m is ShoeMatch => m !== null)
     .sort((a, b) => sortScore(b) - sortScore(a))
     .slice(0, maxResults);
+  const verifiedRatio =
+    products.length === 0
+      ? 0
+      : products.filter((product) => product.dataQuality === "verified").length /
+        products.length;
+  const catalogueEvidence = 0.4 + verifiedRatio * 0.55;
+  const recommendationConfidence =
+    matches.length === 0 ? 0 : Math.min(measurement.confidence, catalogueEvidence);
 
   return {
     uk: sizes.uk,
     us: sizes.us,
     eu: sizes.eu,
     mondopointMm: sizes.mondopointMm,
+    recommendationConfidence,
     matches,
   };
 }
@@ -183,8 +187,8 @@ function buildMatch(
     learnedSig?.dims.length !== undefined
       ? -learnedSig.dims.length * 0.5 * learnedSig.weight
       : learnedSig?.dims.size !== undefined
-      ? -learnedSig.dims.size * 0.5 * learnedSig.weight
-      : 0;
+        ? -learnedSig.dims.size * 0.5 * learnedSig.weight
+        : 0;
   const targetEu = euSize + brandDelta.euSizeDelta + learnedLengthShift;
   const step = Math.max(0.5, product.sizeRangeEu.step);
   const snapped =
@@ -197,8 +201,10 @@ function buildMatch(
   );
 
   // If the adjusted size is outside the product's range, exclude it.
-  if (targetEu < product.sizeRangeEu.min - 0.5 ||
-      targetEu > product.sizeRangeEu.max + 0.5) {
+  if (
+    targetEu < product.sizeRangeEu.min - 0.5 ||
+    targetEu > product.sizeRangeEu.max + 0.5
+  ) {
     return null;
   }
 
@@ -223,7 +229,8 @@ function buildMatch(
   // model with 2 samples doesn't override the rule engine.
   if (ranker && ranker.blendWeight > 0) {
     const p = scoreProduct(ranker, foot, product, profile, preferredBrandsLc);
-    const learnedAdjustment = (p - 0.5) * 2 * LEARNED_RANKER_WEIGHT * ranker.blendWeight;
+    const learnedAdjustment =
+      (p - 0.5) * 2 * LEARNED_RANKER_WEIGHT * ranker.blendWeight;
     comfort = clamp(comfort + learnedAdjustment, 0, 100);
   }
 
@@ -253,7 +260,10 @@ function computeFitScore(
   const ratioScore = clamp01(1 - ratioDelta / 0.06);
 
   let wideBonus = 0;
-  if (isWide(foot) && (product.fitType === "wide" || product.fitType === "extra_wide")) {
+  if (
+    isWide(foot) &&
+    (product.fitType === "wide" || product.fitType === "extra_wide")
+  ) {
     wideBonus = 0.1;
   } else if (isWide(foot) && product.fitType === "narrow") {
     wideBonus = -0.15;
@@ -317,23 +327,18 @@ function computeComfortScore(
     product.category === "running" || product.category === "sneaker"
       ? 0.08
       : product.category === "casual"
-      ? 0.04
-      : 0;
+        ? 0.04
+        : 0;
 
   // Penalise if even after the brand delta the size falls outside the
   // product's range (i.e. we had to clamp).
-  const oobMm = Math.max(
-    0,
-    targetEu - range.max,
-    range.min - targetEu,
-  );
+  const oobMm = Math.max(0, targetEu - range.max, range.min - targetEu);
   const mismatchPenalty = oobMm * 0.05;
 
   // Midsole preference (declared or learned)
   let midsoleBonus = 0;
   const wantsSoft =
-    profile?.preferredMidsoleFeel === "soft" ||
-    insights?.prefersSofterMidsole;
+    profile?.preferredMidsoleFeel === "soft" || insights?.prefersSofterMidsole;
   const wantsFirm = profile?.preferredMidsoleFeel === "firm";
   if (wantsSoft && brandDelta.midsoleFeel === "soft") midsoleBonus = 0.06;
   else if (wantsFirm && brandDelta.midsoleFeel === "firm") midsoleBonus = 0.06;
@@ -394,25 +399,20 @@ export function buildBrandSizeSheet(
 ): BrandSizeRow[] {
   const profile = options.profile;
   const headroom = COMFORT_HEADROOM_MM[profile?.comfortFit ?? "standard"];
-  const asymBump = profile?.asymmetryMm
-    ? Math.abs(profile.asymmetryMm) / 2
-    : 0;
+  const asymBump = profile?.asymmetryMm ? Math.abs(profile.asymmetryMm) / 2 : 0;
   const tightnessBump = (profile?.insights?.meanTightness ?? 0) * 3;
-  const effectiveLengthMm =
-    measurement.lengthMm + headroom + asymBump + tightnessBump;
+  const effectiveLengthMm = measurement.lengthMm + headroom + asymBump + tightnessBump;
   const baseEu = euAsNumber(sizeForLengthMm(effectiveLengthMm).eu);
-  const brands =
-    options.brands ??
-    [
-      "Nike",
-      "Adidas",
-      "Puma",
-      "New Balance",
-      "Asics",
-      "Brooks",
-      "Hoka",
-      "Reebok",
-    ];
+  const brands = options.brands ?? [
+    "Nike",
+    "Adidas",
+    "Puma",
+    "New Balance",
+    "Asics",
+    "Brooks",
+    "Hoka",
+    "Reebok",
+  ];
   return brands.map((brand) => {
     const d = brandFitFor(brand);
     const learned = learnedSignatureFor(profile, brand);
@@ -420,8 +420,8 @@ export function buildBrandSizeSheet(
       learned?.dims.length !== undefined
         ? -learned.dims.length * 0.5 * learned.weight
         : learned?.dims.size !== undefined
-        ? -learned.dims.size * 0.5 * learned.weight
-        : 0;
+          ? -learned.dims.size * 0.5 * learned.weight
+          : 0;
     const trip = sizeForEu(baseEu + d.euSizeDelta + learnedShift);
     return {
       brand,

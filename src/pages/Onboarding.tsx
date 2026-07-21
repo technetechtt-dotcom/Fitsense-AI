@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ScanLine, Sparkles, Footprints } from "lucide-react";
-import { PAGE_X, PAGE_PB } from "../components/PageLayout";
+import { PAGE_X, PAGE_PB } from "../components/pageLayoutClasses";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { markOnboardingComplete } from "../lib/storage";
 
@@ -16,23 +16,20 @@ interface Slide {
 
 const SLIDES: Slide[] = [
   {
-    title: "Scan once. Fit perfectly.",
-    body:
-      "FitSense uses AR + computer vision to measure your foot from a single scan — no tape measure, no guesswork.",
+    title: "Measure once. Reuse your Fit ID.",
+    body: "Use a supported phone and a flat A4 sheet or bank card to create reusable footwear measurements.",
     icon: Footprints,
     haloColor: "rgba(0, 229, 199, 0.40)",
   },
   {
-    title: "Precision powered by ARCore",
-    body:
-      "We map a horizontal plane under your foot and convert pixels to millimetres in real time.",
+    title: "Quality checked measurements",
+    body: "FitSense checks image quality, reference geometry and landmarks, then asks you to correct or retake an unreliable scan.",
     icon: ScanLine,
     haloColor: "rgba(124, 77, 255, 0.45)",
   },
   {
-    title: "Shoes that actually fit",
-    body:
-      "Get personalised recommendations across Nike, Adidas, Puma and local brands — with fit and comfort scores.",
+    title: "More informed footwear sizing",
+    body: "Compare product-specific size recommendations from participating retailers. Recommendations reduce guesswork but do not guarantee fit.",
     icon: Sparkles,
     haloColor: "rgba(210, 255, 0, 0.40)",
   },
@@ -54,10 +51,7 @@ export function Onboarding() {
       <header
         className={`flex justify-end pt-[max(0.75rem,env(safe-area-inset-top))] pb-2 ${PAGE_X}`}
       >
-        <button
-          onClick={finish}
-          className="text-sm text-ink-muted hover:text-ink"
-        >
+        <button onClick={finish} className="text-sm text-ink-muted hover:text-ink">
           Skip
         </button>
       </header>
@@ -96,16 +90,12 @@ export function Onboarding() {
             <h1 className="text-fluid-display font-extrabold leading-tight font-display">
               {slide.title}
             </h1>
-            <p className="text-base text-ink-muted leading-relaxed">
-              {slide.body}
-            </p>
+            <p className="text-base text-ink-muted leading-relaxed">{slide.body}</p>
           </motion.div>
         </AnimatePresence>
       </main>
 
-      <footer
-        className={`flex items-center py-6 gap-3 ${PAGE_X} ${PAGE_PB}`}
-      >
+      <footer className={`flex items-center py-6 gap-3 ${PAGE_X} ${PAGE_PB}`}>
         <div className="flex gap-1.5 flex-1">
           {SLIDES.map((_, i) => (
             <button

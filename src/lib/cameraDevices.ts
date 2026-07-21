@@ -23,10 +23,7 @@ export interface CameraDevice {
 }
 
 export async function enumerateCameras(): Promise<CameraDevice[]> {
-  if (
-    typeof navigator === "undefined" ||
-    !navigator.mediaDevices?.enumerateDevices
-  ) {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) {
     return [];
   }
   const all = await navigator.mediaDevices.enumerateDevices();
@@ -45,18 +42,14 @@ export async function enumerateCameras(): Promise<CameraDevice[]> {
  * standard lens, fall back to whichever back camera exists, and last
  * resort the front camera.
  */
-export function pickPreferredCamera(
-  cameras: CameraDevice[],
-): CameraDevice | null {
+export function pickPreferredCamera(cameras: CameraDevice[]): CameraDevice | null {
   if (cameras.length === 0) return null;
   const back = cameras.filter((c) => c.facing === "environment");
   if (back.length > 0) {
     const main = back.find((c) => c.hint === "main");
     if (main) return main;
     // Avoid ultra-wide/depth if we can.
-    const safe = back.find(
-      (c) => c.hint !== "ultra-wide" && c.hint !== "depth",
-    );
+    const safe = back.find((c) => c.hint !== "ultra-wide" && c.hint !== "depth");
     return safe ?? back[0];
   }
   return cameras[0];

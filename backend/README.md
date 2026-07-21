@@ -2,12 +2,13 @@
 
 Node.js backend for FitSense AI:
 
-- **Handoff relay** — desktop ↔ phone QR size transfer (`/v1/handoff/:sessionId`)
-- **Cloud sync** — Firestore proxy with Firebase ID token auth (`/v1/sync/*`)
+- Handoff relay: desktop to phone QR size transfer (`/v1/handoff/:sessionId`)
+- Cloud sync: profile, fit-event, and scan persistence (`/v1/sync/*`)
 
-Mirrors the contracts used by the web app in `src/lib/cloud/sync.ts` and `src/embed/handoff.ts`.
+The web app contract mirrors `src/lib/cloud/sync.ts` and
+`src/embed/handoff.ts`.
 
-## Quick start
+## Quick Start
 
 ```bash
 cd backend
@@ -16,9 +17,9 @@ npm install
 npm run dev
 ```
 
-Server runs at **http://localhost:8787** by default.
+Server runs at `http://localhost:8787` by default.
 
-### Web app
+### Web App
 
 In the project root `.env.local`:
 
@@ -26,67 +27,88 @@ In the project root `.env.local`:
 VITE_API_BASE_URL=http://localhost:8787
 ```
 
-Restart `npm run dev`. The client will use the API for handoff and (optionally) sync instead of talking to Firestore directly when sync-via-api is enabled.
+Restart `npm run dev`. The client will use the API for handoff and sync when
+`VITE_API_BASE_URL` is set.
 
-### Embed / SDK handoff
+## Neon / Postgres
 
-```javascript
-FitSense.init({
-  handoff: {
-    baseUrl: "http://localhost:8787",
-    transport: "http",
-  },
-});
+Set these in `backend/.env` locally or in Render service environment variables:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require&channel_binding=require
+SYNC_STORE=postgres
+HANDOFF_STORE=postgres
 ```
 
-## Endpoints
+When `DATABASE_URL` exists, the backend defaults both sync and handoff storage
+to Postgres unless you explicitly override `SYNC_STORE` or `HANDOFF_STORE`.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/health` | — | Liveness + Firestore status |
-| PUT | `/v1/handoff/:sessionId` | — | Publish handoff payload `{ payload }` |
-| GET | `/v1/handoff/:sessionId` | — | Poll payload `{ payload? }` |
-| DELETE | `/v1/handoff/:sessionId` | — | Remove session |
-| GET | `/v1/sync` | Bearer | Pull profile, events, scans |
-| PUT | `/v1/sync/fit-profile` | Bearer | Upsert fit profile |
-| PUT | `/v1/sync/scans/:scanId` | Bearer | Upsert scan |
-| PUT | `/v1/sync/fit-events/:eventId` | Bearer | Upsert event |
-| DELETE | `/v1/sync` | Bearer | Erase all user cloud data |
+The API creates these tables automatically on startup or first handoff use:
 
-## Firebase Admin
+- `fit_profiles`
+- `fit_events`
+- `scans`
+- `handoff_sessions`
 
-1. Firebase Console → Project settings → Service accounts → Generate new private key.
-2. Save as `backend/service-account.json` (gitignored).
-3. Set in `.env`:
+Payloads are stored as `jsonb` after request validation.
+
+## Authentication
+
+Production sync routes still require Firebase Admin for ID-token verification.
+This is separate from Firestore storage: you can use Firebase anonymous auth for
+identity and Neon/Postgres for persistence.
+
+Options:
 
 ```env
 GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
+# or for containers:
+FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
 ```
 
-Or set `FIREBASE_SERVICE_ACCOUNT_JSON` to the minified JSON string.
-
-The web client must send `Authorization: Bearer <Firebase ID token>` on sync routes. Tokens come from anonymous (or signed-in) Firebase Auth on the client.
-
-### Local dev without Firebase
-
-Handoff works without Firebase. For sync testing:
+Local sync testing can bypass Firebase:
 
 ```env
 SKIP_AUTH=true
 ```
 
-Then pass header `X-Debug-Uid: test-user-123` instead of a Bearer token.
+Then pass `X-Debug-Uid: test-user-123` instead of a Bearer token. Never enable
+`SKIP_AUTH` in production.
+
+## Endpoints
+
+| Method | Path                           | Auth   | Description                            |
+| ------ | ------------------------------ | ------ | -------------------------------------- |
+| GET    | `/health`                      | no     | Liveness and selected storage backends |
+| PUT    | `/v1/handoff/:sessionId`       | no     | Publish handoff payload `{ payload }`  |
+| GET    | `/v1/handoff/:sessionId`       | no     | Poll payload `{ payload? }`            |
+| DELETE | `/v1/handoff/:sessionId`       | no     | Remove session                         |
+| GET    | `/v1/sync`                     | Bearer | Pull profile, events, scans            |
+| PUT    | `/v1/sync/fit-profile`         | Bearer | Upsert fit profile                     |
+| PUT    | `/v1/sync/scans/:scanId`       | Bearer | Upsert scan                            |
+| DELETE | `/v1/sync/scans/:scanId`       | Bearer | Delete one scan                        |
+| PUT    | `/v1/sync/fit-events/:eventId` | Bearer | Upsert event                           |
+| DELETE | `/v1/sync`                     | Bearer | Erase all user cloud data              |
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Watch mode with `tsx` |
-| `npm run build` | Compile to `dist/` |
-| `npm start` | Run compiled server |
+| Command         | Description                 |
+| --------------- | --------------------------- |
+| `npm run dev`   | Watch mode with `tsx`       |
+| `npm run build` | Compile to `dist/`          |
+| `npm test`      | Node test runner via `tsx`  |
+| `npm run check` | Typecheck, tests, and build |
+| `npm start`     | Run compiled server         |
 
-## Production notes
+## Production Notes
 
-- Replace in-memory handoff store with Redis for multi-instance deploys.
-- Restrict `CORS_ORIGIN` to your real domains.
+- Use `HANDOFF_STORE=postgres` with Neon, or `HANDOFF_STORE=upstash` with
+  Upstash Redis. Do not use memory handoff for normal production.
+- Restrict `CORS_ORIGIN` to the deployed web origin.
 - Never enable `SKIP_AUTH` in production.
+- Keep `JSON_LIMIT` small; raw camera frames must never be sent to this API.
+- Build the deployable API image with `docker build -t fitsense-api .`.
+
+Startup fails in `NODE_ENV=production` when CORS is wildcard, `SKIP_AUTH` is
+enabled, a production-safe handoff store is not configured, or Postgres storage
+is selected without `DATABASE_URL`.

@@ -1,0 +1,26 @@
+---
+description: Phone scanner must produce accurate foot measurements — core platform requirement
+alwaysApply: true
+---
+
+# Phone scan accuracy (non-negotiable)
+
+FitSense must let users measure their feet **on a phone** with **accurate, real millimetre measurements**. That is a primary platform requirement, not a nice-to-have.
+
+## Do
+
+- Prefer real geometric measurement: reference object (A4/card) + homography, WebXR plane hit-test, or native ARKit/ARCore depth — not guesses.
+- Keep quality gates (blur, reference coplanarity, sanity checks) and clear manual refine (tap) when auto-detect is uncertain.
+- Label anything that is demo, simulated, or estimated so users never treat fake mm as sizing truth.
+- When changing scan, CV, AR, embed, or native measurement code, preserve or improve accuracy — never regress it for convenience.
+
+## Don’t
+
+- Silently invent sizes (`simulatedMeasurement`, random offsets, hardcoded foot lengths) in user-facing flows without an explicit “demo / estimate” state.
+- Ship embed or partner paths that return invented millimetres as if they were measured.
+- Remove or weaken calibration / reference requirements just to make the happy path look easier.
+- Gate useful AR measure UI off in ways that push users onto less accurate fallbacks without explanation.
+
+## Relevant areas
+
+`src/pages/Scan.tsx`, `src/lib/realMeasurement.ts`, `src/lib/arSession.ts`, `src/lib/cv/*`, `src/embed/*`, `src/lib/native/*`, `ios/**/FitSenseAR*`, `android/**/ar/**`, `android/**/measurement/**`

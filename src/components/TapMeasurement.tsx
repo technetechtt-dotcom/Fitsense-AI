@@ -12,13 +12,14 @@ import { PrimaryButton } from "./PrimaryButton";
 import type { CalibrationReference } from "../types";
 import {
   computeRealMeasurement,
-  DEFAULT_HEEL_PAD_OFFSET_MM,
+  EXPERIMENTAL_UNWEIGHTED_OFFSET_MM,
   referenceDimensions,
   type RealMeasurementResult,
   type TapPoints,
 } from "../lib/realMeasurement";
 import { sortCornersTL, type Point } from "../lib/homography";
 import { getOrCreateProfile } from "../lib/storage";
+import type { Foot } from "../types";
 
 interface SuggestedFoot {
   heel: Point;
@@ -32,6 +33,7 @@ interface Props {
   imageWidthPx: number;
   imageHeightPx: number;
   calibration: Exclude<CalibrationReference, "arcore_plane">;
+  foot: Exclude<Foot, "unknown">;
   onMeasured: (result: RealMeasurementResult) => void;
   onRetake: () => void;
   /** Pre-populated reference quad from OpenCV.js auto-detect (#1). */
@@ -84,6 +86,7 @@ export function TapMeasurement({
   imageWidthPx,
   imageHeightPx,
   calibration,
+  foot,
   onMeasured,
   onRetake,
   suggestedRefCorners,
@@ -96,10 +99,7 @@ export function TapMeasurement({
   const imageRef = useRef<HTMLImageElement | null>(null);
   // Re-seed if the parent provides new suggestions after a fresh capture.
   useEffect(() => {
-    setState((prev) =>
-      seedState(prev, { suggestedRefCorners, suggestedFoot }),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setState((prev) => seedState(prev, { suggestedRefCorners, suggestedFoot }));
   }, [suggestedRefCorners, suggestedFoot]);
 
   const ref = referenceDimensions(calibration);
@@ -184,22 +184,40 @@ export function TapMeasurement({
   const reset = () => setState(INITIAL);
 
   const confirm = () => {
+    if (!state.heel || !state.toe) {
+      setState((prev) => ({
+        ...prev,
+        error: "Tap both heel and toe before confirming.",
+      }));
+      return;
+    }
     try {
       const taps: TapPoints = {
         refCorners: state.refCorners,
-        heel: state.heel!,
-        toe: state.toe!,
+        heel: state.heel,
+        toe: state.toe,
         widthMedial: state.widthMedial,
         widthLateral: state.widthLateral,
+        foot,
         imageWidthPx,
         imageHeightPx,
       };
       const prefs = getOrCreateProfile().preferences;
       const result = computeRealMeasurement(taps, calibration, {
-        heelPadOffsetMm: prefs.applyHeelPadOffset
-          ? DEFAULT_HEEL_PAD_OFFSET_MM
-          : 0,
+        heelPadOffsetMm:
+          import.meta.env.DEV && prefs.applyHeelPadOffset
+            ? EXPERIMENTAL_UNWEIGHTED_OFFSET_MM
+            : 0,
       });
+      if (!result.sanity.ok) {
+        setState((prev) => ({
+          ...prev,
+          error:
+            result.sanity.issue ??
+            "This scan is unreliable. Correct the points or retake the photo.",
+        }));
+        return;
+      }
       onMeasured(result);
     } catch (err) {
       setState((prev) => ({
@@ -213,12 +231,14 @@ export function TapMeasurement({
   };
 
   const orderedCorners = useMemo(
-    () => (state.refCorners.length === 4 ? sortCornersTL(state.refCorners) : state.refCorners),
+    () =>
+      state.refCorners.length === 4
+        ? sortCornersTL(state.refCorners)
+        : state.refCorners,
     [state.refCorners],
   );
 
-  const allTapped =
-    state.refCorners.length === 4 && state.heel && state.toe;
+  const allTapped = state.refCorners.length === 4 && state.heel && state.toe;
 
   return (
     <div className="flex flex-col gap-3">
@@ -234,10 +254,7 @@ export function TapMeasurement({
           className="block w-full h-full object-cover pointer-events-none"
           draggable={false}
         />
-        <div
-          className="absolute inset-0 cursor-crosshair"
-          onPointerDown={onTap}
-        />
+        <div className="absolute inset-0 cursor-crosshair" onPointerDown={onTap} />
 
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
@@ -401,10 +418,7 @@ function seedState(
   // Don't clobber user-edited state once they've already started tapping.
   if (base.refCorners.length > 0 || base.heel || base.toe) return base;
   let next = base;
-  if (
-    suggestions.suggestedRefCorners &&
-    suggestions.suggestedRefCorners.length === 4
-  ) {
+  if (suggestions.suggestedRefCorners && suggestions.suggestedRefCorners.length === 4) {
     next = {
       ...next,
       refCorners: sortCornersTL(suggestions.suggestedRefCorners),
@@ -419,12 +433,11 @@ function seedState(
       widthMedial: suggestions.suggestedFoot.widthMedial,
       widthLateral: suggestions.suggestedFoot.widthLateral,
       stage:
-        suggestions.suggestedFoot.widthMedial &&
-        suggestions.suggestedFoot.widthLateral
+        suggestions.suggestedFoot.widthMedial && suggestions.suggestedFoot.widthLateral
           ? "confirm"
           : next.measureWidth
-          ? "width-medial"
-          : "confirm",
+            ? "width-medial"
+            : "confirm",
     };
   }
   return next;

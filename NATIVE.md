@@ -129,7 +129,7 @@ interface NativeFootMeasurement {
   widthMm: number;
   archHeightMm?: number;
   confidence: number; // 0..1
-  source: string;     // 'lidar' | 'arkit' | 'arcore' | 'fallback'
+  source: string; // 'lidar' | 'arkit' | 'arcore' | 'fallback'
 }
 
 interface DepthFrame {
@@ -164,7 +164,7 @@ A FitSense native shell **must not**:
 - Upload, log, or persist raw camera frames or depth maps.
 - Run any analytics SDKs that hook into camera frames.
 - Share scan results with third parties before the user explicitly taps
-  *Apply size* in the FitSense UI.
+  _Apply size_ in the FitSense UI.
 
 The web app surfaces these guarantees in the privacy section of the
 welcome screen; a shell that violates them invalidates the brand
@@ -176,7 +176,7 @@ promise.
 
 The off-the-shelf camera plugin returns a JPEG, not a calibrated depth
 buffer. We already have a perfectly good camera capture path via the
-browser's `getUserMedia` — the *point* of a native shell is to access
+browser's `getUserMedia` — the _point_ of a native shell is to access
 the hardware the browser can't:
 
 - iPhone Pro / Pro Max LiDAR
@@ -201,13 +201,13 @@ window.FitSenseNative = {
     hasDepthSensor: true,
     hasArkit: true,
     hasArcore: false,
-    platform: 'mock',
+    platform: "mock",
   }),
   measureFoot: async () => ({
     lengthMm: 267.4,
     widthMm: 101.2,
     confidence: 0.97,
-    source: 'lidar',
+    source: "lidar",
   }),
 };
 ```

@@ -28,14 +28,8 @@ import {
   updateFitProfile,
 } from "../lib/fitProfile";
 import { deriveInsights } from "../lib/fitLearning";
-import {
-  buildBrandSizeSheet,
-  type BrandSizeRow,
-} from "../lib/recommendation";
-import {
-  exportFitToken,
-  importFitToken,
-} from "../lib/portableFitIdentity";
+import { buildBrandSizeSheet, type BrandSizeRow } from "../lib/recommendation";
+import { exportFitToken, importFitToken } from "../lib/portableFitIdentity";
 import { getOrCreateProfile } from "../lib/storage";
 import { formatLength, splitLength } from "../lib/format";
 import {
@@ -44,7 +38,7 @@ import {
   type ComfortFit,
   type FitDimension,
   type FitEvent,
-  type FitProfile,
+  type FitProfile as FitProfileData,
   type MidsoleFeel,
   type ToeShape,
   type WidthClass,
@@ -71,29 +65,22 @@ import {
  */
 export function FitProfile() {
   const nav = useNavigate();
-  const [profile, setProfile] = useState<FitProfile>(() =>
-    getOrCreateFitProfile(),
-  );
+  const [profile, setProfile] = useState<FitProfileData>(() => getOrCreateFitProfile());
   const [events, setEvents] = useState<FitEvent[]>(() => listFitEvents());
 
   // Recompute insights whenever events change.
   useEffect(() => {
     const insights = deriveInsights(profile, events);
-    if (
-      JSON.stringify(insights) !== JSON.stringify(profile.insights)
-    ) {
+    if (JSON.stringify(insights) !== JSON.stringify(profile.insights)) {
       const next = persistInsights(insights);
       setProfile(next);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events.length]);
 
-  const units = useMemo(
-    () => getOrCreateProfile().preferences.units,
-    [],
-  );
+  const units = useMemo(() => getOrCreateProfile().preferences.units, []);
 
-  const onPatch = (patch: Partial<FitProfile>) => {
+  const onPatch = (patch: Partial<FitProfileData>) => {
     setProfile(updateFitProfile(patch));
   };
 
@@ -129,8 +116,7 @@ export function FitProfile() {
           </p>
         </div>
         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-neon/15 border border-neon/35 text-[10px] uppercase tracking-widest text-neon shrink-0">
-          <Sparkles className="w-3 h-3" />
-          v{profile.version}
+          <Sparkles className="w-3 h-3" />v{profile.version}
         </span>
       </StickyPageHeader>
 
@@ -164,9 +150,9 @@ function FootProfileCard({
   units,
   onPatch,
 }: {
-  profile: FitProfile;
+  profile: FitProfileData;
   units: "mm" | "in";
-  onPatch: (patch: Partial<FitProfile>) => void;
+  onPatch: (patch: Partial<FitProfileData>) => void;
 }) {
   const length = profile.lengthMm
     ? splitLength(profile.lengthMm, units)
@@ -180,8 +166,8 @@ function FootProfileCard({
         <div className="flex-1">
           <h2 className="font-bold text-base">Foot profile</h2>
           <p className="text-xs text-ink-muted">
-            Adjust anything we got wrong — the recommendation engine
-            picks it up instantly.
+            Adjust anything we got wrong — the recommendation engine picks it up
+            instantly.
           </p>
         </div>
       </header>
@@ -195,9 +181,7 @@ function FootProfileCard({
         />
         <StatBlock
           label="Width"
-          value={
-            profile.widthMm ? splitLength(profile.widthMm, units).value : "—"
-          }
+          value={profile.widthMm ? splitLength(profile.widthMm, units).value : "—"}
           unit={profile.widthMm ? splitLength(profile.widthMm, units).unit : ""}
           icon={<Ruler className="w-4 h-4 text-lime rotate-90" />}
         />
@@ -278,13 +262,12 @@ function FootProfileCard({
         />
       </FieldRow>
 
-      {profile.asymmetryMm !== undefined &&
-      Math.abs(profile.asymmetryMm) > 1 ? (
+      {profile.asymmetryMm !== undefined && Math.abs(profile.asymmetryMm) > 1 ? (
         <p className="text-[11px] text-ink-muted leading-relaxed">
           <span className="text-ink">Asymmetry:</span>{" "}
           {profile.asymmetryMm > 0 ? "Left" : "Right"} foot is{" "}
-          {formatLength(Math.abs(profile.asymmetryMm), units)} longer — we
-          recommend sizing to the larger foot.
+          {formatLength(Math.abs(profile.asymmetryMm), units)} longer — we recommend
+          sizing to the larger foot.
         </p>
       ) : null}
 
@@ -336,13 +319,7 @@ function StatBlock({
   );
 }
 
-function FieldRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-xs text-ink-muted shrink-0 w-24">{label}</span>
@@ -407,9 +384,7 @@ function BrandCheatSheet({ rows }: { rows: BrandSizeRow[] }) {
           >
             <div className="min-w-0">
               <div className="text-sm font-semibold truncate">{r.brand}</div>
-              <div className="text-[11px] text-ink-muted truncate">
-                {r.note}
-              </div>
+              <div className="text-[11px] text-ink-muted truncate">{r.note}</div>
             </div>
             <div className="text-right">
               <div className="text-[10px] uppercase tracking-widest text-ink-muted">
@@ -425,8 +400,8 @@ function BrandCheatSheet({ rows }: { rows: BrandSizeRow[] }) {
                   r.toeBoxWidth === "wide" || r.toeBoxWidth === "extra_wide"
                     ? "bg-lime/15 text-lime border border-lime/30"
                     : r.toeBoxWidth === "narrow"
-                    ? "bg-coral/15 text-coral border border-coral/30"
-                    : "bg-ink-dim/30 text-ink-soft border border-white/10"
+                      ? "bg-coral/15 text-coral border border-coral/30"
+                      : "bg-ink-dim/30 text-ink-soft border border-white/10"
                 }`}
               >
                 {r.toeBoxWidth.replace("_", " ")} toe
@@ -445,8 +420,8 @@ function EmptyScanPrompt({ onScan }: { onScan: () => void }) {
       <Footprints className="w-8 h-8 text-neon mx-auto" />
       <h2 className="font-bold">Scan to build your brand cheat sheet</h2>
       <p className="text-xs text-ink-muted">
-        Once you've measured your foot we'll show your size in every brand
-        in the catalog.
+        Once you've measured your foot we'll show your size in every brand in the
+        catalog.
       </p>
       <PrimaryButton onClick={onScan} className="w-full">
         Start a scan
@@ -461,15 +436,13 @@ function InsightCard({
   profile,
   events,
 }: {
-  profile: FitProfile;
+  profile: FitProfileData;
   events: FitEvent[];
 }) {
   const insights = profile.insights;
   const eventCount = events.length;
   const learnedBrands = insights
-    ? Object.entries(insights.brandConfidence).sort(
-        ([, a], [, b]) => b - a,
-      )
+    ? Object.entries(insights.brandConfidence).sort(([, a], [, b]) => b - a)
     : [];
   return (
     <section className="rounded-3xl bg-card-grad border border-white/8 p-5 space-y-3">
@@ -495,15 +468,12 @@ function InsightCard({
               insights.meanTightness === 0
                 ? "Neutral"
                 : insights.meanTightness > 0
-                ? `+${insights.meanTightness.toFixed(1)} (looser)`
-                : `${insights.meanTightness.toFixed(1)} (tighter)`
+                  ? `+${insights.meanTightness.toFixed(1)} (looser)`
+                  : `${insights.meanTightness.toFixed(1)} (tighter)`
             }
             icon={<Lightbulb className="w-3.5 h-3.5" />}
           />
-          <InsightTile
-            label="Returns (12mo)"
-            value={String(insights.returnCount)}
-          />
+          <InsightTile label="Returns (12mo)" value={String(insights.returnCount)} />
           <InsightTile
             label="Toe-box pref"
             value={insights.prefersWiderToeBox ? "Prefers wider" : "Standard"}
@@ -625,7 +595,7 @@ function describeDimensionTrend(
   }
 }
 
-function BrandFitSignatureCard({ profile }: { profile: FitProfile }) {
+function BrandFitSignatureCard({ profile }: { profile: FitProfileData }) {
   const sig = profile.insights?.brandFitSignature ?? {};
   const counts = profile.insights?.brandFitSampleCount ?? {};
   const brands = Object.entries(sig).sort(
@@ -641,8 +611,8 @@ function BrandFitSignatureCard({ profile }: { profile: FitProfile }) {
         <div>
           <h2 className="font-bold text-base">Learned brand fit</h2>
           <p className="text-xs text-ink-muted">
-            How each brand has historically fit you. Drives per-brand size
-            corrections automatically.
+            How each brand has historically fit you. Drives per-brand size corrections
+            automatically.
           </p>
         </div>
       </header>
@@ -674,16 +644,14 @@ function BrandFitSignatureCard({ profile }: { profile: FitProfile }) {
                     t.tone === "lime"
                       ? "bg-lime/15 text-lime border-lime/30"
                       : t.tone === "coral"
-                      ? "bg-coral/15 text-coral border-coral/30"
-                      : "bg-ink-dim/30 text-ink-soft border-white/10";
+                        ? "bg-coral/15 text-coral border-coral/30"
+                        : "bg-ink-dim/30 text-ink-soft border-white/10";
                   return (
                     <span
                       key={dim}
                       className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${tone}`}
                     >
-                      <span className="text-ink-muted">
-                        {DIMENSION_LABEL[dim]}
-                      </span>
+                      <span className="text-ink-muted">{DIMENSION_LABEL[dim]}</span>
                       <span className="font-semibold">{t.label}</span>
                       <span className="text-ink-muted tabular-nums">
                         {avg > 0 ? "+" : ""}
@@ -703,7 +671,7 @@ function BrandFitSignatureCard({ profile }: { profile: FitProfile }) {
 
 // ─── Replacement timing ────────────────────────────────────────────────
 
-function ReplacementCard({ profile }: { profile: FitProfile }) {
+function ReplacementCard({ profile }: { profile: FitProfileData }) {
   const hints = profile.insights?.replacementHints ?? [];
   const projected = profile.insights?.projectedLengthMm;
   if (hints.length === 0 && projected === undefined) return null;
@@ -725,8 +693,8 @@ function ReplacementCard({ profile }: { profile: FitProfile }) {
           <span className="text-ink-muted">Projected foot length in 6 months:</span>{" "}
           <span className="font-semibold">{projected.toFixed(1)} mm</span>
           <p className="text-[11px] text-ink-muted mt-1">
-            Children's feet grow ≈ 1.5 sizes per year. Buying a half-size up
-            now usually buys 3–4 months extra wear.
+            Children's feet grow ≈ 1.5 sizes per year. Buying a half-size up now usually
+            buys 3–4 months extra wear.
           </p>
         </div>
       ) : null}
@@ -735,8 +703,7 @@ function ReplacementCard({ profile }: { profile: FitProfile }) {
           key={i}
           className="rounded-2xl bg-surface-2 border border-white/5 p-3 text-xs"
         >
-          <span className="text-ink-muted capitalize">{h.category}</span>{" "}
-          replacement:{" "}
+          <span className="text-ink-muted capitalize">{h.category}</span> replacement:{" "}
           <span className="font-semibold">
             {new Date(h.nextReplacementEpochMs).toLocaleDateString()}
           </span>
@@ -829,8 +796,8 @@ function PortableSection({
   profile,
   onImport,
 }: {
-  profile: FitProfile;
-  onImport: (p: FitProfile) => void;
+  profile: FitProfileData;
+  onImport: (p: FitProfileData) => void;
 }) {
   const token = useMemo(() => exportFitToken(profile), [profile]);
   const [copied, setCopied] = useState(false);
@@ -869,8 +836,7 @@ function PortableSection({
         <div>
           <h2 className="font-bold text-base">Portable fit identity</h2>
           <p className="text-xs text-ink-muted">
-            Take your profile to any FitSense-enabled store — no re-scan
-            needed.
+            Take your profile to any FitSense-enabled store — no re-scan needed.
           </p>
         </div>
       </header>
@@ -912,9 +878,7 @@ function PortableSection({
           placeholder="FSP1.…"
           className="w-full text-xs font-mono px-3 py-2 rounded-xl bg-black/30 border border-white/8 focus:outline-none focus:border-neon/40"
         />
-        {importError ? (
-          <p className="text-[11px] text-coral">{importError}</p>
-        ) : null}
+        {importError ? <p className="text-[11px] text-coral">{importError}</p> : null}
         <button
           onClick={doImport}
           disabled={importValue.trim().length === 0}

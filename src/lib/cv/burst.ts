@@ -51,7 +51,6 @@ export async function captureBurst(
     const q = probeImageQuality(c);
     candidates.push({ canvas: c, q });
     if (i < frames - 1) {
-      // eslint-disable-next-line no-await-in-loop
       await new Promise((r) => setTimeout(r, interval));
     }
   }

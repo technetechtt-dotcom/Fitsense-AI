@@ -1,0 +1,18 @@
+# Replace or extend these owners as the engineering team grows.
+* @technetechtt-dotcom
+
+# Accuracy-critical code requires explicit review.
+/src/lib/realMeasurement.ts @technetechtt-dotcom
+/src/lib/homography.ts @technetechtt-dotcom
+/src/lib/cv/ @technetechtt-dotcom
+/src/lib/arSession.ts @technetechtt-dotcom
+/android/app/src/main/java/com/fitsense/ai/measurement/ @technetechtt-dotcom
+/android/app/src/main/java/com/fitsense/ai/ar/ @technetechtt-dotcom
+/ios/App/App/Plugins/ @technetechtt-dotcom
+
+# Data, identity, privacy, and public API contracts.
+/backend/ @technetechtt-dotcom
+/firestore.rules @technetechtt-dotcom
+/storage.rules @technetechtt-dotcom
+/src/lib/cloud/ @technetechtt-dotcom
+/src/embed/ @technetechtt-dotcom

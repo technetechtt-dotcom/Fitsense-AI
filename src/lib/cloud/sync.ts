@@ -1,6 +1,7 @@
 import { hasCloudSyncConsent } from "../consent";
 import { isApiConfigured } from "../api/config";
 import {
+  deleteScanViaApi,
   eraseCloudDataViaApi,
   pullAllViaApi,
   pushFitEventViaApi,
@@ -75,10 +76,7 @@ export async function pushFitEvent(event: FitEvent): Promise<void> {
   if (!uid) return;
   try {
     const { doc, setDoc } = await import("firebase/firestore");
-    await setDoc(
-      doc(fb.db, "users", uid, "fitEvents", event.eventId),
-      event,
-    );
+    await setDoc(doc(fb.db, "users", uid, "fitEvents", event.eventId), event);
   } catch (err) {
     console.warn("[fitsense] pushFitEvent failed", err);
   }
@@ -103,6 +101,28 @@ export async function pushScan(scan: ScanResult): Promise<void> {
     await setDoc(doc(fb.db, "users", uid, "scans", scan.scanId), scan);
   } catch (err) {
     console.warn("[fitsense] pushScan failed", err);
+  }
+}
+
+export async function deleteScanFromCloud(scanId: string): Promise<void> {
+  if (!hasCloudSyncConsent()) return;
+  if (isApiConfigured()) {
+    try {
+      await deleteScanViaApi(scanId);
+    } catch (err) {
+      console.warn("[fitsense] deleteScan (api) failed", err);
+    }
+    return;
+  }
+  const fb = await tryGetFirebase();
+  if (!fb) return;
+  const uid = await ensureSignedIn();
+  if (!uid) return;
+  try {
+    const { deleteDoc, doc } = await import("firebase/firestore");
+    await deleteDoc(doc(fb.db, "users", uid, "scans", scanId));
+  } catch (err) {
+    console.warn("[fitsense] deleteScan failed", err);
   }
 }
 
@@ -135,17 +155,13 @@ export async function pullAll(): Promise<CloudPullResult> {
   const uid = await ensureSignedIn();
   if (!uid) return empty;
   try {
-    const { collection, doc, getDoc, getDocs } = await import(
-      "firebase/firestore"
-    );
+    const { collection, doc, getDoc, getDocs } = await import("firebase/firestore");
     const [profileSnap, eventsSnap, scansSnap] = await Promise.all([
       getDoc(doc(fb.db, "users", uid, "fitProfile", "current")),
       getDocs(collection(fb.db, "users", uid, "fitEvents")),
       getDocs(collection(fb.db, "users", uid, "scans")),
     ]);
-    const fitProfile = profileSnap.exists()
-      ? (profileSnap.data() as FitProfile)
-      : null;
+    const fitProfile = profileSnap.exists() ? (profileSnap.data() as FitProfile) : null;
     const fitEvents: FitEvent[] = [];
     eventsSnap.forEach((d) => fitEvents.push(d.data() as FitEvent));
     const scans: ScanResult[] = [];
@@ -172,9 +188,7 @@ export async function eraseCloudData(): Promise<void> {
   const uid = await currentUid();
   if (!uid) return;
   try {
-    const { collection, deleteDoc, doc, getDocs } = await import(
-      "firebase/firestore"
-    );
+    const { collection, deleteDoc, doc, getDocs } = await import("firebase/firestore");
     const [eventsSnap, scansSnap, profileSnap] = await Promise.all([
       getDocs(collection(fb.db, "users", uid, "fitEvents")),
       getDocs(collection(fb.db, "users", uid, "scans")),

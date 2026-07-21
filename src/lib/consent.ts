@@ -118,9 +118,7 @@ export function hasAiPersonalizationConsent(
   return state.aiPersonalization === "granted";
 }
 
-export function hasAnalyticsConsent(
-  state: ConsentState = loadConsent(),
-): boolean {
+export function hasAnalyticsConsent(state: ConsentState = loadConsent()): boolean {
   return state.anonymousAnalytics === "granted";
 }
 

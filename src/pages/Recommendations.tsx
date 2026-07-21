@@ -17,12 +17,7 @@ import {
 import { getOrCreateProfile, getScan } from "../lib/storage";
 import { getOrCreateFitProfile } from "../lib/fitProfile";
 import { primaryFoot } from "../types";
-import type {
-  FitProfile,
-  ScanResult,
-  SizeRecommendation,
-  UserProfile,
-} from "../types";
+import type { FitProfile, ScanResult, SizeRecommendation, UserProfile } from "../types";
 
 export function Recommendations() {
   const { scanId = "" } = useParams();
@@ -67,8 +62,9 @@ export function Recommendations() {
     );
   }
 
-  const learnedFromCount =
-    Object.keys(fitProfile?.insights?.brandConfidence ?? {}).length;
+  const learnedFromCount = Object.keys(
+    fitProfile?.insights?.brandConfidence ?? {},
+  ).length;
 
   return (
     <PageLayout withTopBar gap="gap-4">
@@ -98,8 +94,8 @@ export function Recommendations() {
         <div className="rounded-2xl bg-surface-2 border border-white/8 px-4 py-3 text-xs text-ink-muted flex items-center gap-2">
           <Brain className="w-4 h-4 text-neon" />
           <span>
-            Rate or return the shoes you try — your recommendations get
-            smarter every time.
+            Rate or return the shoes you try — your recommendations get smarter every
+            time.
           </span>
           <button
             onClick={() => nav("/fit-profile")}

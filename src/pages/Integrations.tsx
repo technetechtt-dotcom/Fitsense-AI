@@ -115,8 +115,7 @@ export function Integrations() {
     [preset],
   );
 
-  const handoffBaseSnippet =
-    getApiBaseUrl() ?? "https://api.fitsense.ai";
+  const handoffBaseSnippet = getApiBaseUrl() ?? "https://api.fitsense.ai";
 
   // Listen for size events from the live preview iframe.
   useMemo(() => {
@@ -127,10 +126,10 @@ export function Integrations() {
           preset.sizeSystem === "uk"
             ? `UK ${s.uk}`
             : preset.sizeSystem === "us"
-            ? `US ${s.us}`
-            : preset.sizeSystem === "eu"
-            ? `EU ${s.eu}`
-            : `${s.mondopointMm.toFixed(0)} mm`;
+              ? `US ${s.us}`
+              : preset.sizeSystem === "eu"
+                ? `EU ${s.eu}`
+                : `${s.mondopointMm.toFixed(0)} mm`;
         setLastSize(label);
       }
     });
@@ -138,10 +137,7 @@ export function Integrations() {
   }, []);
 
   const scriptSnippet = useMemo(() => buildScriptSnippet(preset), [preset]);
-  const dataAttrSnippet = useMemo(
-    () => buildDataAttrSnippet(preset),
-    [preset],
-  );
+  const dataAttrSnippet = useMemo(() => buildDataAttrSnippet(preset), [preset]);
   const jsApiSnippet = useMemo(() => buildJsApiSnippet(preset), [preset]);
 
   return (
@@ -159,9 +155,9 @@ export function Integrations() {
           Drop FitSense into any storefront in&nbsp;5&nbsp;minutes.
         </h2>
         <p className="text-sm opacity-90 mt-2 leading-relaxed">
-          One <code>&lt;script&gt;</code> tag + one button attribute. The fit
-          finder opens as a modal, returns a size, and matches your store's
-          look — no changes to your existing checkout.
+          One <code>&lt;script&gt;</code> tag + one button attribute. The fit finder
+          opens as a modal, returns a size, and matches your store's look — no changes
+          to your existing checkout.
         </p>
       </motion.section>
 
@@ -186,10 +182,8 @@ export function Integrations() {
         <div className="mt-4 rounded-2xl overflow-hidden border border-white/10 bg-card-grad">
           <div className="px-4 py-2.5 border-b border-white/10 flex items-center justify-between">
             <div className="text-xs text-ink-muted">
-              <span className="text-ink font-semibold">
-                {preset.storeName}
-              </span>{" "}
-              · {preset.brand} · size system{" "}
+              <span className="text-ink font-semibold">{preset.storeName}</span> ·{" "}
+              {preset.brand} · size system{" "}
               <code className="text-neon">{preset.sizeSystem}</code>
             </div>
             <a
@@ -227,8 +221,8 @@ export function Integrations() {
       <section>
         <SectionHeader title="2 · Open from any button" />
         <p className="text-xs text-ink-muted mb-2">
-          Declarative (zero JS) — add{" "}
-          <code className="text-neon">data-fitsense</code> to any element.
+          Declarative (zero JS) — add <code className="text-neon">data-fitsense</code>{" "}
+          to any element.
         </p>
         <Snippet code={dataAttrSnippet} />
       </section>
@@ -244,11 +238,10 @@ export function Integrations() {
       <section>
         <SectionHeader title="Cross-device handoff (desktop → phone)" />
         <p className="text-xs text-ink-muted mb-2">
-          On desktop the user clicks <em>Continue on phone</em> inside the
-          embed → a QR appears → they scan with their phone → the phone
-          completes the AR scan → the size is posted back to the desktop
-          modal automatically. Open the live preview above and tap{" "}
-          <em>Continue on phone</em> to see it.
+          On desktop the user clicks <em>Continue on phone</em> inside the embed → a QR
+          appears → they scan with their phone → the phone completes the AR scan → the
+          size is posted back to the desktop modal automatically. Open the live preview
+          above and tap <em>Continue on phone</em> to see it.
         </p>
         <Snippet
           code={`// With VITE_API_BASE_URL set, handoff uses the FitSense API automatically.
@@ -279,28 +272,27 @@ FitSense.init({
         <SectionHeader title="Why it just works" />
         <ul className="text-sm text-ink-muted leading-relaxed space-y-2 mt-2 list-disc pl-5">
           <li>
-            <strong className="text-ink">Sandboxed iframe</strong> — host CSS,
-            JS and DOM are never touched.
+            <strong className="text-ink">Sandboxed iframe</strong> — host CSS, JS and
+            DOM are never touched.
           </li>
           <li>
-            <strong className="text-ink">Themable</strong> — re-skin via CSS
-            tokens (<code>--fs-primary</code>, <code>--fs-radius</code>, …) so
-            it matches the host site.
+            <strong className="text-ink">Themable</strong> — re-skin via CSS tokens (
+            <code>--fs-primary</code>, <code>--fs-radius</code>, …) so it matches the
+            host site.
           </li>
           <li>
             <strong className="text-ink">Typed callback</strong> — host gets{" "}
-            <code>{`{ uk, us, eu, mondopointMm, fitScore }`}</code> and applies
-            it to its own size selector.
+            <code>{`{ uk, us, eu, mondopointMm, fitScore }`}</code> and applies it to
+            its own size selector.
           </li>
           <li>
-            <strong className="text-ink">Cross-device</strong> — desktop
-            visitors can scan with their phone via QR; result flows back
-            automatically.
+            <strong className="text-ink">Cross-device</strong> — desktop visitors can
+            scan with their phone via QR; result flows back automatically.
           </li>
           <li>
-            <strong className="text-ink">Universal</strong> — works on
-            Shopify, WooCommerce, Magento, BigCommerce, Temu, Shein, Bash,
-            Superbalist, or any plain HTML page.
+            <strong className="text-ink">Universal</strong> — works on Shopify,
+            WooCommerce, Magento, BigCommerce, Temu, Shein, Bash, Superbalist, or any
+            plain HTML page.
           </li>
         </ul>
       </section>

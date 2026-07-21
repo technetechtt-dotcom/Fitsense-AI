@@ -26,10 +26,13 @@ export async function pushFitProfileViaApi(profile: FitProfile): Promise<void> {
 }
 
 export async function pushFitEventViaApi(event: FitEvent): Promise<void> {
-  const res = await apiFetch(`/v1/sync/fit-events/${encodeURIComponent(event.eventId)}`, {
-    method: "PUT",
-    body: JSON.stringify(event),
-  });
+  const res = await apiFetch(
+    `/v1/sync/fit-events/${encodeURIComponent(event.eventId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(event),
+    },
+  );
   if (!res.ok) {
     throw new Error(`sync event failed: HTTP ${res.status}`);
   }
@@ -42,6 +45,15 @@ export async function pushScanViaApi(scan: ScanResult): Promise<void> {
   });
   if (!res.ok) {
     throw new Error(`sync scan failed: HTTP ${res.status}`);
+  }
+}
+
+export async function deleteScanViaApi(scanId: string): Promise<void> {
+  const res = await apiFetch(`/v1/sync/scans/${encodeURIComponent(scanId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`sync scan delete failed: HTTP ${res.status}`);
   }
 }
 

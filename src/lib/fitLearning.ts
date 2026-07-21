@@ -42,9 +42,7 @@ export function deriveInsights(
   events: FitEvent[],
   nowEpochMs: number = Date.now(),
 ): FitInsights {
-  const recent = events.filter(
-    (e) => nowEpochMs - e.epochMs <= RECENT_WINDOW_MS,
-  );
+  const recent = events.filter((e) => nowEpochMs - e.epochMs <= RECENT_WINDOW_MS);
   const returns = recent.filter((e): e is FitEventReturn => e.kind === "return");
   const wear = recent.filter((e) => e.kind === "wear");
   const ratings = recent.filter((e) => e.kind === "rating");
@@ -139,12 +137,7 @@ export function deriveInsights(
       w.tags.some((t) => /firm|hard|stiff/i.test(t)) &&
       w.tightnessDelta <= 0,
   ).length;
-  const archHotspot = countDimensionTrend(
-    fitRatings,
-    ["arch"],
-    (avg) => avg <= -1,
-    2,
-  );
+  const archHotspot = countDimensionTrend(fitRatings, ["arch"], (avg) => avg <= -1, 2);
   const prefersSofterMidsole =
     profile.preferredMidsoleFeel === "soft" || softTagHits >= 2 || archHotspot;
 

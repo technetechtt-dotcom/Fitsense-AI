@@ -67,10 +67,7 @@ export function exportFitToken(profile: FitProfile): string {
  * The `userId` field is left to the caller — typically you'd splice in
  * the local user's id so the imported profile attaches to *this* device.
  */
-export function importFitToken(
-  token: string,
-  userId: string,
-): FitProfile | null {
+export function importFitToken(token: string, userId: string): FitProfile | null {
   if (!token.startsWith(SENTINEL)) return null;
   const body = token.slice(SENTINEL.length);
   try {
@@ -134,9 +131,10 @@ function castEnum<T extends readonly string[]>(
 function base64UrlEncode(input: string): string {
   // Node-style helper isn't available in older Safari; use btoa with a
   // tiny URL-safe transform.
-  const b64 = typeof btoa === "function"
-    ? btoa(unescape(encodeURIComponent(input)))
-    : Buffer.from(input, "utf8").toString("base64");
+  const b64 =
+    typeof btoa === "function"
+      ? btoa(unescape(encodeURIComponent(input)))
+      : Buffer.from(input, "utf8").toString("base64");
   return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 

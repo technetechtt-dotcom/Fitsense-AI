@@ -27,8 +27,7 @@ export function ApiConnectionStatus() {
 
   if (!configured) return null;
 
-  const label =
-    base === "" ? "same origin (dev proxy)" : (base ?? "API");
+  const label = base === "" ? "same origin (dev proxy)" : (base ?? "API");
   const status = checking
     ? "Checking…"
     : health?.ok
@@ -42,9 +41,7 @@ export function ApiConnectionStatus() {
   return (
     <p className="text-xs text-ink-muted leading-relaxed">
       FitSense API ({label}):{" "}
-      <span className={health?.ok ? "text-neon" : "text-warning"}>
-        {status}
-      </span>
+      <span className={health?.ok ? "text-neon" : "text-warning"}>{status}</span>
       {syncNote}
     </p>
   );

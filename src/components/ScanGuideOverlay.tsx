@@ -66,10 +66,10 @@ export function ScanGuideOverlay() {
               c === "tl"
                 ? "top-[-12px] left-[-12px] border-t-2 border-l-2"
                 : c === "tr"
-                ? "top-[-12px] right-[-12px] border-t-2 border-r-2"
-                : c === "bl"
-                ? "bottom-[-12px] left-[-12px] border-b-2 border-l-2"
-                : "bottom-[-12px] right-[-12px] border-b-2 border-r-2"
+                  ? "top-[-12px] right-[-12px] border-t-2 border-r-2"
+                  : c === "bl"
+                    ? "bottom-[-12px] left-[-12px] border-b-2 border-l-2"
+                    : "bottom-[-12px] right-[-12px] border-b-2 border-r-2"
             }`}
           />
         ))}

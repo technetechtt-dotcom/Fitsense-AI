@@ -31,10 +31,10 @@ shoe-selling platform.
 <script>
   // Receive the recommendation and apply it to your own size selector
   function applyFitSenseSize(size /*, scan */) {
-    const select = document.querySelector('#size-select');
+    const select = document.querySelector("#size-select");
     if (!select) return;
     select.value = size.uk;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    select.dispatchEvent(new Event("change", { bubbles: true }));
   }
 </script>
 ```
@@ -54,21 +54,21 @@ Add `data-fitsense` plus any of the `data-*` attributes below to **any element**
 auto-binds the click handler. New elements added after page load are picked up
 automatically by a `MutationObserver`.
 
-| Attribute            | Purpose                                                      | Example            |
-|----------------------|--------------------------------------------------------------|--------------------|
-| `data-fitsense`      | Marks the element as a trigger (required, no value needed)   | `data-fitsense`    |
-| `data-product-id`    | Your SKU. Echoed back on events for analytics                | `NK-AM90-BLK-9`    |
-| `data-brand`         | Brand label shown in the embed header                        | `Nike`             |
-| `data-store-name`    | Host store name shown in the embed header                    | `Bash`             |
-| `data-size-system`   | `uk` &#124; `us` &#124; `eu` &#124; `mondopoint`             | `uk`               |
-| `data-on-size`       | Global function name called with the recommendation          | `applyFitSenseSize`|
-| `data-on-close`      | Global function name called when the modal closes            | `onFitSenseClose`  |
-| `data-theme-primary` | Primary / accent colour (any CSS colour)                     | `#FF3D00`          |
-| `data-theme-bg`      | Background colour                                            | `#ffffff`          |
-| `data-theme-text`    | Text colour                                                  | `#111111`          |
-| `data-theme-radius`  | Corner radius                                                | `8px`              |
-| `data-theme-font`    | Font family                                                  | `'Inter'`          |
-| `data-theme-mode`    | `light` &#124; `dark` base neutrals                          | `light`            |
+| Attribute            | Purpose                                                    | Example             |
+| -------------------- | ---------------------------------------------------------- | ------------------- |
+| `data-fitsense`      | Marks the element as a trigger (required, no value needed) | `data-fitsense`     |
+| `data-product-id`    | Your SKU. Echoed back on events for analytics              | `NK-AM90-BLK-9`     |
+| `data-brand`         | Brand label shown in the embed header                      | `Nike`              |
+| `data-store-name`    | Host store name shown in the embed header                  | `Bash`              |
+| `data-size-system`   | `uk` &#124; `us` &#124; `eu` &#124; `mondopoint`           | `uk`                |
+| `data-on-size`       | Global function name called with the recommendation        | `applyFitSenseSize` |
+| `data-on-close`      | Global function name called when the modal closes          | `onFitSenseClose`   |
+| `data-theme-primary` | Primary / accent colour (any CSS colour)                   | `#FF3D00`           |
+| `data-theme-bg`      | Background colour                                          | `#ffffff`           |
+| `data-theme-text`    | Text colour                                                | `#111111`           |
+| `data-theme-radius`  | Corner radius                                              | `8px`               |
+| `data-theme-font`    | Font family                                                | `'Inter'`           |
+| `data-theme-mode`    | `light` &#124; `dark` base neutrals                        | `light`             |
 
 ### B · Imperative (JavaScript API)
 
@@ -77,23 +77,23 @@ automatically by a `MutationObserver`.
 <script>
   // Optional: page-wide defaults applied to every open() call
   window.FitSense.init({
-    storeName: 'Superbalist',
-    sizeSystem: 'uk',
+    storeName: "Superbalist",
+    sizeSystem: "uk",
     theme: {
-      primary: '#FF3D00',
-      bg: '#0d0d0d',
-      text: '#f5f5f5',
-      radius: '4px',
-      mode: 'dark',
+      primary: "#FF3D00",
+      bg: "#0d0d0d",
+      text: "#f5f5f5",
+      radius: "4px",
+      mode: "dark",
     },
   });
 
-  document.querySelector('#find-size').addEventListener('click', () => {
+  document.querySelector("#find-size").addEventListener("click", () => {
     const handle = FitSense.open({
-      productId: 'SB-ADI-SBA',
-      brand: 'Adidas',
+      productId: "SB-ADI-SBA",
+      brand: "Adidas",
       onSize: (size, scan) => {
-        console.log('Recommended:', size);
+        console.log("Recommended:", size);
         // size = { uk: '9', us: '10', eu: '43', mondopointMm: 270, fitScore: 0.92, preferred: 'uk' }
         // scan = { scanId, lengthMm, widthMm, widthToLengthRatio, capturedAtEpochMs }
       },
@@ -121,16 +121,16 @@ works the same way it does with Stripe, Klarna or Google Analytics.
 
 The embed exposes six CSS custom properties internally:
 
-| Token              | Default          | Notes                                  |
-|--------------------|------------------|----------------------------------------|
-| `--fs-primary`     | `#0a84ff`        | CTAs, focus ring, highlight chip       |
-| `--fs-bg`          | `#ffffff`        | Surface background                     |
-| `--fs-text`        | `#111827`        | Primary text                           |
-| `--fs-text-muted`  | `#6b7280`        | Labels, captions                       |
-| `--fs-surface`     | `#f3f4f6`        | Cards, dividers                        |
-| `--fs-border`      | `rgba(0,0,0,.08)`| Hairlines                              |
-| `--fs-radius`      | `14px`           | Cards, buttons, chips                  |
-| `--fs-font`        | `Inter, …`       | Font stack                             |
+| Token             | Default           | Notes                            |
+| ----------------- | ----------------- | -------------------------------- |
+| `--fs-primary`    | `#0a84ff`         | CTAs, focus ring, highlight chip |
+| `--fs-bg`         | `#ffffff`         | Surface background               |
+| `--fs-text`       | `#111827`         | Primary text                     |
+| `--fs-text-muted` | `#6b7280`         | Labels, captions                 |
+| `--fs-surface`    | `#f3f4f6`         | Cards, dividers                  |
+| `--fs-border`     | `rgba(0,0,0,.08)` | Hairlines                        |
+| `--fs-radius`     | `14px`            | Cards, buttons, chips            |
+| `--fs-font`       | `Inter, …`        | Font stack                       |
 
 Pass these via the `theme` field (camelCase: `primary`, `bg`, `text`,
 `textMuted`, `surface`, `border`, `radius`, `font`, `mode`). The SDK
@@ -146,21 +146,21 @@ namespaced `fitsense:*`.
 
 ### Host → iframe
 
-| Type                    | Payload                          |
-|-------------------------|----------------------------------|
-| `fitsense:configure`    | `{ config: EmbedConfig }`        |
+| Type                 | Payload                   |
+| -------------------- | ------------------------- |
+| `fitsense:configure` | `{ config: EmbedConfig }` |
 
 ### Iframe → host
 
-| Type                    | Payload                                         | Meaning                                            |
-|-------------------------|-------------------------------------------------|----------------------------------------------------|
-| `fitsense:ready`        | `{ version: string }`                           | Iframe has mounted; safe to send config            |
-| `fitsense:resize`       | `{ height: number }`                            | Content height changed (inline mode only)          |
-| `fitsense:scan`         | `{ scan: EmbedScanSummary }`                    | A scan finished — recommendation may follow        |
-| `fitsense:size`         | `{ size: EmbedSizeResult, scan: ... }`          | Recommendation ready (user has not confirmed yet)  |
-| `fitsense:apply`        | `{ size, scan }`                                | User tapped **Use this size**                      |
-| `fitsense:close`        | `{}`                                            | User dismissed the modal                          |
-| `fitsense:error`        | `{ message: string }`                           | Non-fatal error                                    |
+| Type              | Payload                                | Meaning                                           |
+| ----------------- | -------------------------------------- | ------------------------------------------------- |
+| `fitsense:ready`  | `{ version: string }`                  | Iframe has mounted; safe to send config           |
+| `fitsense:resize` | `{ height: number }`                   | Content height changed (inline mode only)         |
+| `fitsense:scan`   | `{ scan: EmbedScanSummary }`           | A scan finished — recommendation may follow       |
+| `fitsense:size`   | `{ size: EmbedSizeResult, scan: ... }` | Recommendation ready (user has not confirmed yet) |
+| `fitsense:apply`  | `{ size, scan }`                       | User tapped **Use this size**                     |
+| `fitsense:close`  | `{}`                                   | User dismissed the modal                          |
+| `fitsense:error`  | `{ message: string }`                  | Non-fatal error                                   |
 
 `EmbedSizeResult`:
 
@@ -217,10 +217,10 @@ DESKTOP                                      PHONE
 ```js
 FitSense.init({
   handoff: {
-    baseUrl: "https://api.fitsense.ai",   // your relay endpoint
-    transport: "http",                     // "http" | "broadcast" | "auto"
-    pollMs: 1500
-  }
+    baseUrl: "https://api.fitsense.ai", // your relay endpoint
+    transport: "http", // "http" | "broadcast" | "auto"
+    pollMs: 1500,
+  },
 });
 ```
 
@@ -256,9 +256,11 @@ Behaviour:
 interface HandoffPayload {
   v: 1;
   size: {
-    uk: string; us: string; eu: string;
+    uk: string;
+    us: string;
+    eu: string;
     mondopointMm: number;
-    fitScore: number;                // 0..1
+    fitScore: number; // 0..1
     preferred: "uk" | "us" | "eu" | "mondopoint";
   };
   scan: {
@@ -289,7 +291,9 @@ app.use(cors({ origin: true, methods: ["GET", "PUT", "DELETE"] }));
 const SESSION_TTL_MS = 5 * 60 * 1000;
 const sessions = new Map(); // sessionId → { payload, expiresAt }
 
-function valid(id) { return /^[A-Za-z0-9_-]{16,64}$/.test(id); }
+function valid(id) {
+  return /^[A-Za-z0-9_-]{16,64}$/.test(id);
+}
 function cleanup() {
   const now = Date.now();
   for (const [id, s] of sessions) if (s.expiresAt < now) sessions.delete(id);
@@ -348,9 +352,11 @@ Need the fit finder inside a product-page tab rather than a modal?
 <div id="fit-finder" style="min-height: 600px"></div>
 <script>
   FitSense.open({
-    productId: 'SHEIN-WMN-4421',
-    container: '#fit-finder',  // string selector or HTMLElement
-    onSize: (size) => { /* … */ },
+    productId: "SHEIN-WMN-4421",
+    container: "#fit-finder", // string selector or HTMLElement
+    onSize: (size) => {
+      /* … */
+    },
   });
 </script>
 ```
@@ -362,15 +368,15 @@ The iframe fills the container instead of opening a backdrop, and posts
 
 ## 7. Per-platform notes
 
-| Platform        | Where to drop the snippet                                   |
-|-----------------|-------------------------------------------------------------|
-| **Shopify**     | `theme.liquid` (before `</body>`); call from a product section |
-| **WooCommerce** | Theme `functions.php` `wp_enqueue_script` or a snippet plugin |
-| **Magento 2**   | `default.xml` head block; React PWA: import in your product page |
-| **BigCommerce** | Storefront `<head>` script via Script Manager                |
-| **Temu / Shein affiliate stores** | Header injection slot or product description HTML |
-| **Bash / Superbalist** | Product detail template, near the size selector       |
-| **Plain HTML**  | Anywhere on the page                                         |
+| Platform                          | Where to drop the snippet                                        |
+| --------------------------------- | ---------------------------------------------------------------- |
+| **Shopify**                       | `theme.liquid` (before `</body>`); call from a product section   |
+| **WooCommerce**                   | Theme `functions.php` `wp_enqueue_script` or a snippet plugin    |
+| **Magento 2**                     | `default.xml` head block; React PWA: import in your product page |
+| **BigCommerce**                   | Storefront `<head>` script via Script Manager                    |
+| **Temu / Shein affiliate stores** | Header injection slot or product description HTML                |
+| **Bash / Superbalist**            | Product detail template, near the size selector                  |
+| **Plain HTML**                    | Anywhere on the page                                             |
 
 None of these require server-side changes.
 

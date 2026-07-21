@@ -14,10 +14,10 @@ export async function requireAuth(
   try {
     if (config.skipAuth) {
       const debugUid = req.header("x-debug-uid");
-      if (!debugUid) {
+      if (!debugUid || !/^[A-Za-z0-9_.:-]{1,128}$/.test(debugUid)) {
         res.status(401).json({
           error: "unauthorized",
-          message: "Set X-Debug-Uid header when SKIP_AUTH=true",
+          message: "Set a valid X-Debug-Uid header when SKIP_AUTH=true",
         });
         return;
       }

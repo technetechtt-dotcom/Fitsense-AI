@@ -20,11 +20,7 @@ declare global {
 
   type XRSessionMode = "inline" | "immersive-vr" | "immersive-ar";
   type XRReferenceSpaceType =
-    | "viewer"
-    | "local"
-    | "local-floor"
-    | "bounded-floor"
-    | "unbounded";
+    "viewer" | "local" | "local-floor" | "bounded-floor" | "unbounded";
 
   interface XRSessionInit {
     requiredFeatures?: string[];
@@ -40,20 +36,10 @@ declare global {
     updateRenderState: (state: XRRenderStateInit) => Promise<void>;
     renderState: XRRenderState;
     requestAnimationFrame: (cb: XRFrameRequestCallback) => number;
-    requestReferenceSpace: (
-      type: XRReferenceSpaceType,
-    ) => Promise<XRReferenceSpace>;
-    requestHitTestSource?: (options: {
-      space: XRSpace;
-    }) => Promise<XRHitTestSource>;
-    addEventListener: (
-      type: string,
-      listener: (e: XRSessionEvent) => void,
-    ) => void;
-    removeEventListener: (
-      type: string,
-      listener: (e: XRSessionEvent) => void,
-    ) => void;
+    requestReferenceSpace: (type: XRReferenceSpaceType) => Promise<XRReferenceSpace>;
+    requestHitTestSource?: (options: { space: XRSpace }) => Promise<XRHitTestSource>;
+    addEventListener: (type: string, listener: (e: XRSessionEvent) => void) => void;
+    removeEventListener: (type: string, listener: (e: XRSessionEvent) => void) => void;
   }
 
   interface XRRenderState {

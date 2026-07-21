@@ -36,18 +36,8 @@ export interface OpenCv {
   };
   imread: (canvas: HTMLCanvasElement | string) => OcvMat;
   cvtColor: (src: OcvMat, dst: OcvMat, code: number) => void;
-  GaussianBlur: (
-    src: OcvMat,
-    dst: OcvMat,
-    ksize: OcvSize,
-    sigmaX: number,
-  ) => void;
-  Canny: (
-    src: OcvMat,
-    dst: OcvMat,
-    threshold1: number,
-    threshold2: number,
-  ) => void;
+  GaussianBlur: (src: OcvMat, dst: OcvMat, ksize: OcvSize, sigmaX: number) => void;
+  Canny: (src: OcvMat, dst: OcvMat, threshold1: number, threshold2: number) => void;
   findContours: (
     image: OcvMat,
     contours: OcvMatVector,
@@ -156,8 +146,7 @@ export function loadOpenCv(url: string = OPENCV_URL): Promise<OpenCv> {
     script.async = true;
     script.src = url;
     script.crossOrigin = "anonymous";
-    script.onerror = () =>
-      reject(new Error("Failed to load OpenCV.js from " + url));
+    script.onerror = () => reject(new Error("Failed to load OpenCV.js from " + url));
     script.onload = () => {
       // The OpenCV runtime resolves asynchronously after the script tag
       // executes — we have to wait for `onRuntimeInitialized`.

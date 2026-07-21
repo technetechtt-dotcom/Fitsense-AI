@@ -3,8 +3,8 @@ import type { FootMeasurement } from "../types";
 
 /**
  * WebXR-based 3D foot measurement. Drives a real `immersive-ar` session
- * with the `hit-test` feature, lets the user tap two points on the floor
- * (heel then longest toe), and returns the resulting 3D distance as a
+ * with the `hit-test` feature, lets the user tap heel, longest toe, and both
+ * sides of the ball of the foot, and returns real-world length and width as a
  * fully-calibrated {@link FootMeasurement}.
  *
  * The renderer is intentionally minimal: a single white quad acting as
@@ -21,7 +21,7 @@ export interface ArScannerCallbacks {
   onReady?: () => void;
   /** Status updates for the host UI: "Searching floor" / "Heel locked" etc. */
   onStatus?: (status: ArStatus) => void;
-  /** Fired when both heel and toe are locked and a measurement is computed. */
+  /** Fired after heel, toe, and both ball-width points pass validation. */
   onMeasured: (measurement: FootMeasurement) => void;
   /** Fired when the session ends for any reason (user / browser / error). */
   onEnded?: (reason?: string) => void;
@@ -31,11 +31,13 @@ export type ArStatus =
   | { kind: "searching" }
   | { kind: "ready" }
   | { kind: "heel-locked" }
+  | { kind: "toe-locked" }
+  | { kind: "width-a-locked" }
   | { kind: "measuring" }
   | { kind: "error"; message: string };
 
 export interface ArSessionHandle {
-  /** Capture the current reticle position (heel → toe in sequence). */
+  /** Capture heel → toe → first ball edge → opposite ball edge. */
   capture: () => void;
   /** End the AR session early. */
   end: () => void;
@@ -49,6 +51,7 @@ interface InternalState {
   lastHitPose: XRRigidTransform | null;
   heelWorld: [number, number, number] | null;
   toeWorld: [number, number, number] | null;
+  widthWorldA: [number, number, number] | null;
   reticle: ReticleRenderer | null;
   animationFrameHandle: number | null;
   ended: boolean;
@@ -106,6 +109,7 @@ export async function startArSession(
     lastHitPose: null,
     heelWorld: null,
     toeWorld: null,
+    widthWorldA: null,
     reticle: new ReticleRenderer(gl),
     animationFrameHandle: null,
     ended: false,
@@ -140,11 +144,41 @@ export async function startArSession(
       }
       if (!state.toeWorld) {
         state.toeWorld = point;
-        callbacks.onStatus?.({ kind: "measuring" });
-        const m = measurementFrom(state.heelWorld, point);
-        callbacks.onMeasured(m);
-        state.session.end().catch(() => onEnd());
+        if (!validLengthPoints(state.heelWorld, point)) {
+          state.heelWorld = null;
+          state.toeWorld = null;
+          callbacks.onStatus?.({
+            kind: "error",
+            message: "Heel and toe are implausible or not on one plane. Start again.",
+          });
+          return;
+        }
+        callbacks.onStatus?.({ kind: "toe-locked" });
+        return;
       }
+      if (!state.widthWorldA) {
+        state.widthWorldA = point;
+        callbacks.onStatus?.({ kind: "width-a-locked" });
+        return;
+      }
+      callbacks.onStatus?.({ kind: "measuring" });
+      const measurement = measurementFromArPoints(
+        state.heelWorld,
+        state.toeWorld,
+        state.widthWorldA,
+        point,
+      );
+      if (!measurement) {
+        state.widthWorldA = null;
+        callbacks.onStatus?.({
+          kind: "error",
+          message:
+            "Width points are unreliable. Mark both sides of the ball of the foot again.",
+        });
+        return;
+      }
+      callbacks.onMeasured(measurement);
+      state.session.end().catch(() => onEnd());
     },
     end: () => {
       state.session.end().catch(() => onEnd());
@@ -172,9 +206,15 @@ function renderFrame(
       const pose = hits[0].getPose(state.refSpace);
       if (pose) {
         state.lastHitPose = pose.transform;
-        if (state.heelWorld === null) {
-          callbacks.onStatus?.({ kind: "ready" });
-        }
+        callbacks.onStatus?.(
+          state.heelWorld === null
+            ? { kind: "ready" }
+            : state.toeWorld === null
+              ? { kind: "heel-locked" }
+              : state.widthWorldA === null
+                ? { kind: "toe-locked" }
+                : { kind: "width-a-locked" },
+        );
       }
     } else if (state.lastHitPose) {
       // lost lock; keep last pose so capture still works but warn user
@@ -443,26 +483,47 @@ function invertMat4(m: Float32Array): Float32Array {
   return inv;
 }
 
-/** Build a {@link FootMeasurement} from two 3D points captured by AR. */
-function measurementFrom(
+function validLengthPoints(
   heel: [number, number, number],
   toe: [number, number, number],
-): FootMeasurement {
-  const dx = heel[0] - toe[0];
-  const dy = heel[1] - toe[1];
-  const dz = heel[2] - toe[2];
-  // Distance is reported in metres by WebXR; convert to millimetres.
-  const lengthMm = Math.hypot(dx, dy, dz) * 1000;
-  // We don't capture width via AR in this version — estimate via the
-  // 0.38 population ratio. Future iterations will add 3rd/4th taps for
-  // medial/lateral.
-  const widthMm = lengthMm * 0.38;
+): boolean {
+  const lengthMm = distanceMm(heel, toe);
+  const planeDeltaMm = Math.abs(heel[1] - toe[1]) * 1000;
+  return lengthMm >= 120 && lengthMm <= 360 && planeDeltaMm <= 15;
+}
+
+/** Build measured length and width from four validated WebXR hit points. */
+export function measurementFromArPoints(
+  heel: [number, number, number],
+  toe: [number, number, number],
+  widthA: [number, number, number],
+  widthB: [number, number, number],
+): FootMeasurement | null {
+  const lengthMm = distanceMm(heel, toe);
+  const widthMm = distanceMm(widthA, widthB);
+  const widthPlaneDeltaMm = Math.abs(widthA[1] - widthB[1]) * 1000;
+  const ratio = widthMm / lengthMm;
+  if (
+    widthMm < 45 ||
+    widthMm > 160 ||
+    ratio < 0.25 ||
+    ratio > 0.55 ||
+    widthPlaneDeltaMm > 15
+  ) {
+    return null;
+  }
+  const confidence = 0.8;
   return {
     lengthMm,
     widthMm,
-    confidence: 0.95,
+    confidence,
+    dimensionConfidence: { length: confidence, width: confidence },
     foot: "right",
     calibration: "arcore_plane",
     pixelsPerMm: 0,
   };
+}
+
+function distanceMm(a: [number, number, number], b: [number, number, number]): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) * 1000;
 }

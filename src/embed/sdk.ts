@@ -57,8 +57,7 @@ function guessOwnScriptSrc(): string | null {
   for (const s of scripts) {
     const src = (s as HTMLScriptElement).src;
     if (/fitsense[^/]*embed(?:\.[\w-]+)?\.js/.test(src)) return src;
-    if (/\/embed(?:\.[\w-]+)?\.js/.test(src) && /fitsense/i.test(src))
-      return src;
+    if (/\/embed(?:\.[\w-]+)?\.js/.test(src) && /fitsense/i.test(src)) return src;
   }
   return null;
 }
@@ -86,9 +85,7 @@ function withDefaults(options: OpenOptions = {}): OpenOptions {
 }
 
 /** Resolve `container` to an HTMLElement (or null for modal mode). */
-function resolveContainer(
-  container?: HTMLElement | string,
-): HTMLElement | null {
+function resolveContainer(container?: HTMLElement | string): HTMLElement | null {
   if (!container) return null;
   if (typeof container === "string") {
     return document.querySelector(container);
@@ -148,12 +145,9 @@ function openInstance(options: OpenOptions): Instance {
 
   let modal: HTMLDivElement | null = null;
   let dialog: HTMLDivElement | null = null;
-  let host: HTMLElement;
-
   if (explicitContainer) {
-    host = explicitContainer;
-    host.innerHTML = "";
-    host.appendChild(iframe);
+    explicitContainer.innerHTML = "";
+    explicitContainer.appendChild(iframe);
   } else {
     modal = document.createElement("div");
     modal.setAttribute("data-fitsense-modal", "");
@@ -212,8 +206,6 @@ function openInstance(options: OpenOptions): Instance {
       modal.style.opacity = "1";
       dialog.style.transform = "translateY(0)";
     });
-
-    host = modal;
   }
 
   let destroyed = false;
@@ -253,8 +245,7 @@ function openInstance(options: OpenOptions): Instance {
   const handler = (event: MessageEvent) => {
     if (origin !== "*" && event.origin !== origin) return;
     const data = event.data as EmbedToHostMessage | undefined;
-    if (!data || typeof data !== "object" || typeof data.type !== "string")
-      return;
+    if (!data || typeof data !== "object" || typeof data.type !== "string") return;
     if (!data.type.startsWith("fitsense:")) return;
     switch (data.type) {
       case "fitsense:ready":
@@ -284,16 +275,10 @@ function openInstance(options: OpenOptions): Instance {
       case "fitsense:size":
         // The recommendation is available, but the user hasn't pressed
         // "Use this size" yet. Surface it for analytics, don't auto-apply.
-        opts.onSize?.(
-          data.size as EmbedSizeResult,
-          data.scan as EmbedScanSummary,
-        );
+        opts.onSize?.(data.size as EmbedSizeResult, data.scan as EmbedScanSummary);
         break;
       case "fitsense:apply":
-        opts.onSize?.(
-          data.size as EmbedSizeResult,
-          data.scan as EmbedScanSummary,
-        );
+        opts.onSize?.(data.size as EmbedSizeResult, data.scan as EmbedScanSummary);
         destroy();
         break;
       case "fitsense:close":
@@ -419,23 +404,16 @@ function readTriggerOptions(el: HTMLElement): OpenOptions {
     onSize:
       onSizeName && typeof window !== "undefined"
         ? (size, scan) => {
-            const fn = (window as unknown as Record<string, unknown>)[
-              onSizeName
-            ];
+            const fn = (window as unknown as Record<string, unknown>)[onSizeName];
             if (typeof fn === "function") {
-              (fn as (a: EmbedSizeResult, b: EmbedScanSummary) => void)(
-                size,
-                scan,
-              );
+              (fn as (a: EmbedSizeResult, b: EmbedScanSummary) => void)(size, scan);
             }
           }
         : undefined,
     onClose:
       onCloseName && typeof window !== "undefined"
         ? () => {
-            const fn = (window as unknown as Record<string, unknown>)[
-              onCloseName
-            ];
+            const fn = (window as unknown as Record<string, unknown>)[onCloseName];
             if (typeof fn === "function") {
               (fn as () => void)();
             }

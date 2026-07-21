@@ -28,10 +28,7 @@ export function Results() {
   if (scan === undefined) return <Loading label="Loading scan…" />;
   if (scan === null) {
     return (
-      <ErrorState
-        message="We couldn't find that scan."
-        onRetry={() => nav("/home")}
-      />
+      <ErrorState message="We couldn't find that scan." onRetry={() => nav("/home")} />
     );
   }
 
@@ -40,6 +37,7 @@ export function Results() {
   const units = profile?.preferences.units ?? "mm";
   const length = foot ? splitLength(foot.lengthMm, units) : null;
   const width = foot ? splitLength(foot.widthMm, units) : null;
+  const missingFoot = !scan.leftFoot ? "left" : !scan.rightFoot ? "right" : null;
 
   return (
     <PageLayout withTopBar>
@@ -51,16 +49,8 @@ export function Results() {
         transition={{ duration: 0.35 }}
         className="grid grid-cols-2 gap-3"
       >
-        <StatTile
-          label="Length"
-          value={length?.value ?? "—"}
-          unit={length?.unit}
-        />
-        <StatTile
-          label="Width"
-          value={width?.value ?? "—"}
-          unit={width?.unit}
-        />
+        <StatTile label="Length" value={length?.value ?? "—"} unit={length?.unit} />
+        <StatTile label="Width" value={width?.value ?? "—"} unit={width?.unit} />
       </motion.div>
 
       {rec ? (
@@ -84,7 +74,7 @@ export function Results() {
           className="rounded-2xl bg-card-grad border border-white/5 p-4 flex flex-col xs:flex-row items-center gap-4 sm:gap-5"
         >
           <FitScoreRing
-            label="confidence"
+            label="measurement"
             percent={Math.round(foot.confidence * 100)}
           />
           <div className="space-y-1 flex-1 text-sm">
@@ -95,13 +85,19 @@ export function Results() {
               </div>
             ) : null}
             <div className="text-ink-muted">
-              Confidence: {Math.round(foot.confidence * 100)}%
+              Measurement confidence: {Math.round(foot.confidence * 100)}%
             </div>
+            {rec ? (
+              <div className="text-ink-muted">
+                Recommendation confidence:{" "}
+                {Math.round(rec.recommendationConfidence * 100)}%
+              </div>
+            ) : null}
             <div className="text-ink-muted">
               Calibration: {CALIBRATION_META[foot.calibration].label}
             </div>
             <div className="text-ink-muted">
-              {scan.arcoreUsed ? "ARCore-assisted" : "Reference-card scan"}
+              {scan.arcoreUsed ? "Experimental AR plane scan" : "Reference-object scan"}
             </div>
           </div>
         </motion.section>
@@ -110,12 +106,27 @@ export function Results() {
       <div className="flex-1" />
 
       <div className="space-y-3">
-        <PrimaryButton
-          className="w-full"
-          onClick={() => nav(`/recommendations/${scan.scanId}`)}
-        >
-          See matching shoes
-        </PrimaryButton>
+        {missingFoot ? (
+          <>
+            <p className="text-sm text-ink-muted text-center">
+              Scan the {missingFoot} foot before sizing. FitSense uses the larger
+              accepted foot and stores asymmetry.
+            </p>
+            <PrimaryButton
+              className="w-full"
+              onClick={() => nav(`/scan?foot=${missingFoot}`)}
+            >
+              Scan {missingFoot} foot
+            </PrimaryButton>
+          </>
+        ) : (
+          <PrimaryButton
+            className="w-full"
+            onClick={() => nav(`/recommendations/${scan.scanId}`)}
+          >
+            See matching shoes
+          </PrimaryButton>
+        )}
         <button
           onClick={() => nav("/scan")}
           className="w-full h-12 rounded-full border border-white/10 text-sm font-semibold hover:bg-surface-2"

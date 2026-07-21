@@ -24,12 +24,7 @@ import { getOrCreateProfile, listScans, updatePreferences } from "../lib/storage
 import { getOrCreateFitProfile } from "../lib/fitProfile";
 import { averageLengthMm, primaryFoot } from "../types";
 import { splitLength } from "../lib/format";
-import type {
-  Product,
-  ShoeCategory,
-  ShoeMatch,
-  UserProfile,
-} from "../types";
+import type { Product, ShoeCategory, ShoeMatch, UserProfile } from "../types";
 
 const CATEGORY_LABEL: Record<ShoeCategory, string> = {
   running: "Running",
@@ -209,11 +204,7 @@ export function ProductDetail() {
           value={fitTypeLabel(product.fitType)}
           hint={FIT_TYPE_DESCRIPTION[product.fitType]}
         />
-        <Spec
-          icon={Tag}
-          label="Category"
-          value={CATEGORY_LABEL[product.category]}
-        />
+        <Spec icon={Tag} label="Category" value={CATEGORY_LABEL[product.category]} />
         <Spec
           icon={Palette}
           label="Colourways"
@@ -308,7 +299,5 @@ function Spec({
 }
 
 function fitTypeLabel(fit: Product["fitType"]): string {
-  return fit
-    .replace(/_/g, " ")
-    .replace(/^./, (c) => c.toUpperCase());
+  return fit.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 }

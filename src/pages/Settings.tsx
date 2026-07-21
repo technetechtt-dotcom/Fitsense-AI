@@ -9,15 +9,14 @@ import { ApiConnectionStatus } from "../components/ApiConnectionStatus";
 import { canUseCloudSync, isApiConfigured } from "../lib/api/config";
 import {
   getOrCreateProfile,
+  saveProfile,
   signOut,
   updatePreferences,
 } from "../lib/storage";
+import { linkGoogleAccount, signOutCloudAccount } from "../lib/cloud/auth";
+import { isFirebaseConfigured } from "../lib/cloud/firebaseClient";
 import { SHOE_CATALOG } from "../data/catalog";
-import type {
-  CalibrationReference,
-  MeasurementUnit,
-  UserProfile,
-} from "../types";
+import type { CalibrationReference, MeasurementUnit, UserProfile } from "../types";
 import { CALIBRATION_META } from "../types";
 
 export function Settings() {
@@ -25,6 +24,8 @@ export function Settings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountMsg, setAccountMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setProfile(getOrCreateProfile());
@@ -39,8 +40,7 @@ export function Settings() {
   if (!profile) return null;
   const prefs = profile.preferences;
 
-  const setUnits = (units: MeasurementUnit) =>
-    setProfile(updatePreferences({ units }));
+  const setUnits = (units: MeasurementUnit) => setProfile(updatePreferences({ units }));
   const setCalibration = (ref: CalibrationReference) =>
     setProfile(updatePreferences({ defaultCalibration: ref }));
   const toggleBrand = (brand: string) => {
@@ -61,9 +61,45 @@ export function Settings() {
         </div>
         <div className="text-sm text-ink-muted">
           {profile.isAnonymous
-            ? "Anonymous session"
-            : profile.email ?? "Signed in"}
+            ? "Guest on this device"
+            : (profile.email ?? "Signed in")}
         </div>
+        {profile.isAnonymous && isFirebaseConfigured() ? (
+          <button
+            type="button"
+            disabled={accountBusy}
+            onClick={async () => {
+              setAccountBusy(true);
+              setAccountMsg(null);
+              try {
+                const account = await linkGoogleAccount();
+                setProfile(
+                  saveProfile({
+                    ...profile,
+                    displayName: account.displayName,
+                    email: account.email,
+                    isAnonymous: false,
+                  }),
+                );
+                setAccountMsg(
+                  "Google account linked. Your Fit ID can be restored on another device.",
+                );
+              } catch (error) {
+                setAccountMsg(
+                  error instanceof Error
+                    ? error.message
+                    : "Could not link the Google account.",
+                );
+              } finally {
+                setAccountBusy(false);
+              }
+            }}
+            className="mt-3 w-full h-11 rounded-full bg-neon text-surface-0 text-sm font-semibold disabled:opacity-50"
+          >
+            {accountBusy ? "Linking…" : "Link Google account"}
+          </button>
+        ) : null}
+        {accountMsg ? <p className="text-xs text-ink-muted">{accountMsg}</p> : null}
         <button
           onClick={() => nav("/fit-profile")}
           className="mt-3 w-full rounded-2xl bg-surface-2 border border-white/5 px-4 py-3 text-left flex items-center justify-between hover:bg-surface-3"
@@ -118,40 +154,39 @@ export function Settings() {
               (x) => x.toLowerCase() === b.toLowerCase(),
             );
             return (
-              <Chip
-                key={b}
-                active={active}
-                label={b}
-                onClick={() => toggleBrand(b)}
-              />
+              <Chip key={b} active={active} label={b} onClick={() => toggleBrand(b)} />
             );
           })}
         </div>
       </Section>
 
-      <Section label="Scan accuracy">
-        <label className="flex items-start justify-between gap-3 cursor-pointer">
-          <span>
-            <span className="block text-sm">Add heel-pad load offset (+4 mm)</span>
-            <span className="block text-xs text-ink-muted mt-0.5">
-              Recommended when standing on the reference. Turn off for
-              seated scans or children.
+      {import.meta.env.DEV ? (
+        <Section label="Experimental measurement">
+          <label className="flex items-start justify-between gap-3 cursor-pointer">
+            <span>
+              <span className="block text-sm">
+                Unvalidated seated-scan estimate (+4 mm)
+              </span>
+              <span className="block text-xs text-ink-muted mt-0.5">
+                Development only. Valid production scans are standing, weight-bearing
+                and add no population-average offset.
+              </span>
             </span>
-          </span>
-          <input
-            type="checkbox"
-            checked={prefs.applyHeelPadOffset}
-            onChange={() =>
-              setProfile(
-                updatePreferences({
-                  applyHeelPadOffset: !prefs.applyHeelPadOffset,
-                }),
-              )
-            }
-            className="accent-neon w-5 h-5 mt-0.5"
-          />
-        </label>
-      </Section>
+            <input
+              type="checkbox"
+              checked={prefs.applyHeelPadOffset}
+              onChange={() =>
+                setProfile(
+                  updatePreferences({
+                    applyHeelPadOffset: !prefs.applyHeelPadOffset,
+                  }),
+                )
+              }
+              className="accent-neon w-5 h-5 mt-0.5"
+            />
+          </label>
+        </Section>
+      ) : null}
 
       <section className="space-y-2">
         <h2 className="text-[10px] uppercase tracking-widest text-ink-muted">
@@ -169,8 +204,8 @@ export function Settings() {
       {canUseCloudSync() && hasCloudSyncConsent() ? (
         <Section label="Cloud backup">
           <p className="text-xs text-ink-muted leading-relaxed">
-            Pull scans, fit profile, and events from your cloud account onto
-            this device.
+            Pull scans, fit profile, and events from your cloud account onto this
+            device.
             {isApiConfigured()
               ? " Sync goes through the FitSense API when configured."
               : ""}
@@ -189,9 +224,7 @@ export function Settings() {
           >
             {restoring ? "Restoring…" : "Restore from cloud"}
           </button>
-          {restoreMsg ? (
-            <p className="text-xs text-neon">{restoreMsg}</p>
-          ) : null}
+          {restoreMsg ? <p className="text-xs text-neon">{restoreMsg}</p> : null}
         </Section>
       ) : null}
 
@@ -213,7 +246,8 @@ export function Settings() {
       <div className="flex-1" />
 
       <button
-        onClick={() => {
+        onClick={async () => {
+          await signOutCloudAccount().catch(() => undefined);
           signOut();
           nav("/splash", { replace: true });
         }}
@@ -234,9 +268,7 @@ interface SectionProps {
 function Section({ label, children }: SectionProps) {
   return (
     <section className="space-y-2">
-      <h2 className="text-[10px] uppercase tracking-widest text-ink-muted">
-        {label}
-      </h2>
+      <h2 className="text-[10px] uppercase tracking-widest text-ink-muted">{label}</h2>
       <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
         {children}
       </div>
@@ -257,9 +289,7 @@ function Chip({
     <button
       onClick={onClick}
       className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors ${
-        active
-          ? "bg-neon text-surface-0"
-          : "bg-surface-3 text-ink hover:bg-surface-2"
+        active ? "bg-neon text-surface-0" : "bg-surface-3 text-ink hover:bg-surface-2"
       }`}
     >
       {label}

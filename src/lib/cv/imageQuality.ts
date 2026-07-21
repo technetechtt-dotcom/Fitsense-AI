@@ -15,6 +15,10 @@ export interface ImageQuality {
   sharpness: number;
   /** Mean luminance in 0..255 — < 35 = too dark, > 235 = blown out. */
   meanLuminance: number;
+  /** Fraction of pixels near black; high values indicate severe shadow/clipping. */
+  shadowFraction: number;
+  /** Fraction of pixels near white; high values indicate glare/clipping. */
+  highlightFraction: number;
   /** Composite OK flag. */
   ok: boolean;
   /** Human-readable reason if not OK. */
@@ -25,6 +29,7 @@ const MAX_PROBE_WIDTH = 320;
 const SHARPNESS_FLOOR = 55;
 const LUMINANCE_MIN = 35;
 const LUMINANCE_MAX = 235;
+const CLIPPED_FRACTION_MAX = 0.3;
 
 /**
  * Compute sharpness + brightness for a captured frame.
@@ -51,12 +56,18 @@ export function probeImageQuality(canvas: HTMLCanvasElement): ImageQuality {
   // Convert to grayscale (8-bit). Reuse a typed array for the kernel.
   const gray = new Uint8ClampedArray(w * h);
   let lumSum = 0;
+  let shadowPixels = 0;
+  let highlightPixels = 0;
   for (let i = 0, j = 0; i < data.length; i += 4, j++) {
     const lum = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114) | 0;
     gray[j] = lum;
     lumSum += lum;
+    if (lum < 20) shadowPixels++;
+    if (lum > 245) highlightPixels++;
   }
   const meanLuminance = lumSum / (w * h);
+  const shadowFraction = shadowPixels / (w * h);
+  const highlightFraction = highlightPixels / (w * h);
 
   // Laplacian (3×3 kernel) → variance.
   let sumSq = 0;
@@ -90,10 +101,28 @@ export function probeImageQuality(canvas: HTMLCanvasElement): ImageQuality {
     issue = "Too dark — move to better light and try again.";
   } else if (meanLuminance > LUMINANCE_MAX) {
     issue = "Photo is overexposed — soften the lighting and try again.";
+  } else if (shadowFraction > CLIPPED_FRACTION_MAX) {
+    issue = "Severe shadows hide the foot or reference — use bright, even light.";
+  } else if (highlightFraction > CLIPPED_FRACTION_MAX) {
+    issue = "Glare hides the foot or reference — avoid flash and reflective light.";
   }
-  return { sharpness, meanLuminance, ok: issue === null, issue };
+  return {
+    sharpness,
+    meanLuminance,
+    shadowFraction,
+    highlightFraction,
+    ok: issue === null,
+    issue,
+  };
 }
 
 function emptyResult(issue: string): ImageQuality {
-  return { sharpness: 0, meanLuminance: 0, ok: false, issue };
+  return {
+    sharpness: 0,
+    meanLuminance: 0,
+    shadowFraction: 1,
+    highlightFraction: 0,
+    ok: false,
+    issue,
+  };
 }

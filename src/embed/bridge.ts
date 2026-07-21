@@ -1,7 +1,4 @@
-import type {
-  EmbedToHostMessage,
-  HostToEmbedMessage,
-} from "./types";
+import type { EmbedToHostMessage, HostToEmbedMessage } from "./types";
 
 /**
  * Thin postMessage bridges. Used in two contexts:
@@ -16,6 +13,19 @@ const NAMESPACE = "fitsense:";
 
 /** No-op unsubscribe handle for server-side rendering paths. */
 const noop = (): void => undefined;
+
+function expectedParentOrigin(): string {
+  if (typeof document !== "undefined" && document.referrer) {
+    try {
+      return new URL(document.referrer).origin;
+    } catch {
+      // Fall through.
+    }
+  }
+  const ancestors = window.location.ancestorOrigins;
+  if (ancestors?.length) return ancestors[0];
+  return "*";
+}
 
 function isFitSenseMessage(data: unknown): data is { type: string } {
   return (
@@ -32,17 +42,18 @@ export function postToHost(message: EmbedToHostMessage): void {
   if (typeof window === "undefined") return;
   if (window.parent === window) return;
   try {
-    window.parent.postMessage(message, "*");
+    window.parent.postMessage(message, expectedParentOrigin());
   } catch {
     // ignore — host frame may have navigated away
   }
 }
 
-export function listenFromHost(
-  handler: (msg: HostToEmbedMessage) => void,
-): () => void {
+export function listenFromHost(handler: (msg: HostToEmbedMessage) => void): () => void {
   if (typeof window === "undefined") return noop;
+  const expectedOrigin = expectedParentOrigin();
   const onMessage = (event: MessageEvent) => {
+    if (event.source !== window.parent) return;
+    if (expectedOrigin !== "*" && event.origin !== expectedOrigin) return;
     if (!isFitSenseMessage(event.data)) return;
     handler(event.data as HostToEmbedMessage);
   };

@@ -170,7 +170,10 @@ export async function segmentFoot(
   }
 }
 
-function binariseMask(mask: import("./opencvLoader").OcvMat, cv: Awaited<ReturnType<typeof loadOpenCv>>): Uint8Array {
+function binariseMask(
+  mask: import("./opencvLoader").OcvMat,
+  cv: Awaited<ReturnType<typeof loadOpenCv>>,
+): Uint8Array {
   // OpenCV.js exposes raw mask bytes through `mask.data`. Each pixel is
   // a single uchar: 0=BG, 1=FG, 2=PR_BG, 3=PR_FG.
   const out = new Uint8Array(mask.rows * mask.cols);

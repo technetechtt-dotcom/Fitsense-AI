@@ -1,27 +1,37 @@
-# FitSense AI — Web companion
+# FitSense — retail footwear-fit technology
 
-Interactive web app for AR-assisted foot sizing and shoe recommendations.
-Shares sizing logic with the native Android app in `android/`.
+Phone-assisted foot measurement, reusable Fit ID, and product-specific footwear
+size recommendations. The initial launch focus is South African school footwear,
+with safety footwear as a separate secondary validation segment.
+
+FitSense is not a medical device. It does not diagnose, treat, prevent, or
+monitor medical conditions, and it does not guarantee that footwear will fit.
+See [the product definition](docs/PRODUCT_DEFINITION.md) and
+[validated measurement protocol](docs/MEASUREMENT_PROTOCOL.md).
 
 ## Tech
 
-- **React 18 + TypeScript + Vite 5**
+- **React 18 + TypeScript + Vite 8**
 - **Tailwind CSS** — responsive layout, safe-area insets, PWA manifest
 - **React Router 6** — screen transitions via Framer Motion
 - **OpenCV.js + MediaPipe** — reference detection and foot landmarks on `/scan`
 - **WebXR** — immersive AR plane mode (Android Chrome) via `arSession.ts`
-- **Firebase** (optional) — anonymous auth, Firestore sync, Analytics
+- **Firebase** (optional) — guest-to-Google account linking, Firestore sync, Analytics
 - **localStorage** — offline-first persistence
 
 ## Run
 
+Use Node 22.16.0 and npm 11.6.x (`.nvmrc`, `.node-version`, and
+`packageManager` are committed).
+
 ```bash
-npm install
+npm ci
 npm run dev          # http://localhost:5173
 npm run dev:full     # web + API together (recommended)
 npm run build        # production bundle in dist/
 npm run build:sdk    # partner embed SDK → dist-sdk/embed.js
 npm run build:all    # app + SDK
+npm run check        # typecheck + lint + backend tests + production builds
 npm run preview      # serve production build
 ```
 
@@ -39,27 +49,47 @@ Handoff, embed QR flow, and cloud sync automatically use the API when
 `VITE_API_BASE_URL` is set. Sync still requires Firebase web config (ID tokens)
 plus Firebase Admin on the server — see [backend/README.md](backend/README.md).
 
+Neon/Postgres storage is supported through `DATABASE_URL`; see
+[docs/RENDER_NEON.md](docs/RENDER_NEON.md) for the Render Blueprint setup.
+
 ### Firebase (optional)
 
 Copy `.env.example` to `.env.local` and fill in your Firebase web app config.
 Without it, the app runs fully offline; cloud sync and analytics stay disabled.
 
+### Production
+
+Production readiness assets live in:
+
+- `docs/PRODUCT_DEFINITION.md` - market, use cases, claims, value and acceptance
+- `docs/MEASUREMENT_PROTOCOL.md` - valid/rejected scans and validation targets
+- `docs/PRODUCTION_READINESS.md` - release gate, required env, external blockers
+- `docs/RENDER_NEON.md` - Render Blueprint + Neon deployment guide
+- `docs/architecture/ADR-001-monorepo-migration.md` - staged target architecture
+- `render.yaml` - Render services for the API and static web app
+- `firebase.json`, `firestore.rules`, `storage.rules` - Firebase deployment rules
+- `backend/Dockerfile` - API container build
+- `.github/workflows/ci.yml` - web, SDK, backend, and container CI
+
+Use `VITE_ENABLE_DEMO_SCAN=false` or leave it unset in production. Simulated
+scan fallback is enabled only in Vite dev by default.
+
 ## Screens
 
-| Route | Page |
-|-------|------|
-| `/splash` | Animated splash |
-| `/onboarding` | Intro carousel |
-| `/home` | Dashboard + consent reminder |
-| `/scan` | Camera / tap-to-measure / WebXR AR |
-| `/results/:scanId` | Measurement summary |
-| `/recommendations/:scanId` | Ranked shoes |
-| `/measurements` | Scan history |
-| `/fit-profile` | Portable fit identity |
-| `/products/:productId` | Product detail |
-| `/integrations` | Partner embed preview + docs |
-| `/settings` | Units, consent, cloud restore, sign-out |
-| `/privacy` | Policy, export, delete, restore |
+| Route                      | Page                                    |
+| -------------------------- | --------------------------------------- |
+| `/splash`                  | Animated splash                         |
+| `/onboarding`              | Intro carousel                          |
+| `/home`                    | Dashboard + consent reminder            |
+| `/scan`                    | Camera / tap-to-measure / WebXR AR      |
+| `/results/:scanId`         | Measurement summary                     |
+| `/recommendations/:scanId` | Ranked shoes                            |
+| `/measurements`            | Scan history                            |
+| `/fit-profile`             | Portable fit identity                   |
+| `/products/:productId`     | Product detail                          |
+| `/integrations`            | Partner embed preview + docs            |
+| `/settings`                | Units, consent, cloud restore, sign-out |
+| `/privacy`                 | Policy, export, delete, restore         |
 
 Embed mode: append `?embed=1` (see `INTEGRATION.md` and `npm run build:sdk`).
 

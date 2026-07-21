@@ -1,4 +1,4 @@
-import { CALIBRATION_META, type CalibrationReference } from "../types";
+import type { CalibrationReference } from "../types";
 
 interface Props {
   value: CalibrationReference;
@@ -21,9 +21,7 @@ export function CalibrationChips({
             key={ref}
             onClick={() => onChange(ref)}
             className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-colors ${
-              active
-                ? "bg-neon text-surface-0"
-                : "text-ink hover:bg-white/5"
+              active ? "bg-neon text-surface-0" : "text-ink hover:bg-white/5"
             }`}
           >
             {labelFor(ref)}
@@ -38,8 +36,4 @@ function labelFor(ref: CalibrationReference): string {
   if (ref === "arcore_plane") return "AR plane";
   if (ref === "a4_paper") return "A4 paper";
   return "Bank card";
-}
-
-export function calibrationLabel(ref: CalibrationReference): string {
-  return CALIBRATION_META[ref].label;
 }

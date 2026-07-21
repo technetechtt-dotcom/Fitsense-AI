@@ -5,15 +5,13 @@ import { captureBurst } from "../lib/cv/burst";
 import { autoDetectReference } from "../lib/cv/autoDetectReference";
 import { autoDetectFoot } from "../lib/cv/autoDetectFoot";
 import { TapMeasurement, AutoDetectChip } from "../components/TapMeasurement";
-import type {
-  CalibrationReference,
-  FootMeasurement,
-} from "../types";
+import type { CalibrationReference, Foot, FootMeasurement } from "../types";
 import type { Point } from "../lib/homography";
 import type { RealMeasurementResult } from "../lib/realMeasurement";
 
 interface Props {
   calibration: Exclude<CalibrationReference, "arcore_plane">;
+  foot: Exclude<Foot, "unknown">;
   onMeasured: (m: FootMeasurement) => void;
   onCancel: () => void;
 }
@@ -46,11 +44,7 @@ interface CapturedFrame {
  *     `allow="camera"` (or `permissions-policy: camera=*`). The SDK
  *     bootstrap already sets this in `sdk.ts`.
  */
-export function EmbedLiveScanner({
-  calibration,
-  onMeasured,
-  onCancel,
-}: Props) {
+export function EmbedLiveScanner({ calibration, foot, onMeasured, onCancel }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [captured, setCaptured] = useState<CapturedFrame | null>(null);
   const [busy, setBusy] = useState<null | "burst" | "cv" | "ml">(null);
@@ -94,9 +88,7 @@ export function EmbedLiveScanner({
         const ref = await autoDetectReference(burst.canvas, calibration);
         if (ref) {
           suggestedRefCorners = ref.corners;
-          autoNotice = `Auto-detected reference (${Math.round(
-            ref.confidence * 100,
-          )}%)`;
+          autoNotice = `Auto-detected reference (${Math.round(ref.confidence * 100)}%)`;
         }
       } catch {
         // OpenCV failed; fall through.
@@ -146,8 +138,7 @@ export function EmbedLiveScanner({
         <Camera size={48} className="fs-camera-icon" />
         <h2 className="fs-h2">Scan your foot</h2>
         <p className="fs-muted">
-          We'll use your device camera to measure your foot — nothing is
-          uploaded.
+          We'll use your device camera to measure your foot — nothing is uploaded.
         </p>
         {camera.state.kind === "denied" ? (
           <p className="fs-error">{camera.state.message}</p>
@@ -207,6 +198,7 @@ export function EmbedLiveScanner({
           imageWidthPx={captured.widthPx}
           imageHeightPx={captured.heightPx}
           calibration={calibration}
+          foot={foot}
           onMeasured={onTapMeasured}
           onRetake={() => {
             setCaptured(null);
@@ -215,9 +207,7 @@ export function EmbedLiveScanner({
           suggestedRefCorners={captured.suggestedRefCorners}
           suggestedFoot={captured.suggestedFoot}
           banner={
-            captured.autoNotice ? (
-              <AutoDetectChip label={captured.autoNotice} />
-            ) : null
+            captured.autoNotice ? <AutoDetectChip label={captured.autoNotice} /> : null
           }
         />
       </div>
@@ -227,13 +217,7 @@ export function EmbedLiveScanner({
   // ─── Live preview ───────────────────────────────────────────────
   return (
     <div className="fs-live">
-      <video
-        ref={videoRef}
-        playsInline
-        muted
-        autoPlay
-        className="fs-video"
-      />
+      <video ref={videoRef} playsInline muted autoPlay className="fs-video" />
       <div className="fs-live-overlay">
         <div className="fs-live-hint">
           {calibration === "a4_paper"
@@ -253,8 +237,8 @@ export function EmbedLiveScanner({
               {busy === "burst"
                 ? "Capturing burst…"
                 : busy === "cv"
-                ? "Finding reference…"
-                : "Detecting foot…"}
+                  ? "Finding reference…"
+                  : "Detecting foot…"}
             </span>
           </div>
         ) : null}

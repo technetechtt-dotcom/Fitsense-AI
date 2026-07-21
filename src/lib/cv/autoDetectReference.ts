@@ -21,13 +21,10 @@ import type { CalibrationReference } from "../../types";
  * if nothing convincing was found. Callers can fall back to manual taps.
  */
 
-const MIN_AREA_FRACTION = 0.02;
+const MIN_AREA_FRACTION = 0.05;
 const MAX_AREA_FRACTION = 0.85;
 
-const EXPECTED_ASPECT: Record<
-  Exclude<CalibrationReference, "arcore_plane">,
-  number
-> = {
+const EXPECTED_ASPECT: Record<Exclude<CalibrationReference, "arcore_plane">, number> = {
   a4_paper: 297 / 210, // ≈ 1.414
   credit_card: 85.6 / 53.98, // ≈ 1.586
 };
@@ -57,13 +54,7 @@ export async function autoDetectReference(
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
     cv.Canny(blurred, edges, 50, 150);
-    cv.findContours(
-      edges,
-      contours,
-      hierarchy,
-      cv.RETR_LIST,
-      cv.CHAIN_APPROX_SIMPLE,
-    );
+    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
 
     const frameArea = canvas.width * canvas.height;
     const expectedAspect = EXPECTED_ASPECT[calibration];
@@ -81,10 +72,7 @@ export async function autoDetectReference(
       if (approx.rows === 4 && cv.isContourConvex(approx)) {
         const area = Math.abs(cv.contourArea(approx));
         const areaFraction = area / frameArea;
-        if (
-          areaFraction >= MIN_AREA_FRACTION &&
-          areaFraction <= MAX_AREA_FRACTION
-        ) {
+        if (areaFraction >= MIN_AREA_FRACTION && areaFraction <= MAX_AREA_FRACTION) {
           const corners = matRowsToPoints(approx);
           const score = scoreQuad(corners, expectedAspect, areaFraction);
           if (!best || score > best.confidence) {
@@ -110,7 +98,7 @@ export async function autoDetectReference(
 
   // Require at least a modest confidence — better to fall back to taps
   // than confidently show wrong corners.
-  if (!best || best.confidence < 0.45) return null;
+  if (!best || best.confidence < 0.6) return null;
   return best;
 }
 

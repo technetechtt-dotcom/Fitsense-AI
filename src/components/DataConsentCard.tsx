@@ -36,13 +36,9 @@ export function DataConsentCard() {
       setChoices({
         cloudSync: state.cloudSync === "unset" ? "denied" : state.cloudSync,
         aiPersonalization:
-          state.aiPersonalization === "unset"
-            ? "granted"
-            : state.aiPersonalization,
+          state.aiPersonalization === "unset" ? "granted" : state.aiPersonalization,
         anonymousAnalytics:
-          state.anonymousAnalytics === "unset"
-            ? "denied"
-            : state.anonymousAnalytics,
+          state.anonymousAnalytics === "unset" ? "denied" : state.anonymousAnalytics,
       });
     });
   }, []);
@@ -83,9 +79,7 @@ export function DataConsentCard() {
   return (
     <div
       className={`rounded-2xl border p-4 space-y-4 ${
-        needsReview
-          ? "border-neon/40 bg-neon/5"
-          : "border-white/5 bg-surface-2"
+        needsReview ? "border-neon/40 bg-neon/5" : "border-white/5 bg-surface-2"
       }`}
     >
       <header className="flex items-start gap-3">
@@ -95,8 +89,8 @@ export function DataConsentCard() {
         <div className="flex-1">
           <h3 className="text-base font-bold">Your data, your choice</h3>
           <p className="text-xs text-ink-muted leading-relaxed mt-1">
-            FitSense works fully offline by default. Turn on only what you
-            need — you can change these anytime.
+            FitSense works fully offline by default. Turn on only what you need — you
+            can change these anytime.
           </p>
           {needsReview ? (
             <p className="text-xs text-neon mt-2 font-medium">
@@ -175,9 +169,7 @@ function ChoiceRow({ icon, title, body, value, onChange }: ChoiceRowProps) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-semibold">{title}</div>
-        <p className="text-[11px] text-ink-muted leading-relaxed mt-0.5">
-          {body}
-        </p>
+        <p className="text-[11px] text-ink-muted leading-relaxed mt-0.5">{body}</p>
       </div>
       <button
         type="button"

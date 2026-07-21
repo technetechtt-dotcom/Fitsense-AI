@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   Camera,
@@ -19,7 +19,7 @@ import { CameraPermissionHelp } from "../components/CameraPermissionHelp";
 import { ArScanner } from "../components/ArScanner";
 import { recommend } from "../lib/recommendation";
 import { SHOE_CATALOG } from "../data/catalog";
-import { getOrCreateProfile, saveScan } from "../lib/storage";
+import { getOrCreateProfile, listScans, saveScan } from "../lib/storage";
 import {
   appendFitEvent,
   applyScanToFitProfile,
@@ -41,12 +41,7 @@ import {
   nativeMeasureFoot,
   type NativeCapabilities,
 } from "../lib/native/bridge";
-import type {
-  CalibrationReference,
-  Foot,
-  FootMeasurement,
-  ScanResult,
-} from "../types";
+import type { CalibrationReference, Foot, FootMeasurement, ScanResult } from "../types";
 import type { Point } from "../lib/homography";
 import type { RealMeasurementResult } from "../lib/realMeasurement";
 
@@ -88,6 +83,7 @@ interface CapturedFrame {
  */
 export function Scan() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [phase, setPhase] = useState<Phase>("permission");
@@ -104,7 +100,9 @@ export function Scan() {
   >(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [nativeCaps, setNativeCaps] = useState<NativeCapabilities | null>(null);
-  const [scanFoot, setScanFoot] = useState<Foot>("right");
+  const [scanFoot, setScanFoot] = useState<Exclude<Foot, "unknown">>(() =>
+    searchParams.get("foot") === "left" ? "left" : "right",
+  );
 
   const camera = useCamera({
     onStreamReady: (stream) => {
@@ -242,24 +240,57 @@ export function Scan() {
 
   // ─── Persist + route ─────────────────────────────────────────────
   const onMeasured = useCallback(
-    (measurement: FootMeasurement, sanityIssue: string | null) => {
+    (
+      measurement: FootMeasurement,
+      sanityIssue: string | null,
+      method: "reference" | "webxr" | "native-arkit" | "native-arcore",
+    ) => {
       const userProfile = getOrCreateProfile();
       const fitProfile = getOrCreateFitProfile();
-      const recommendation = recommend(measurement, SHOE_CATALOG, {
-        preferredBrands: userProfile.preferences.preferredBrands,
-        profile: fitProfile,
+      const measuredFoot: FootMeasurement = {
+        ...measurement,
+        foot: scanFoot,
+      };
+      const oppositeFoot = listScans().find((candidate) => {
+        const ageMs = Date.now() - candidate.createdAtEpochMs;
+        if (candidate.userId !== userProfile.userId || ageMs > 30 * 60 * 1000) {
+          return false;
+        }
+        return scanFoot === "left"
+          ? candidate.rightFoot !== undefined
+          : candidate.leftFoot !== undefined;
       });
-      const footField =
-        scanFoot === "left"
-          ? { leftFoot: { ...measurement, foot: "left" as const } }
-          : { rightFoot: { ...measurement, foot: "right" as const } };
+      const leftFoot = scanFoot === "left" ? measuredFoot : oppositeFoot?.leftFoot;
+      const rightFoot = scanFoot === "right" ? measuredFoot : oppositeFoot?.rightFoot;
+      const sizingFoot =
+        leftFoot && rightFoot
+          ? leftFoot.lengthMm >= rightFoot.lengthMm
+            ? leftFoot
+            : rightFoot
+          : measuredFoot;
+      const recommendation =
+        leftFoot && rightFoot
+          ? recommend(sizingFoot, SHOE_CATALOG, {
+              preferredBrands: userProfile.preferences.preferredBrands,
+              profile: fitProfile,
+            })
+          : undefined;
       const scan: ScanResult = {
         scanId: crypto.randomUUID(),
         userId: userProfile.userId,
         createdAtEpochMs: Date.now(),
-        ...footField,
+        leftFoot,
+        rightFoot,
         recommendation,
         arcoreUsed: calibration === "arcore_plane",
+        provenance: {
+          measurementKind: "measured",
+          method,
+          algorithmVersion: "web-0.2.0",
+          widthSource: "measured",
+          qualityStatus: "accepted",
+          pairedFeet: Boolean(leftFoot && rightFoot),
+        },
       };
       saveScan(scan);
 
@@ -273,8 +304,8 @@ export function Scan() {
         epochMs: scan.createdAtEpochMs,
         kind: "scan",
         scanId: scan.scanId,
-        lengthMm: measurement.lengthMm,
-        widthMm: measurement.widthMm,
+        lengthMm: sizingFoot.lengthMm,
+        widthMm: sizingFoot.widthMm,
         asymmetryMm: updated.asymmetryMm,
       });
       persistInsights(deriveInsights(updated, listFitEvents()));
@@ -293,14 +324,14 @@ export function Scan() {
 
   const onTapMeasured = useCallback(
     (result: RealMeasurementResult) => {
-      onMeasured(result.measurement, result.sanity.issue);
+      onMeasured(result.measurement, result.sanity.issue, "reference");
     },
     [onMeasured],
   );
 
   /**
-   * If a native shell exposes `measureFoot`, the most accurate scan is a
-   * single tap away. We surface it as a top-level CTA when the bridge is
+   * If a native shell exposes `measureFoot`, an experimental hardware-assisted
+   * scan is available. We surface it as a top-level CTA when the bridge is
    * present; otherwise the standard reference / AR pipeline takes over.
    */
   const runNativeScan = useCallback(async () => {
@@ -312,26 +343,46 @@ export function Scan() {
         setCaptureError("Native scan unavailable — falling back to camera.");
         return;
       }
+      const nativeSource = native.source.toLowerCase();
+      const ratio = native.widthMm / native.lengthMm;
+      if (
+        (!nativeSource.includes("arkit") &&
+          !nativeSource.includes("arcore") &&
+          !nativeSource.includes("lidar")) ||
+        native.confidence < 0.7 ||
+        native.lengthMm < 120 ||
+        native.lengthMm > 360 ||
+        native.widthMm < 45 ||
+        native.widthMm > 160 ||
+        ratio < 0.25 ||
+        ratio > 0.55
+      ) {
+        setCaptureError(
+          "Native measurement did not pass quality checks. Use the A4 or bank-card workflow.",
+        );
+        return;
+      }
       onMeasured(
         {
           lengthMm: native.lengthMm,
           widthMm: native.widthMm,
           confidence: native.confidence,
-          foot: "right",
+          foot: scanFoot,
           calibration: "arcore_plane",
           pixelsPerMm: 0,
         },
         null,
+        nativeSource.includes("arkit") || nativeSource.includes("lidar")
+          ? "native-arkit"
+          : "native-arcore",
       );
     } finally {
       setCaptureBusy(null);
     }
-  }, [onMeasured]);
+  }, [onMeasured, scanFoot]);
 
-  const fallbackCalibration: Exclude<
-    CalibrationReference,
-    "arcore_plane"
-  > = calibration === "credit_card" ? "credit_card" : "a4_paper";
+  const fallbackCalibration: Exclude<CalibrationReference, "arcore_plane"> =
+    calibration === "credit_card" ? "credit_card" : "a4_paper";
 
   // ─── Permission gate (iOS Safari needs an explicit gesture) ─────
   if (phase === "permission" && camera.state.kind !== "live") {
@@ -349,7 +400,7 @@ export function Scan() {
   if (phase === "ar") {
     return (
       <ArScanner
-        onMeasured={(m) => onMeasured(m, null)}
+        onMeasured={(m) => onMeasured(m, null, "webxr")}
         onCancel={() => setPhase("live")}
         onError={(message) => {
           setArSupport({ kind: "unsupported", reason: message });
@@ -444,10 +495,10 @@ export function Scan() {
               {captureBusy === "burst"
                 ? "Capturing burst…"
                 : captureBusy === "cv"
-                ? "Finding reference object…"
-                : captureBusy === "native"
-                ? "Running native depth scan…"
-                : "Detecting foot landmarks…"}
+                  ? "Finding reference object…"
+                  : captureBusy === "native"
+                    ? "Running native depth scan…"
+                    : "Detecting foot landmarks…"}
             </span>
           </div>
         </div>
@@ -460,6 +511,7 @@ export function Scan() {
             imageWidthPx={captured.widthPx}
             imageHeightPx={captured.heightPx}
             calibration={fallbackCalibration}
+            foot={scanFoot}
             onMeasured={onTapMeasured}
             onRetake={retake}
             suggestedRefCorners={captured.suggestedRefCorners}
@@ -475,14 +527,16 @@ export function Scan() {
 
       {phase === "live" ? (
         <footer className="absolute inset-x-0 bottom-0 z-10 px-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-3 pb-[max(2rem,env(safe-area-inset-bottom))] space-y-2 sm:space-y-3">
-          {nativeCaps?.hasDepthSensor ? (
+          {nativeCaps && (nativeCaps.hasArkit || nativeCaps.hasArcore) ? (
             <button
               onClick={runNativeScan}
               disabled={captureBusy !== null}
               className="w-full rounded-2xl bg-violet/85 text-white text-sm font-semibold py-3 inline-flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Sparkles className="w-4 h-4" />
-              Use {nativeCaps.platform.includes("ios") ? "LiDAR" : "depth"} sensor for sub-mm accuracy
+              {nativeCaps.hasDepthSensor
+                ? "Use native depth-assisted measurement (experimental)"
+                : "Use native AR measurement (experimental)"}
             </button>
           ) : null}
           <FootPicker value={scanFoot} onChange={setScanFoot} />
@@ -538,8 +592,8 @@ function PermissionGate({
         <div className="space-y-1.5">
           <h1 className="text-xl font-bold">Scan your foot</h1>
           <p className="text-sm text-ink-muted">
-            We need access to your camera. Nothing is uploaded — every
-            measurement runs on your device.
+            We need access to your camera. Nothing is uploaded — every measurement runs
+            on your device.
           </p>
           {safari ? (
             <p className="text-xs text-ink-soft">
@@ -613,17 +667,13 @@ function FootSilhouette() {
   );
 }
 
-function ReferenceHint({
-  calibration,
-}: {
-  calibration: CalibrationReference;
-}) {
+function ReferenceHint({ calibration }: { calibration: CalibrationReference }) {
   const label =
     calibration === "a4_paper"
       ? "Stand on a sheet of A4 paper (full weight)"
       : calibration === "credit_card"
-      ? "Place a bank card flat next to your foot"
-      : "Aim at the floor — we'll calibrate against the plane";
+        ? "Place a bank card flat next to your foot"
+        : "Aim at the floor — we'll calibrate against the plane";
   return (
     <div className="absolute top-20 inset-x-5 z-10 flex justify-center pointer-events-none">
       <div className="rounded-full bg-black/55 backdrop-blur px-4 py-2 text-xs font-medium text-ink">
@@ -637,8 +687,8 @@ function FootPicker({
   value,
   onChange,
 }: {
-  value: Foot;
-  onChange: (f: Foot) => void;
+  value: Exclude<Foot, "unknown">;
+  onChange: (f: Exclude<Foot, "unknown">) => void;
 }) {
   return (
     <div className="grid grid-cols-2 gap-2">
@@ -794,8 +844,7 @@ function ArProbe({
     if (support.kind === "supported") {
       return {
         title: "AR plane scanning",
-        body:
-          "Your device supports WebXR AR sessions. Tap below to switch into immersive AR — you'll point your camera at the floor, then tap your heel and longest toe to capture a 3D measurement.",
+        body: "Your device supports WebXR AR sessions. Tap below to switch into immersive AR — you'll point your camera at the floor, then tap your heel and longest toe to capture a 3D measurement.",
         tone: "info" as const,
       };
     }
@@ -804,7 +853,7 @@ function ArProbe({
         title: "AR plane isn't supported here",
         body:
           (support as { reason: string }).reason ??
-          "Your device doesn't support WebXR AR sessions. Use A4 paper or a bank card instead — it's just as accurate.",
+          "Your device doesn't support WebXR AR sessions. Use a flat A4 sheet or bank card for the validated reference workflow.",
         tone: "warn" as const,
       };
     }
@@ -830,9 +879,7 @@ function ArProbe({
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="font-bold text-lg leading-tight">{message.title}</h2>
-          <p className="text-sm text-ink-muted mt-1 leading-relaxed">
-            {message.body}
-          </p>
+          <p className="text-sm text-ink-muted mt-1 leading-relaxed">{message.body}</p>
         </div>
       </div>
       <div className="rounded-2xl bg-surface-2 border border-white/5 p-4 space-y-2">
@@ -841,16 +888,17 @@ function ArProbe({
         </div>
         <div className="flex items-center gap-2 text-sm">
           <Ruler className="w-4 h-4 text-neon" />
-          <span>A reference object gives sub-millimetre accuracy today.</span>
+          <span>
+            Use a flat A4 sheet or bank card for a quality-checked real-scale
+            measurement.
+          </span>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <PrimaryButton variant="ghost" onClick={onClose}>
           Cancel
         </PrimaryButton>
-        <PrimaryButton onClick={onUseReference}>
-          Use A4 paper
-        </PrimaryButton>
+        <PrimaryButton onClick={onUseReference}>Use A4 paper</PrimaryButton>
       </div>
     </div>
   );

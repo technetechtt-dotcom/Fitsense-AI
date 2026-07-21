@@ -27,9 +27,7 @@ export function Measurements() {
       <TopBar title="Saved measurements" />
 
       {scans.length === 0 ? (
-        <p className="text-sm text-ink-muted py-8 text-center">
-          No saved scans yet.
-        </p>
+        <p className="text-sm text-ink-muted py-8 text-center">No saved scans yet.</p>
       ) : (
         <div className="space-y-3">
           {scans.map((scan, i) => (

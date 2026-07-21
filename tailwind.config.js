@@ -57,7 +57,8 @@ export default {
         display: ["Sora", "Inter", "system-ui", "sans-serif"],
       },
       backgroundImage: {
-        "scan-grad": "linear-gradient(135deg, rgba(0,229,199,0.95), rgba(124,77,255,0.85))",
+        "scan-grad":
+          "linear-gradient(135deg, rgba(0,229,199,0.95), rgba(124,77,255,0.85))",
         "hero-grad": "linear-gradient(135deg, #7C4DFF 0%, #00E5C7 100%)",
         "card-grad": "linear-gradient(145deg, #161D33 0%, #1F2740 100%)",
       },

@@ -18,8 +18,8 @@ export function ConsentBanner() {
         <div className="flex-1 min-w-0 text-left">
           <div className="text-sm font-semibold">Your data, your choice</div>
           <p className="text-xs text-ink-muted mt-0.5 leading-relaxed">
-            Review cloud sync, AI personalisation, and analytics in Settings
-            before you continue.
+            Review cloud sync, AI personalisation, and analytics in Settings before you
+            continue.
           </p>
         </div>
         <span className="text-neon text-xs font-semibold shrink-0 self-center">

@@ -17,17 +17,14 @@ import {
   Smartphone,
   X,
 } from "lucide-react";
-import { buildScanResult, simulatedMeasurement } from "../lib/measurement";
+import { buildScanResult } from "../lib/measurement";
 import { recommend } from "../lib/recommendation";
 import { SHOE_CATALOG } from "../data/catalog";
 import { CALIBRATION_META, primaryFoot, widthToLengthRatio } from "../types";
-import type {
-  CalibrationReference,
-  FootMeasurement,
-  ScanResult,
-} from "../types";
+import type { CalibrationReference, FootMeasurement, ScanResult } from "../types";
 import { ArScanner } from "../components/ArScanner";
 import { detectArSupport } from "../lib/webxr";
+import { isDemoScanEnabled } from "../lib/runtimeFlags";
 import { EmbedLiveScanner } from "./EmbedLiveScanner";
 import { listenFromHost, postToHost } from "./bridge";
 import { useApplyEmbedTheme } from "./EmbedTheme";
@@ -95,10 +92,16 @@ export function EmbedApp() {
   const [scan, setScan] = useState<ScanResult | null>(null);
   const [progress, setProgress] = useState(0);
   const [handoffError, setHandoffError] = useState<string | null>(null);
+  const [demoResult, setDemoResult] = useState(false);
+  const [pendingRightFoot, setPendingRightFoot] = useState<FootMeasurement | null>(
+    null,
+  );
+  const activeFoot = pendingRightFoot ? "left" : "right";
 
   useApplyEmbedTheme(config.theme);
 
   const isPhoneReceiver = !!config.handoff?.sessionId;
+  const demoScanEnabled = isDemoScanEnabled();
 
   // Announce readiness + accept reconfiguration from the host page.
   useEffect(() => {
@@ -133,28 +136,36 @@ export function EmbedApp() {
    */
   const runSimulatedScan = useCallback(
     async (calibration: CalibrationReference): Promise<ScanResult> => {
+      if (!import.meta.env.DEV || !demoScanEnabled) {
+        throw new Error("Simulated scan fallback is disabled.");
+      }
+      setDemoResult(true);
       setStep("scanning");
       setProgress(0);
       for (let i = 1; i <= 6; i++) {
-        // eslint-disable-next-line no-await-in-loop
         await new Promise((r) => setTimeout(r, 130));
         setProgress(i / 6);
       }
+      const { simulatedMeasurement } = await import("../lib/demo/simulatedMeasurement");
       const measurement = simulatedMeasurement(calibration);
       const recommendation = recommend(measurement, SHOE_CATALOG);
       return buildScanResult(
         config.productId ?? "embed-anonymous",
         measurement,
         recommendation,
+        undefined,
+        "simulated",
       );
     },
-    [config.productId],
+    [config.productId, demoScanEnabled],
   );
 
   const finaliseLocal = useCallback(
-    (result: ScanResult) => {
+    (result: ScanResult, isDemo = false) => {
       setScan(result);
       setStep("result");
+      setDemoResult(isDemo);
+      if (isDemo) return;
       const summary = toScanSummary(result);
       postToHost({ type: "fitsense:scan", scan: summary });
       const size = toSizeResult(result, config.sizeSystem ?? "uk");
@@ -191,9 +202,7 @@ export function EmbedApp() {
         setScan(result);
         setStep("handoff-done");
       } catch (err) {
-        setHandoffError(
-          err instanceof Error ? err.message : "Handoff failed.",
-        );
+        setHandoffError(err instanceof Error ? err.message : "Handoff failed.");
         setStep("result");
       }
     },
@@ -208,8 +217,15 @@ export function EmbedApp() {
         setStep("ar-scan");
         return;
       }
+      if (!demoScanEnabled) {
+        setHandoffError(
+          "AR scanning is not available on this device. Use A4 paper or a bank card for a real measurement.",
+        );
+        setStep("intro");
+        return;
+      }
       const result = await runSimulatedScan(calibration);
-      finaliseLocal(result);
+      finaliseLocal(result, true);
       return;
     }
     setStep("live-scan");
@@ -228,47 +244,85 @@ export function EmbedApp() {
         setStep("ar-scan");
         return;
       }
+      if (!demoScanEnabled) {
+        setHandoffError(
+          "AR scanning is not available on this device. Use A4 paper or a bank card for a real measurement.",
+        );
+        setStep("intro");
+        return;
+      }
       const result = await runSimulatedScan(calibration);
-      await finalisePhone(result);
+      setScan(result);
+      setDemoResult(true);
+      setHandoffError(
+        "DEMO result only — simulated measurements cannot be sent to a retailer.",
+      );
+      setStep("result");
       return;
     }
     setStep("live-scan");
   };
 
-  const onArMeasured = useCallback(
+  const completeRealFoot = useCallback(
     (measurement: FootMeasurement) => {
-      const recommendation = recommend(measurement, SHOE_CATALOG);
-      const result = buildScanResult(
-        config.productId ?? "embed-anonymous",
-        measurement,
+      setDemoResult(false);
+      const measuredFoot: FootMeasurement = { ...measurement, foot: activeFoot };
+      if (!pendingRightFoot) {
+        setPendingRightFoot(measuredFoot);
+        setHandoffError(
+          "Right foot accepted. Scan the left foot to create a size recommendation.",
+        );
+        setStep("intro");
+        return;
+      }
+      const rightFoot = pendingRightFoot;
+      const leftFoot = measuredFoot;
+      const sizingFoot = leftFoot.lengthMm >= rightFoot.lengthMm ? leftFoot : rightFoot;
+      const recommendation = recommend(sizingFoot, SHOE_CATALOG);
+      const result: ScanResult = {
+        scanId: crypto.randomUUID(),
+        userId: config.productId ?? "embed-anonymous",
+        createdAtEpochMs: Date.now(),
+        leftFoot,
+        rightFoot,
         recommendation,
-      );
+        arcoreUsed:
+          leftFoot.calibration === "arcore_plane" ||
+          rightFoot.calibration === "arcore_plane",
+        deviceModel: navigator.userAgent,
+        provenance: {
+          measurementKind: "measured",
+          method:
+            leftFoot.calibration === "arcore_plane" ||
+            rightFoot.calibration === "arcore_plane"
+              ? "webxr"
+              : "reference",
+          algorithmVersion: "web-0.2.0",
+          widthSource: "measured",
+          qualityStatus: "accepted",
+          pairedFeet: true,
+        },
+      };
+      setPendingRightFoot(null);
+      setHandoffError(null);
       if (isPhoneReceiver) {
         void finalisePhone(result);
       } else {
         finaliseLocal(result);
       }
     },
-    [config.productId, finaliseLocal, finalisePhone, isPhoneReceiver],
+    [
+      activeFoot,
+      config.productId,
+      finaliseLocal,
+      finalisePhone,
+      isPhoneReceiver,
+      pendingRightFoot,
+    ],
   );
 
-  /** Called by EmbedLiveScanner when the user confirms a tap measurement. */
-  const onLiveMeasured = useCallback(
-    (measurement: FootMeasurement) => {
-      const recommendation = recommend(measurement, SHOE_CATALOG);
-      const result = buildScanResult(
-        config.productId ?? "embed-anonymous",
-        measurement,
-        recommendation,
-      );
-      if (isPhoneReceiver) {
-        finalisePhone(result);
-      } else {
-        finaliseLocal(result);
-      }
-    },
-    [config.productId, finaliseLocal, finalisePhone, isPhoneReceiver],
-  );
+  const onArMeasured = completeRealFoot;
+  const onLiveMeasured = completeRealFoot;
 
   // ─── Desktop sender: open session, await phone payload ─────────────
   const handoffSession = useDesktopHandoff({
@@ -276,11 +330,9 @@ export function EmbedApp() {
     config,
     onPayload: (payload) => {
       // Reconstruct a minimal ScanResult shell for the result UI.
-      const reconstructed = reconstructScanResult(
-        config,
-        payload,
-      );
+      const reconstructed = reconstructScanResult(config, payload);
       setScan(reconstructed);
+      setDemoResult(false);
       setStep("result");
       postToHost({ type: "fitsense:scan", scan: payload.scan });
       postToHost({
@@ -297,7 +349,7 @@ export function EmbedApp() {
   };
 
   const apply = () => {
-    if (!scan) return;
+    if (!scan || demoResult) return;
     const size = toSizeResult(scan, config.sizeSystem ?? "uk");
     if (!size) return;
     const summary = toScanSummary(scan);
@@ -308,6 +360,16 @@ export function EmbedApp() {
   return (
     <div className="fs-root">
       <Header config={config} onClose={close} showPhoneBadge={isPhoneReceiver} />
+      {demoResult ? (
+        <div className="fs-demo-watermark" role="alert">
+          DEMO — SIMULATED VALUES — NOT A MEASUREMENT
+        </div>
+      ) : null}
+      {pendingRightFoot ? (
+        <div className="fs-pair-status" role="status">
+          RIGHT FOOT ACCEPTED — NOW SCAN LEFT FOOT
+        </div>
+      ) : null}
       <main className="fs-main">
         <AnimatePresence mode="wait">
           {step === "intro" && (
@@ -351,23 +413,19 @@ export function EmbedApp() {
             />
           ) : null}
 
-          {step === "live-scan" &&
-            calibrationForScan !== "arcore_plane" && (
-              <motion.div key="live-scan" {...stepMotion}>
-                <EmbedLiveScanner
-                  calibration={calibrationForScan}
-                  onMeasured={onLiveMeasured}
-                  onCancel={() => setStep("intro")}
-                />
-              </motion.div>
-            )}
+          {step === "live-scan" && calibrationForScan !== "arcore_plane" && (
+            <motion.div key="live-scan" {...stepMotion}>
+              <EmbedLiveScanner
+                calibration={calibrationForScan}
+                foot={activeFoot}
+                onMeasured={onLiveMeasured}
+                onCancel={() => setStep("intro")}
+              />
+            </motion.div>
+          )}
           {(step === "handoff-desktop" || step === "handoff-waiting") &&
             handoffSession && (
-              <motion.div
-                key="handoff"
-                {...stepMotion}
-                className="fs-step"
-              >
+              <motion.div key="handoff" {...stepMotion} className="fs-step">
                 <HandoffDesktop
                   qrUrl={handoffSession.qrUrl}
                   status={handoffSession.status}
@@ -377,11 +435,7 @@ export function EmbedApp() {
               </motion.div>
             )}
           {step === "handoff-done" && (
-            <motion.div
-              key="handoff-done"
-              {...stepMotion}
-              className="fs-step"
-            >
+            <motion.div key="handoff-done" {...stepMotion} className="fs-step">
               <HandoffDone scan={scan} sizeSystem={config.sizeSystem ?? "uk"} />
             </motion.div>
           )}
@@ -480,14 +534,14 @@ function Intro({
       <h2 className="fs-h2">
         {isPhoneReceiver
           ? "Finish the scan on this phone"
-          : "Find your perfect size"}
+          : "Find a better-informed size"}
       </h2>
       <p className="fs-muted">
         {isPhoneReceiver
           ? "Your size will be sent straight back to the other device."
           : config.brand
-          ? `Get a tailored fit for ${config.brand} in under 30 seconds. Place your foot on a flat floor and we'll measure with AR.`
-          : "Get a tailored fit in under 30 seconds. Place your foot on a flat floor and we'll measure with AR."}
+            ? `Get a tailored fit for ${config.brand} in under 30 seconds. Place your foot on a flat floor and we'll measure with AR.`
+            : "Get a tailored fit in under 30 seconds. Place your foot on a flat floor and we'll measure with AR."}
       </p>
       <div className="fs-stack">
         <button className="fs-btn fs-btn-primary" onClick={onStart}>
@@ -561,8 +615,8 @@ function HandoffDesktop({
     <div className="fs-handoff">
       <h2 className="fs-h2">Continue on your phone</h2>
       <p className="fs-muted">
-        Scan this QR with your phone camera to capture your foot. The size
-        will appear here as soon as it's done.
+        Scan this QR with your phone camera to capture your foot. The size will appear
+        here as soon as it's done.
       </p>
       <div className="fs-qr-wrap">
         <QrCode value={qrUrl} size={220} />
@@ -582,12 +636,7 @@ function HandoffDesktop({
       </div>
       <p className="fs-muted fs-small">
         Or open this link on any device:{" "}
-        <a
-          href={qrUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="fs-link"
-        >
+        <a href={qrUrl} target="_blank" rel="noreferrer" className="fs-link">
           {shortHost(qrUrl)}
         </a>
       </p>
@@ -597,8 +646,8 @@ function HandoffDesktop({
       </button>
       {transportKind === "broadcast" ? (
         <p className="fs-muted fs-small fs-warn">
-          Demo mode — running over BroadcastChannel (same-browser only).
-          Configure <code>handoff.baseUrl</code> for real cross-device flow.
+          Demo mode — running over BroadcastChannel (same-browser only). Configure{" "}
+          <code>handoff.baseUrl</code> for real cross-device flow.
         </p>
       ) : null}
     </div>
@@ -654,20 +703,12 @@ function Result({
         <div className="fs-muted">{chosen.unit}</div>
       </div>
       <div className="fs-stats">
-        <Stat
-          label="Length"
-          value={foot ? `${foot.lengthMm.toFixed(1)} mm` : "—"}
-        />
-        <Stat
-          label="Width"
-          value={foot ? `${foot.widthMm.toFixed(1)} mm` : "—"}
-        />
+        <Stat label="Length" value={foot ? `${foot.lengthMm.toFixed(1)} mm` : "—"} />
+        <Stat label="Width" value={foot ? `${foot.widthMm.toFixed(1)} mm` : "—"} />
         <Stat
           label="Fit"
           value={
-            rec && rec.matches[0]
-              ? `${Math.round(rec.matches[0].fitScore)}%`
-              : "—"
+            rec && rec.matches[0] ? `${Math.round(rec.matches[0].fitScore)}%` : "—"
           }
         />
       </div>
@@ -684,8 +725,7 @@ function Result({
         </div>
       ) : null}
       <p className="fs-muted fs-small">
-        Calibration:{" "}
-        {foot ? CALIBRATION_META[foot.calibration].label : "—"} · captured{" "}
+        Calibration: {foot ? CALIBRATION_META[foot.calibration].label : "—"} · captured{" "}
         {new Date(scan.createdAtEpochMs).toLocaleTimeString()}
       </p>
       <div className="fs-stack">
@@ -780,13 +820,10 @@ function useDesktopHandoff({
     if (!enabled || !sessionIdRef.current) return;
     const transport = createHandoffTransport(config.handoff);
     transportRef.current = transport;
-    const unsubscribe = transport.subscribe(
-      sessionIdRef.current,
-      (payload) => {
-        setStatus("received");
-        onPayload(payload);
-      },
-    );
+    const unsubscribe = transport.subscribe(sessionIdRef.current, (payload) => {
+      setStatus("received");
+      onPayload(payload);
+    });
     return unsubscribe;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, config.handoff?.baseUrl, config.handoff?.transport]);
@@ -822,15 +859,13 @@ function toScanSummary(scan: ScanResult): EmbedScanSummary {
     scanId: scan.scanId,
     lengthMm: foot?.lengthMm ?? 0,
     widthMm: foot?.widthMm ?? 0,
+    measurementConfidence: foot?.confidence ?? 0,
     widthToLengthRatio: foot ? widthToLengthRatio(foot) : 0,
     capturedAtEpochMs: scan.createdAtEpochMs,
   };
 }
 
-function toSizeResult(
-  scan: ScanResult,
-  preferred: SizeSystem,
-): EmbedSizeResult | null {
+function toSizeResult(scan: ScanResult, preferred: SizeSystem): EmbedSizeResult | null {
   const rec = scan.recommendation;
   if (!rec) return null;
   const topScore = rec.matches[0]?.fitScore ?? 0;
@@ -840,6 +875,7 @@ function toSizeResult(
     eu: rec.eu,
     mondopointMm: rec.mondopointMm,
     fitScore: Math.max(0, Math.min(1, topScore / 100)),
+    recommendationConfidence: rec.recommendationConfidence,
     preferred,
   };
 }
@@ -879,7 +915,7 @@ function reconstructScanResult(
     rightFoot: {
       lengthMm: scan.lengthMm,
       widthMm: scan.widthMm,
-      confidence: size.fitScore,
+      confidence: scan.measurementConfidence ?? 0,
       foot: "right",
       calibration: "arcore_plane",
       pixelsPerMm: 0,
@@ -889,6 +925,7 @@ function reconstructScanResult(
       us: size.us,
       eu: size.eu,
       mondopointMm: size.mondopointMm,
+      recommendationConfidence: size.recommendationConfidence ?? 0,
       matches: [],
     },
   };
@@ -902,4 +939,3 @@ function shortHost(url: string): string {
     return url;
   }
 }
-

@@ -1,7 +1,7 @@
 import type { ScanResult, UserPreferences, UserProfile } from "../types";
 import { DEFAULT_PREFERENCES } from "../types";
 import { logAnalyticsEvent } from "./analytics";
-import { pushScan } from "./cloud/sync";
+import { deleteScanFromCloud, pushScan } from "./cloud/sync";
 import { wipeSessionData } from "./session";
 
 /**
@@ -53,9 +53,7 @@ export function saveProfile(profile: UserProfile): UserProfile {
   return next;
 }
 
-export function updatePreferences(
-  patch: Partial<UserPreferences>,
-): UserProfile {
+export function updatePreferences(patch: Partial<UserPreferences>): UserProfile {
   const current = getOrCreateProfile();
   return saveProfile({
     ...current,
@@ -69,9 +67,7 @@ export function signOut(): void {
 
 /** Replace the full scan list (used by cloud restore). */
 export function replaceAllScans(scans: ScanResult[]): void {
-  const sorted = [...scans].sort(
-    (a, b) => b.createdAtEpochMs - a.createdAtEpochMs,
-  );
+  const sorted = [...scans].sort((a, b) => b.createdAtEpochMs - a.createdAtEpochMs);
   localStorage.setItem(KEYS.scans, JSON.stringify(sorted));
 }
 
@@ -115,6 +111,7 @@ export function saveScan(scan: ScanResult): ScanResult {
 export function deleteScan(scanId: string): void {
   const remaining = listScans().filter((s) => s.scanId !== scanId);
   localStorage.setItem(KEYS.scans, JSON.stringify(remaining));
+  void deleteScanFromCloud(scanId);
 }
 
 // ---- Onboarding ------------------------------------------------------------

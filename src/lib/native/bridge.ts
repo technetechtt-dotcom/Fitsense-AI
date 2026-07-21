@@ -7,8 +7,8 @@
  * a vanilla browser. When a host *does* expose a native bridge though,
  * we can take advantage of:
  *
- *   - **LiDAR / ToF depth maps** (iPhone Pro, Pixel 8 Pro, Samsung S24 Ultra)
- *     for sub-millimetre accuracy without a reference object.
+ *   - **LiDAR / ToF depth maps** on supported devices for experimental
+ *     depth-assisted measurement without a reference object.
  *   - **ARCore / ARKit raw camera intrinsics** for tighter homography fit.
  *   - **Background privacy attestation** — only the depth/scan metadata
  *     leaves the device, never the camera frames themselves.
@@ -17,8 +17,6 @@
  * `window` object before the web bundle boots. The shape is the
  * contract documented in NATIVE.md.
  */
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export interface DepthFrame {
   /** Raw float32 buffer, row-major, with `width*height` elements. */

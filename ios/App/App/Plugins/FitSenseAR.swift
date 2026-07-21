@@ -10,11 +10,9 @@ import UIKit
 /// detected floor plane. We compute the metric distance between the
 /// two hit-test points in world space and return it as millimetres.
 ///
-/// Width measurement is intentionally NOT done in ARKit here — the
-/// existing web pipeline already produces a width via reference-based
-/// homography (or the new GrabCut segmentation). On iPhones with LiDAR
-/// (Pro / Pro Max from iPhone 12 onward) future revisions can request
-/// `ARSceneDepth` and extract a depth-aligned silhouette for width.
+/// The user captures heel, toe, and both sides of the ball of the foot.
+/// Length and width are therefore measured in world space; no population
+/// ratio or invented dimension is returned.
 @objc(FitSenseARPlugin)
 public class FitSenseARPlugin: CAPPlugin {
 
@@ -75,11 +73,13 @@ private struct ARMeasurement {
 private enum ARMeasureError: LocalizedError {
     case userCancelled
     case noPlane
+    case invalidMeasurement(String)
 
     var errorDescription: String? {
         switch self {
         case .userCancelled: return "Measurement cancelled."
         case .noPlane: return "Couldn't find a floor plane. Try better lighting."
+        case .invalidMeasurement(let message): return message
         }
     }
 }
@@ -95,6 +95,8 @@ private final class FitSenseARMeasureViewController: UIViewController, ARSCNView
     private let cancelButton = UIButton(type: .system)
 
     private var heelWorld: simd_float3?
+    private var toeWorld: simd_float3?
+    private var widthWorldA: simd_float3?
     private var lastHitWorld: simd_float3?
 
     override func viewDidLoad() {
@@ -195,6 +197,11 @@ private final class FitSenseARMeasureViewController: UIViewController, ARSCNView
     // MARK: Hit-test driven reticle tracking
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        guard case .normal = frame.camera.trackingState else {
+            lastHitWorld = nil
+            promptLabel.text = "Tracking lost. Hold still and move the phone slowly."
+            return
+        }
         guard let result = raycastCenter(frame: frame) else { return }
         lastHitWorld = simd_make_float3(
             result.worldTransform.columns.3.x,
@@ -206,7 +213,7 @@ private final class FitSenseARMeasureViewController: UIViewController, ARSCNView
     private func raycastCenter(frame: ARFrame) -> ARRaycastResult? {
         guard let query = sceneView.raycastQuery(
             from: view.center,
-            allowing: .estimatedPlane,
+            allowing: .existingPlaneGeometry,
             tracking: .horizontal
         ) else { return nil }
         let results = sceneView.session.raycast(query)
@@ -223,16 +230,41 @@ private final class FitSenseARMeasureViewController: UIViewController, ARSCNView
             promptLabel.text = "Heel locked. Now aim at your longest toe and tap Capture."
             return
         }
+        if toeWorld == nil {
+            let heel = heelWorld!
+            let lengthMm = Double(simd_distance(heel, hit)) * 1000.0
+            guard (120.0...360.0).contains(lengthMm),
+                  abs(Double(heel.y - hit.y) * 1000.0) <= 15.0 else {
+                heelWorld = nil
+                onResult?(.failure(ARMeasureError.invalidMeasurement(
+                    "Heel and toe points are implausible or not on one plane. Start again."
+                )))
+                return
+            }
+            toeWorld = hit
+            promptLabel.text = "Length locked. Aim at one side of the ball of your foot."
+            return
+        }
+        if widthWorldA == nil {
+            widthWorldA = hit
+            promptLabel.text = "Now aim at the opposite side of the ball and tap Capture."
+            return
+        }
+
         let heel = heelWorld!
-        let toe = hit
-        let lengthMeters = simd_distance(heel, toe)
-        let lengthMm = Double(lengthMeters) * 1000.0
-        // Width is not measured in this flow — see comment on FitSenseARPlugin.
-        // Use the 0.38 population ratio as a sensible placeholder; the
-        // web layer's segmentation path will refine this when the user
-        // continues to a tap-to-measure photo flow.
-        let widthMm = lengthMm * 0.38
-        let measurement = ARMeasurement(lengthMm: lengthMm, widthMm: widthMm, confidence: 0.95)
+        let toe = toeWorld!
+        let widthA = widthWorldA!
+        let lengthMm = Double(simd_distance(heel, toe)) * 1000.0
+        let widthMm = Double(simd_distance(widthA, hit)) * 1000.0
+        let ratio = widthMm / lengthMm
+        guard (45.0...160.0).contains(widthMm),
+              (0.25...0.55).contains(ratio),
+              abs(Double(widthA.y - hit.y) * 1000.0) <= 15.0 else {
+            widthWorldA = nil
+            promptLabel.text = "Width points were unreliable. Mark both sides of the ball again."
+            return
+        }
+        let measurement = ARMeasurement(lengthMm: lengthMm, widthMm: widthMm, confidence: 0.85)
         onResult?(.success(measurement))
     }
 
