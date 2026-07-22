@@ -14,7 +14,7 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
-      - run: npm ci
+      - run: npm ci --include=dev
       - run: npm run format:check
       - run: npm run typecheck
       - run: npm run lint
@@ -26,6 +26,28 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fitsense
+          POSTGRES_PASSWORD: fitsense
+          POSTGRES_DB: fitsense_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fitsense -d fitsense_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://fitsense:fitsense@localhost:5432/fitsense_ci
+      DATABASE_SSL: "false"
+      AUTH_SECRET: ci-auth-secret-at-least-32-characters!!
+      HANDOFF_SECRET: ci-handoff-secret-at-least-32-chars!!
+      HANDOFF_STORE: memory
+      SKIP_AUTH: "false"
+      NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -33,9 +55,36 @@ jobs:
           node-version-file: .node-version
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - run: npm ci
-      - run: npm run check
+      - name: Install (Render-parity lockfile install)
+        run: npm ci --include=dev
+      - name: Typecheck, tests (incl. Postgres auth), build
+        run: npm run check
       - run: docker build -t fitsense-api:test .
+
+  render-api-build:
+    name: render-api-build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Reproduce Render: production NODE_ENV during install/build.
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Render-parity build
+        run: |
+          node -v
+          npm -v
+          npm ci --include=dev
+          npm run build
+      - name: Assert tsc output exists
+        run: test -f dist/index.js
 
   android-build:
     runs-on: ubuntu-latest

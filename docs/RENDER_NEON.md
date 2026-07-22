@@ -37,6 +37,10 @@ HANDOFF_SECRET=<different long random secret>
 CORS_ORIGIN=https://fitsense-web.onrender.com
 ```
 
+`HANDOFF_SECRET` is **required** in production and **must differ** from `AUTH_SECRET`.
+Render Blueprint keeps `autoDeployTrigger: off` until branch protection is enabled
+(see [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md)).
+
 `CORS_ORIGIN` must be the **exact** public URL of `fitsense-web` (no trailing slash).
 After the static site deploys, copy its URL from the Render dashboard and paste it
 here, then redeploy the API if needed.
@@ -51,8 +55,13 @@ DATABASE_SSL=true
 DATABASE_SSL_REJECT_UNAUTHORIZED=true
 ```
 
-Production requires both `AUTH_SECRET` and `HANDOFF_SECRET`. Later product phases
-are listed in [ROADMAP.md](./ROADMAP.md).
+Build command (must match CI `render-api-build`):
+
+```bash
+npm ci --include=dev && npm run build
+```
+
+Later product phases: [ROADMAP.md](./ROADMAP.md).
 
 ### fitsense-web
 
@@ -61,12 +70,14 @@ are listed in [ROADMAP.md](./ROADMAP.md).
 
 ## 3. Auth + handoff
 
-Cloud sync uses **device challenge-response** (`AUTH_SECRET`): register → challenge →
-token → refresh. Handoff sessions use **separate** publish/consume tokens signed with
-`HANDOFF_SECRET` (hashed at rest; consume is one-time).
+Cloud sync uses **device challenge-response** (`AUTH_SECRET`). Handoff sessions use
+**separate** publish/consume tokens signed with `HANDOFF_SECRET`.
 
-Critical gates vs later milestones: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md),
-[ROADMAP.md](./ROADMAP.md).
+Staging smoke after deploy:
+
+```bash
+STAGING_API_BASE_URL=https://<fitsense-api>.onrender.com npm run staging:smoke --prefix backend
+```
 
 ## 4. Verify
 

@@ -58,8 +58,9 @@ const databaseSsl = parseBoolean(
 );
 
 const authSecret = process.env.AUTH_SECRET?.trim();
-const handoffSecretExplicit = process.env.HANDOFF_SECRET?.trim();
-const handoffSecret = handoffSecretExplicit || authSecret;
+/** Production must set HANDOFF_SECRET explicitly and distinctly from AUTH_SECRET. */
+const handoffSecret =
+  process.env.HANDOFF_SECRET?.trim() || (!isProduction ? authSecret : undefined);
 
 export const config = {
   port: parseNumber(process.env.PORT, 8787),
@@ -127,15 +128,12 @@ export function assertProductionConfig(): void {
       "AUTH_SECRET is required in production when SKIP_AUTH is not enabled.",
     );
   }
-  if (!config.handoffSecret) {
-    throw new Error(
-      "HANDOFF_SECRET or AUTH_SECRET is required in production for handoff signing.",
-    );
+  const handoffExplicit = process.env.HANDOFF_SECRET?.trim();
+  if (!handoffExplicit) {
+    throw new Error("HANDOFF_SECRET is required in production.");
   }
-  if (isProduction && !handoffSecretExplicit && authSecret) {
-    console.warn(
-      "[fitsense-api] HANDOFF_SECRET is unset; falling back to AUTH_SECRET. Set a distinct HANDOFF_SECRET when you can.",
-    );
+  if (config.authSecret && handoffExplicit === config.authSecret) {
+    throw new Error("HANDOFF_SECRET must be distinct from AUTH_SECRET in production.");
   }
 }
 
