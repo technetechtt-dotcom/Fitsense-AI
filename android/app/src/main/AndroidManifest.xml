@@ -42,7 +42,10 @@
         <!-- ARCore metadata. "optional" lets devices without ARCore install the app
              and use the OpenCV fallback measurement path. -->
         <meta-data android:name="com.google.ar.core" android:value="optional" />
-        <meta-data android:name="com.google.ar.core.min_apk_version" android:value="240916000" />
+        <meta-data
+            android:name="com.google.ar.core.min_apk_version"
+            android:value="240916000"
+            tools:replace="android:value" />
 
         <activity
             android:name=".MainActivity"
