@@ -9,7 +9,9 @@ import { createHash, randomBytes } from "node:crypto";
 
 const base = (process.env.STAGING_API_BASE_URL ?? "").replace(/\/+$/, "");
 if (!base) {
-  console.error("Set STAGING_API_BASE_URL to the deployed API origin (no trailing slash).");
+  console.error(
+    "Set STAGING_API_BASE_URL to the deployed API origin (no trailing slash).",
+  );
   process.exit(1);
 }
 
@@ -52,7 +54,9 @@ async function main() {
   });
   const challenge = await json(challengeRes);
   if (!challengeRes.ok) {
-    throw new Error(`challenge failed: ${challengeRes.status} ${JSON.stringify(challenge)}`);
+    throw new Error(
+      `challenge failed: ${challengeRes.status} ${JSON.stringify(challenge)}`,
+    );
   }
 
   const proof = sha256Hex(`${sha256Hex(device.deviceSecret)}:${challenge.nonce}`);
@@ -87,7 +91,9 @@ async function main() {
   });
   const session = await json(sessionRes);
   if (sessionRes.status !== 201) {
-    throw new Error(`handoff session failed: ${sessionRes.status} ${JSON.stringify(session)}`);
+    throw new Error(
+      `handoff session failed: ${sessionRes.status} ${JSON.stringify(session)}`,
+    );
   }
 
   const payload = {
@@ -130,7 +136,9 @@ async function main() {
   });
   const consumed = await json(consume);
   if (!consume.ok || !consumed?.payload) {
-    throw new Error(`handoff consume failed: ${consume.status} ${JSON.stringify(consumed)}`);
+    throw new Error(
+      `handoff consume failed: ${consume.status} ${JSON.stringify(consumed)}`,
+    );
   }
 
   const unsigned = await fetch(`${base}/v1/handoff/${session.sessionId}`, {
