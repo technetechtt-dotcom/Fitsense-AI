@@ -88,20 +88,17 @@ cd Fitsense\ AI/android
 
 Open `android/` in Android Studio and let Gradle sync.
 
-The Gradle wrapper jar is intentionally omitted from source control. On first
-sync Android Studio will download it automatically. If you want to build from
-the command line first, run:
-
-````bash
-The Gradle wrapper (`gradlew`, `gradlew.bat`, `gradle/wrapper/*`) is committed. Build with:
+The Gradle wrapper (`gradlew`, `gradlew.bat`, `gradle/wrapper/*`) is committed.
+Build with:
 
 ```bash
 cd android
 ./gradlew :app:assembleDebug
 ./gradlew :app:test
-````
-
 ```
+
+CI uploads the debug APK (`app-debug-apk`) and unit test reports. Physical
+device sign-off: [docs/ANDROID_DEVICE_VERIFY.md](../docs/ANDROID_DEVICE_VERIFY.md).
 
 ### 3. FitSense API (optional cloud sync / handoff)
 

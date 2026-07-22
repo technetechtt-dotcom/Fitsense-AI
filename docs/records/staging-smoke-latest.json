@@ -1,0 +1,63 @@
+{
+  "baseUrl": "https://fitsense-api-1rne.onrender.com",
+  "startedAt": "2026-07-22T14:31:37.313Z",
+  "finishedAt": "2026-07-22T14:31:43.468Z",
+  "ok": true,
+  "steps": [
+    {
+      "name": "health",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "register",
+      "ok": true,
+      "status": 201
+    },
+    {
+      "name": "challenge",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "token",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "sync",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "handoff_session",
+      "ok": true,
+      "status": 201
+    },
+    {
+      "name": "handoff_publish",
+      "ok": true,
+      "status": 204
+    },
+    {
+      "name": "handoff_consume",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "handoff_unsigned_rejected",
+      "ok": true,
+      "status": 401
+    }
+  ],
+  "health": {
+    "ok": true,
+    "service": "fitsense-api",
+    "version": "0.1.0",
+    "handoffStore": "postgres",
+    "syncStore": "postgres",
+    "syncReady": true,
+    "postgres": true
+  },
+  "error": null
+}

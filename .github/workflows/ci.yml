@@ -45,7 +45,8 @@ jobs:
       DATABASE_SSL: "false"
       AUTH_SECRET: ci-auth-secret-at-least-32-characters!!
       HANDOFF_SECRET: ci-handoff-secret-at-least-32-chars!!
-      HANDOFF_STORE: memory
+      HANDOFF_STORE: postgres
+      SYNC_STORE: postgres
       SKIP_AUTH: "false"
       NODE_ENV: test
     steps:
@@ -57,7 +58,7 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - name: Install (Render-parity lockfile install)
         run: npm ci --include=dev
-      - name: Typecheck, tests (incl. Postgres auth), build
+      - name: Typecheck, tests (Postgres handoff/sync/migrations), build
         run: npm run check
       - run: docker build -t fitsense-api:test .
 
@@ -99,4 +100,52 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug test --no-daemon
+          ./gradlew :app:assembleDebug :app:test --no-daemon
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-unit-test-reports
+          path: |
+            android/app/build/reports/tests/
+            android/app/build/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  staging-smoke:
+    name: staging-smoke
+    runs-on: ubuntu-latest
+    # Set repo variable STAGING_API_BASE_URL (Settings → Variables) to enable.
+    if: ${{ vars.STAGING_API_BASE_URL != '' }}
+    needs: [backend]
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      STAGING_API_BASE_URL: ${{ vars.STAGING_API_BASE_URL }}
+      STAGING_SMOKE_RECORD: ${{ github.workspace }}/staging-smoke-record.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci --include=dev
+      - name: Run staging smoke (health, auth, sync, handoff)
+        run: npm run staging:smoke
+      - name: Upload staging smoke record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-smoke-record
+          path: staging-smoke-record.json
+          if-no-files-found: warn
+          retention-days: 30

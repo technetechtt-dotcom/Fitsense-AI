@@ -26,5 +26,16 @@ gh api repos/technetechtt-dotcom/Fitsense-AI/branches/main/protection \
 
 Payload file: [branch-protection-payload.json](./branch-protection-payload.json).
 
+### Verify
+
+```bash
+gh api repos/technetechtt-dotcom/Fitsense-AI/branches/main/protection \
+  --jq "{checks:.required_status_checks.contexts, pr_reviews:.required_pull_request_reviews.required_approving_review_count, code_owners:.required_pull_request_reviews.require_code_owner_reviews, enforce_admins:.enforce_admins.enabled, conversations:.required_conversation_resolution}"
+```
+
+Expect required checks `web-and-sdk`, `backend`, `render-api-build`,
+`android-build`; PR reviews ≥ 1 with code owners; `enforce_admins: true`.
+
 After protection is confirmed, set Render Blueprint `autoDeployTrigger: commit`
-(or enable auto-deploy in the dashboard) for `fitsense-api` and `fitsense-web`.
+(or enable auto-deploy in the dashboard) for **production** `fitsense-api` and
+`fitsense-web` only. Keep staging auto-deploy policy explicit and separate.

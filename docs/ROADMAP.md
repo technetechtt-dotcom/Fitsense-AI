@@ -3,10 +3,11 @@
 ## Critical deploy gates (must stay green)
 
 - Separate production secrets: `AUTH_SECRET` **and** distinct `HANDOFF_SECRET` (no fallback).
-- Render + CI: `npm ci --include=dev` then build; backend CI provisions Postgres; device-auth tests **must not skip**.
+- Render + CI: `npm ci --include=dev` then build; backend CI provisions Postgres; device-auth, **Postgres handoff**, sync CRUD, and schema bootstrap tests **must not skip**.
 - Required CI checks: `web-and-sdk`, `backend`, `render-api-build`, `android-build`.
-- Branch protection on `main` **before** re-enabling Render `autoDeployTrigger: commit`.
-- Staging smoke: health + auth + sync + handoff (`npm run staging:smoke --prefix backend`).
+- Branch protection on `main` **before** re-enabling Render production `autoDeployTrigger: commit`.
+- Dedicated staging Blueprint services (`fitsense-api-staging` / `fitsense-web-staging`); smoke recorded via `STAGING_SMOKE_RECORD`.
+- Android CI uploads debug APK + unit test reports; physical sign-off: [ANDROID_DEVICE_VERIFY.md](./ANDROID_DEVICE_VERIFY.md).
 
 See [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md), [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
 
