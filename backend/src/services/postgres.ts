@@ -24,8 +24,10 @@ export function getPostgresPool(): pg.Pool {
   return pool;
 }
 
-function isConcurrentDdlRace(err: unknown): boolean {
+function isRetryableSchemaError(err: unknown): boolean {
   const e = err as { code?: string; constraint?: string; message?: string };
+  if (e.code === "40P01") return true; // deadlock_detected
+  if (e.code === "40001") return true; // serialization_failure
   if (e.code !== "23505") return false;
   const haystack = `${e.constraint ?? ""} ${e.message ?? ""}`;
   return haystack.includes("pg_type_typname_nsp_index");
@@ -47,7 +49,7 @@ export async function withPostgresSchemaLock(
       return;
     } catch (err) {
       lastErr = err;
-      if (!isConcurrentDdlRace(err) || attempt === 7) throw err;
+      if (!isRetryableSchemaError(err) || attempt === 7) throw err;
       await new Promise((r) => setTimeout(r, 25 * 2 ** attempt));
     } finally {
       client.release();

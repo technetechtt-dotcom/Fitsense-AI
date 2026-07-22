@@ -1,9 +1,6 @@
 import { config } from "../config.js";
-import {
-  getPostgresPool,
-  isPostgresConfigured,
-  withPostgresSchemaLock,
-} from "./postgres.js";
+import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
+import { requireMigrationsApplied } from "./migrate.js";
 
 export interface CloudPullResult {
   fitProfile: unknown | null;
@@ -32,41 +29,7 @@ class PostgresSyncStore implements SyncStore {
       console.warn("[fitsense-api] Postgres sync disabled — DATABASE_URL is not set.");
       return;
     }
-    await withPostgresSchemaLock(async (client) => {
-      await client.query(`
-      CREATE TABLE IF NOT EXISTS fit_profiles (
-        uid text PRIMARY KEY,
-        fit_id text NOT NULL,
-        data jsonb NOT NULL,
-        updated_at timestamptz NOT NULL DEFAULT now()
-      );
-
-      CREATE TABLE IF NOT EXISTS scans (
-        uid text NOT NULL,
-        scan_id text NOT NULL,
-        data jsonb NOT NULL,
-        created_at_epoch_ms bigint,
-        updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY (uid, scan_id)
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_scans_uid_created_at_epoch_ms
-        ON scans (uid, created_at_epoch_ms DESC);
-
-      CREATE TABLE IF NOT EXISTS fit_events (
-        uid text NOT NULL,
-        event_id text NOT NULL,
-        fit_id text,
-        data jsonb NOT NULL,
-        epoch_ms bigint,
-        updated_at timestamptz NOT NULL DEFAULT now(),
-        PRIMARY KEY (uid, event_id)
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_fit_events_uid_epoch_ms
-        ON fit_events (uid, epoch_ms DESC);
-    `);
-    });
+    await requireMigrationsApplied();
     this.ready = true;
   }
 

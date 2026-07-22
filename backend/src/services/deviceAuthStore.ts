@@ -1,9 +1,6 @@
 import { config } from "../config.js";
-import {
-  getPostgresPool,
-  isPostgresConfigured,
-  withPostgresSchemaLock,
-} from "./postgres.js";
+import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
+import { requireMigrationsApplied } from "./migrate.js";
 import {
   generateDeviceId,
   generateOpaqueToken,
@@ -18,64 +15,11 @@ export interface DeviceRecord {
   revokedAt: Date | null;
 }
 
-let schemaReady: Promise<void> | null = null;
-
 export async function ensureAuthSchema(): Promise<void> {
   if (!isPostgresConfigured()) {
     throw new Error("DATABASE_URL is required for device authentication.");
   }
-  schemaReady ??= withPostgresSchemaLock(async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS devices (
-          device_id text PRIMARY KEY,
-          secret_hash text NOT NULL,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          revoked_at timestamptz
-        );
-
-        CREATE TABLE IF NOT EXISTS auth_challenges (
-          challenge_id text PRIMARY KEY,
-          device_id text NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
-          nonce_hash text NOT NULL,
-          expires_at timestamptz NOT NULL,
-          consumed_at timestamptz
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_auth_challenges_expires_at
-          ON auth_challenges (expires_at);
-
-        CREATE TABLE IF NOT EXISTS refresh_tokens (
-          token_hash text PRIMARY KEY,
-          device_id text NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
-          expires_at timestamptz NOT NULL,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          revoked_at timestamptz,
-          replaced_by_hash text
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_refresh_tokens_device_id
-          ON refresh_tokens (device_id);
-
-        CREATE TABLE IF NOT EXISTS revoked_access_jtis (
-          jti text PRIMARY KEY,
-          device_id text NOT NULL,
-          expires_at timestamptz NOT NULL
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_revoked_access_jtis_expires_at
-          ON revoked_access_jtis (expires_at);
-
-        CREATE TABLE IF NOT EXISTS security_events (
-          id bigserial PRIMARY KEY,
-          event_type text NOT NULL,
-          device_id text,
-          ip text,
-          detail jsonb,
-          created_at timestamptz NOT NULL DEFAULT now()
-        );
-      `);
-  });
-  await schemaReady;
+  await requireMigrationsApplied();
 }
 
 export async function recordSecurityEvent(input: {
@@ -234,7 +178,24 @@ export async function rotateRefreshToken(input: {
       [sha256Hex(input.refreshToken)],
     );
     const row = existing.rows[0];
-    if (!row || row.revoked_at || row.expires_at.getTime() <= Date.now()) {
+    if (!row) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    // Reuse of a rotated refresh token → revoke the entire device token family.
+    if (row.revoked_at) {
+      await client.query(
+        `
+          UPDATE refresh_tokens
+          SET revoked_at = now()
+          WHERE device_id = $1 AND revoked_at IS NULL
+        `,
+        [row.device_id],
+      );
+      await client.query("COMMIT");
+      return null;
+    }
+    if (row.expires_at.getTime() <= Date.now()) {
       await client.query("ROLLBACK");
       return null;
     }

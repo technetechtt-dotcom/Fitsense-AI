@@ -1,7 +1,8 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { HandoffPayload } from "../types.js";
 import { config } from "../config.js";
-import { getPostgresPool, withPostgresSchemaLock } from "./postgres.js";
+import { getPostgresPool } from "./postgres.js";
+import { requireMigrationsApplied } from "./migrate.js";
 import { sha256Hex, timingSafeEqualString } from "./sessionAuth.js";
 
 export type HandoffOp = "publish" | "consume";
@@ -366,31 +367,7 @@ export class PostgresHandoffStore implements HandoffStore {
   }
 
   private async ensureSchema(): Promise<void> {
-    this.schemaReady ??= withPostgresSchemaLock(async (client) => {
-      await client.query(`
-          CREATE TABLE IF NOT EXISTS handoff_sessions (
-            session_id text PRIMARY KEY,
-            publish_token_hash text NOT NULL,
-            consume_token_hash text NOT NULL,
-            payload jsonb,
-            created_at timestamptz NOT NULL DEFAULT now(),
-            expires_at timestamptz NOT NULL,
-            consumed_at timestamptz,
-            cancelled_at timestamptz
-          );
-
-          CREATE INDEX IF NOT EXISTS idx_handoff_sessions_expires_at
-            ON handoff_sessions (expires_at);
-        `);
-      await client.query(`
-          ALTER TABLE handoff_sessions
-            ADD COLUMN IF NOT EXISTS publish_token_hash text,
-            ADD COLUMN IF NOT EXISTS consume_token_hash text,
-            ADD COLUMN IF NOT EXISTS consumed_at timestamptz,
-            ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;
-          ALTER TABLE handoff_sessions ALTER COLUMN payload DROP NOT NULL;
-        `);
-    });
+    this.schemaReady ??= requireMigrationsApplied();
     await this.schemaReady;
   }
 }

@@ -1,34 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 import { config } from "../config.js";
-import {
-  getPostgresPool,
-  isPostgresConfigured,
-  withPostgresSchemaLock,
-} from "./postgres.js";
-
-let schemaReady: Promise<void> | null = null;
+import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
+import { requireMigrationsApplied } from "./migrate.js";
 
 async function ensureSchema(): Promise<void> {
   if (!isPostgresConfigured()) {
     throw new Error("DATABASE_URL is required for Fit Identity recovery.");
   }
-  schemaReady ??= withPostgresSchemaLock(async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS fit_recovery_codes (
-          code_hash text PRIMARY KEY,
-          device_id text NOT NULL,
-          fit_id text NOT NULL,
-          profile_json jsonb NOT NULL,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          expires_at timestamptz NOT NULL,
-          consumed_at timestamptz
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_fit_recovery_codes_expires_at
-          ON fit_recovery_codes (expires_at);
-      `);
-  });
-  await schemaReady;
+  await requireMigrationsApplied();
 }
 
 function sha256Hex(value: string): string {

@@ -1,9 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
-import {
-  getPostgresPool,
-  isPostgresConfigured,
-  withPostgresSchemaLock,
-} from "./postgres.js";
+import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
+import { requireMigrationsApplied } from "./migrate.js";
 
 export type OrgRole = "owner" | "admin" | "operator" | "viewer";
 
@@ -21,91 +18,11 @@ const ROLE_RANK: Record<OrgRole, number> = {
   viewer: 10,
 };
 
-let schemaReady: Promise<void> | null = null;
-
 export async function ensureMerchantSchema(): Promise<void> {
   if (!isPostgresConfigured()) {
     throw new Error("DATABASE_URL is required for merchant APIs.");
   }
-  schemaReady ??= withPostgresSchemaLock(async (client) => {
-    await client.query(`
-        CREATE TABLE IF NOT EXISTS merchant_orgs (
-          org_id text PRIMARY KEY,
-          name text NOT NULL,
-          region text,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          updated_at timestamptz NOT NULL DEFAULT now()
-        );
-
-        CREATE TABLE IF NOT EXISTS merchant_members (
-          org_id text NOT NULL REFERENCES merchant_orgs(org_id) ON DELETE CASCADE,
-          device_id text NOT NULL,
-          role text NOT NULL,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          PRIMARY KEY (org_id, device_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS merchant_api_keys (
-          key_hash text PRIMARY KEY,
-          org_id text NOT NULL REFERENCES merchant_orgs(org_id) ON DELETE CASCADE,
-          label text NOT NULL,
-          created_at timestamptz NOT NULL DEFAULT now(),
-          revoked_at timestamptz
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_merchant_api_keys_org
-          ON merchant_api_keys (org_id);
-
-        CREATE TABLE IF NOT EXISTS catalogue_products (
-          org_id text NOT NULL REFERENCES merchant_orgs(org_id) ON DELETE CASCADE,
-          product_id text NOT NULL,
-          data jsonb NOT NULL,
-          updated_at timestamptz NOT NULL DEFAULT now(),
-          PRIMARY KEY (org_id, product_id)
-        );
-
-        CREATE TABLE IF NOT EXISTS catalogue_inventory (
-          org_id text NOT NULL REFERENCES merchant_orgs(org_id) ON DELETE CASCADE,
-          product_id text NOT NULL,
-          size_system text NOT NULL,
-          size_label text NOT NULL,
-          quantity integer NOT NULL DEFAULT 0,
-          updated_at timestamptz NOT NULL DEFAULT now(),
-          PRIMARY KEY (org_id, product_id, size_system, size_label)
-        );
-
-        CREATE TABLE IF NOT EXISTS brand_fit_profiles (
-          org_id text NOT NULL REFERENCES merchant_orgs(org_id) ON DELETE CASCADE,
-          brand text NOT NULL,
-          model text NOT NULL DEFAULT '',
-          eu_size_delta double precision NOT NULL DEFAULT 0,
-          toe_box_width text NOT NULL DEFAULT 'regular',
-          midsole_feel text NOT NULL DEFAULT 'balanced',
-          note text,
-          data jsonb NOT NULL DEFAULT '{}'::jsonb,
-          updated_at timestamptz NOT NULL DEFAULT now(),
-          PRIMARY KEY (org_id, brand, model)
-        );
-
-        CREATE TABLE IF NOT EXISTS merchant_outcomes (
-          outcome_id text PRIMARY KEY,
-          org_id text NOT NULL REFERENCES merchant_orgs(org_id) ON DELETE CASCADE,
-          kind text NOT NULL,
-          product_id text,
-          brand text,
-          size_label text,
-          size_system text,
-          fit_id text,
-          reason text,
-          data jsonb NOT NULL DEFAULT '{}'::jsonb,
-          created_at timestamptz NOT NULL DEFAULT now()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_merchant_outcomes_org_created
-          ON merchant_outcomes (org_id, created_at DESC);
-      `);
-  });
-  await schemaReady;
+  await requireMigrationsApplied();
 }
 
 function sha256Hex(value: string): string {
