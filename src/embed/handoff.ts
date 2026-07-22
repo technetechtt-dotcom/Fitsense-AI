@@ -4,28 +4,16 @@ import type { EmbedScanSummary, EmbedSizeResult } from "./types";
 /**
  * FitSense AI · Cross-device handoff
  *
- * When the fit finder is opened on a desktop browser the AR scan can't run
- * locally, so we offer a QR-code handoff: the desktop iframe shows a QR
- * pointing at the same embed URL but with a unique `session=` token, the
- * user scans on their phone, completes the scan there, and the phone
- * publishes the size result back to the desktop via a small relay.
- *
- * This module defines:
- *  - the payload format
- *  - the [HandoffTransport] interface
- *  - two implementations:
- *      • `createHttpTransport`    – production (any partner-hostable HTTP relay)
- *      • `createBroadcastTransport` – local fallback (same-browser tabs)
- *  - `createHandoffTransport`     – auto-select based on config / capabilities
+ * Desktop creates a server session (publish + consume tokens), embeds
+ * sessionId + publishToken in the phone QR URL, phone PUTs with publish
+ * Bearer, desktop POSTs consume with consume Bearer (one-time).
  *
  * Production transport contract:
  *
- *     PUT  /v1/handoff/{sessionId}          body: { payload }   → 204
- *     GET  /v1/handoff/{sessionId}          → 200 { payload? }  (long-poll or short-poll)
- *     DELETE /v1/handoff/{sessionId}        → 204               (single-use cleanup)
- *
- * Sessions MUST expire server-side after a few minutes; payloads are
- * single-use. See INTEGRATION.md for a reference Node/Express server.
+ *     POST /v1/handoff/sessions              → 201 { sessionId, publishToken, consumeToken }
+ *     PUT  /v1/handoff/{sessionId}           Authorization: Bearer publishToken  body: { payload } → 204
+ *     POST /v1/handoff/{sessionId}/consume   Authorization: Bearer consumeToken → 200 { payload? }
+ *     DELETE /v1/handoff/{sessionId}         Authorization: Bearer consumeToken → 204
  */
 
 /** Payload published by the phone, consumed by the desktop. */
@@ -37,13 +25,28 @@ export interface HandoffPayload {
   v: 1;
 }
 
+export interface HandoffSessionTokens {
+  sessionId: string;
+  publishToken: string;
+  consumeToken: string;
+  expiresAtEpochMs: number;
+}
+
 export interface HandoffTransport {
   readonly kind: "http" | "broadcast";
-  publish: (sessionId: string, payload: HandoffPayload) => Promise<void>;
+  /** Create a server-issued session (HTTP only). Broadcast invents a local id. */
+  createSession: () => Promise<HandoffSessionTokens>;
+  publish: (
+    sessionId: string,
+    payload: HandoffPayload,
+    publishToken: string,
+  ) => Promise<void>;
   subscribe: (
     sessionId: string,
+    consumeToken: string,
     onPayload: (payload: HandoffPayload) => void,
   ) => () => void;
+  cancel?: (sessionId: string, consumeToken: string) => Promise<void>;
 }
 
 export interface HandoffConfig {
@@ -53,18 +56,25 @@ export interface HandoffConfig {
   transport?: "http" | "broadcast" | "auto";
   /** Poll interval when using HTTP short-polling. Default 1500ms. */
   pollMs?: number;
+  /** Server session id (phone receiver / desktop after create). */
+  sessionId?: string;
+  /** Publish Bearer for the phone QR path. */
+  publishToken?: string;
 }
 
 const POLL_DEFAULT_MS = 1500;
 
-// ─── Session IDs ─────────────────────────────────────────────────────────
-
-/**
- * Generates a 22-character URL-safe random session id (~132 bits of
- * entropy). Uses `crypto.getRandomValues` and base64url-encodes the bytes.
- */
+/** Local-only session id for broadcast fallback (not used with HTTP relay). */
 export function newSessionId(): string {
   const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function localOpaqueToken(): string {
+  const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
@@ -78,14 +88,38 @@ export function createHttpTransport(
   pollMs: number = POLL_DEFAULT_MS,
 ): HandoffTransport {
   const trimmed = baseUrl.replace(/\/+$/, "");
-  const url = (id: string) => `${trimmed}/v1/handoff/${encodeURIComponent(id)}`;
+  const sessionUrl = (id: string) => `${trimmed}/v1/handoff/${encodeURIComponent(id)}`;
+  const consumeUrl = (id: string) => `${sessionUrl(id)}/consume`;
 
   return {
     kind: "http",
-    async publish(sessionId, payload) {
-      const res = await fetch(url(sessionId), {
+    async createSession() {
+      const res = await fetch(`${trimmed}/v1/handoff/sessions`, {
+        method: "POST",
+        headers: { accept: "application/json", "content-type": "application/json" },
+        body: "{}",
+      });
+      if (!res.ok) {
+        throw new Error(`handoff session create failed: HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as Partial<HandoffSessionTokens>;
+      if (!body.sessionId || !body.publishToken || !body.consumeToken) {
+        throw new Error("handoff session create returned incomplete tokens");
+      }
+      return {
+        sessionId: body.sessionId,
+        publishToken: body.publishToken,
+        consumeToken: body.consumeToken,
+        expiresAtEpochMs: body.expiresAtEpochMs ?? Date.now() + 5 * 60 * 1000,
+      };
+    },
+    async publish(sessionId, payload, publishToken) {
+      const res = await fetch(sessionUrl(sessionId), {
         method: "PUT",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${publishToken}`,
+        },
         body: JSON.stringify({ payload }),
         keepalive: true,
       });
@@ -93,25 +127,31 @@ export function createHttpTransport(
         throw new Error(`handoff publish failed: HTTP ${res.status}`);
       }
     },
-    subscribe(sessionId, onPayload) {
+    subscribe(sessionId, consumeToken, onPayload) {
       let cancelled = false;
       let timer: ReturnType<typeof setTimeout> | null = null;
 
       const poll = async () => {
         if (cancelled) return;
         try {
-          const res = await fetch(url(sessionId), {
-            headers: { accept: "application/json" },
+          const res = await fetch(consumeUrl(sessionId), {
+            method: "POST",
+            headers: {
+              accept: "application/json",
+              authorization: `Bearer ${consumeToken}`,
+            },
           });
           if (cancelled) return;
+          if (res.status === 409) {
+            // Already consumed elsewhere — stop.
+            return;
+          }
           if (res.ok) {
             const body = (await res.json().catch(() => null)) as {
               payload?: HandoffPayload;
             } | null;
             if (body?.payload && isValidPayload(body.payload)) {
               onPayload(body.payload);
-              // Best-effort cleanup; ignore errors.
-              fetch(url(sessionId), { method: "DELETE" }).catch(() => undefined);
               return;
             }
           }
@@ -125,6 +165,12 @@ export function createHttpTransport(
         cancelled = true;
         if (timer) clearTimeout(timer);
       };
+    },
+    async cancel(sessionId, consumeToken) {
+      await fetch(sessionUrl(sessionId), {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${consumeToken}` },
+      }).catch(() => undefined);
     },
   };
 }
@@ -144,6 +190,14 @@ export function createBroadcastTransport(): HandoffTransport {
 
   return {
     kind: "broadcast",
+    async createSession() {
+      return {
+        sessionId: newSessionId(),
+        publishToken: localOpaqueToken(),
+        consumeToken: localOpaqueToken(),
+        expiresAtEpochMs: Date.now() + 5 * 60 * 1000,
+      };
+    },
     async publish(sessionId, payload) {
       const ch = safeChannel();
       if (ch) {
@@ -155,18 +209,15 @@ export function createBroadcastTransport(): HandoffTransport {
         ch.postMessage(frame);
         ch.close();
       }
-      // Also persist briefly in localStorage so a slow-mounting subscriber
-      // on the same origin can still pick it up.
       try {
         const key = `fitsense:handoff:${sessionId}`;
         localStorage.setItem(key, JSON.stringify({ payload, ts: Date.now() }));
-        // Self-clean after 5 minutes.
         setTimeout(() => localStorage.removeItem(key), 5 * 60 * 1000);
       } catch {
         // localStorage might be disabled — fine
       }
     },
-    subscribe(sessionId, onPayload) {
+    subscribe(sessionId, _consumeToken, onPayload) {
       let cancelled = false;
       const ch = safeChannel();
       const handler = (event: MessageEvent) => {
@@ -178,7 +229,6 @@ export function createBroadcastTransport(): HandoffTransport {
       };
       ch?.addEventListener("message", handler);
 
-      // Also poll localStorage in case the publish landed before subscribe.
       const key = `fitsense:handoff:${sessionId}`;
       const lsTimer = setInterval(() => {
         if (cancelled) return;
@@ -219,7 +269,6 @@ export function createHandoffTransport(cfg?: HandoffConfig): HandoffTransport {
   if (preferred === "broadcast") {
     return createBroadcastTransport();
   }
-  // auto — use API relay when VITE_API_BASE_URL is set
   if (baseUrl !== undefined) {
     return createHttpTransport(baseUrl, cfg?.pollMs);
   }

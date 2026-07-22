@@ -127,6 +127,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.splashscreen)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)

@@ -4,4 +4,6 @@ export interface HandoffConfig {
   transport?: "http" | "broadcast" | "auto";
   pollMs?: number;
   sessionId?: string;
+  /** Publish Bearer embedded in the phone QR URL (never send consume token in QR). */
+  publishToken?: string;
 }

@@ -57,6 +57,10 @@ const databaseSsl = parseBoolean(
   Boolean(databaseUrl?.includes("sslmode=require")) || isProduction,
 );
 
+const authSecret = process.env.AUTH_SECRET?.trim();
+const handoffSecret =
+  process.env.HANDOFF_SECRET?.trim() || (!isProduction ? authSecret : undefined);
+
 export const config = {
   port: parseNumber(process.env.PORT, 8787),
   nodeEnv,
@@ -84,9 +88,19 @@ export const config = {
     handoffReadMax: parseNumber(process.env.RATE_LIMIT_HANDOFF_READ_MAX, 60),
     handoffWriteMax: parseNumber(process.env.RATE_LIMIT_HANDOFF_WRITE_MAX, 20),
     syncMax: parseNumber(process.env.RATE_LIMIT_SYNC_MAX, 120),
+    authMax: parseNumber(process.env.RATE_LIMIT_AUTH_MAX, 30),
   },
   skipAuth: process.env.SKIP_AUTH === "true",
-  authSecret: process.env.AUTH_SECRET?.trim(),
+  authSecret,
+  handoffSecret,
+  authKid: process.env.AUTH_KID?.trim() || "auth-v1",
+  handoffKid: process.env.HANDOFF_KID?.trim() || "handoff-v1",
+  accessTokenTtlMs: parseNumber(process.env.ACCESS_TOKEN_TTL_MS, 15 * 60 * 1000),
+  refreshTokenTtlMs: parseNumber(
+    process.env.REFRESH_TOKEN_TTL_MS,
+    30 * 24 * 60 * 60 * 1000,
+  ),
+  challengeTtlMs: parseNumber(process.env.AUTH_CHALLENGE_TTL_MS, 5 * 60 * 1000),
 } as const;
 
 export function assertProductionConfig(): void {
@@ -109,7 +123,12 @@ export function assertProductionConfig(): void {
     throw new Error("DATABASE_URL is required in production.");
   }
   if (!config.skipAuth && !config.authSecret) {
-    throw new Error("AUTH_SECRET is required in production when SKIP_AUTH is not enabled.");
+    throw new Error(
+      "AUTH_SECRET is required in production when SKIP_AUTH is not enabled.",
+    );
+  }
+  if (!config.handoffSecret) {
+    throw new Error("HANDOFF_SECRET is required in production.");
   }
 }
 

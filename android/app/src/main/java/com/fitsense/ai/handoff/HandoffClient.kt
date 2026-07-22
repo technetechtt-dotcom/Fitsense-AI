@@ -12,6 +12,9 @@ import javax.inject.Singleton
 
 /**
  * Client for signed, one-time handoff sessions against the FitSense API.
+ *
+ * Desktop/web creates the session; the phone only publishes with the
+ * publish Bearer from the QR. Consume stays on the desktop.
  */
 @Singleton
 class HandoffClient @Inject constructor() {
@@ -21,6 +24,7 @@ class HandoffClient @Inject constructor() {
     data class SessionResponse(
         val sessionId: String,
         val publishToken: String,
+        val consumeToken: String,
         val expiresAtEpochMs: Long,
     )
 
@@ -58,7 +62,7 @@ class HandoffClient @Inject constructor() {
     private data class PublishBody(val payload: HandoffPayload)
 
     @Serializable
-    private data class PollBody(val payload: HandoffPayload? = null)
+    private data class ConsumeBody(val payload: HandoffPayload? = null)
 
     fun createSession(baseUrl: String): SessionResponse {
         val conn = open("$baseUrl/v1/handoff/sessions", "POST")
@@ -75,10 +79,19 @@ class HandoffClient @Inject constructor() {
         return conn.responseCode == HttpURLConnection.HTTP_NO_CONTENT
     }
 
-    fun poll(baseUrl: String, sessionId: String): HandoffPayload? {
-        val conn = open("$baseUrl/v1/handoff/$sessionId", "GET")
-        val body = json.decodeFromString<PollBody>(readBody(conn))
-        return body.payload
+    fun consume(baseUrl: String, sessionId: String, consumeToken: String): HandoffPayload? {
+        val conn = open("$baseUrl/v1/handoff/$sessionId/consume", "POST")
+        conn.setRequestProperty("Authorization", "Bearer $consumeToken")
+        conn.doOutput = true
+        conn.outputStream.use { it.write("{}".toByteArray()) }
+        if (conn.responseCode !in 200..299) return null
+        return json.decodeFromString<ConsumeBody>(readBody(conn)).payload
+    }
+
+    fun cancel(baseUrl: String, sessionId: String, consumeToken: String): Boolean {
+        val conn = open("$baseUrl/v1/handoff/$sessionId", "DELETE")
+        conn.setRequestProperty("Authorization", "Bearer $consumeToken")
+        return conn.responseCode == HttpURLConnection.HTTP_NO_CONTENT
     }
 
     fun buildPayload(

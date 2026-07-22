@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Camera,
@@ -38,12 +31,7 @@ import {
   type EmbedSizeResult,
   type SizeSystem,
 } from "./types";
-import {
-  createHandoffTransport,
-  newSessionId,
-  type HandoffPayload,
-  type HandoffTransport,
-} from "./handoff";
+import { createHandoffTransport, type HandoffPayload } from "./handoff";
 import "./embed.css";
 
 type Step =
@@ -68,14 +56,12 @@ const VERSION = "1.1.0";
  *     posts the size back to the host via `bridge.ts`.
  *
  *  2. **Desktop sender mode** — when the user picks "Continue on phone"
- *     we generate a session id, display a QR code with the same embed
- *     URL + `?session=<id>`, and subscribe to a handoff transport. Once
- *     the phone publishes a result we apply it as if it had been captured
- *     locally.
+ *     we create a server handoff session, display a QR with
+ *     `?session=<id>&pt=<publishToken>`, and consume with the consume token.
  *
- *  3. **Phone receiver mode** — when `?session=<id>` is present we run
- *     the normal scan flow, publish the result to the handoff transport,
- *     and show a "✅ result sent" terminal screen.
+ *  3. **Phone receiver mode** — when session + publish token are present we run
+ *     the normal scan flow, publish with the publish Bearer, and show a
+ *     "✅ result sent" terminal screen.
  */
 export function EmbedApp() {
   const initialConfig = useMemo(() => {
@@ -100,7 +86,7 @@ export function EmbedApp() {
 
   useApplyEmbedTheme(config.theme);
 
-  const isPhoneReceiver = !!config.handoff?.sessionId;
+  const isPhoneReceiver = !!config.handoff?.sessionId && !!config.handoff?.publishToken;
   const demoScanEnabled = isDemoScanEnabled();
 
   // Announce readiness + accept reconfiguration from the host page.
@@ -179,8 +165,9 @@ export function EmbedApp() {
   const finalisePhone = useCallback(
     async (result: ScanResult) => {
       const sessionId = config.handoff?.sessionId;
-      if (!sessionId) {
-        setHandoffError("Missing handoff session id.");
+      const publishToken = config.handoff?.publishToken;
+      if (!sessionId || !publishToken) {
+        setHandoffError("Missing handoff session credentials.");
         setStep("intro");
         return;
       }
@@ -198,7 +185,7 @@ export function EmbedApp() {
           completedAtEpochMs: Date.now(),
           v: 1,
         };
-        await transport.publish(sessionId, payload);
+        await transport.publish(sessionId, payload, publishToken);
         setScan(result);
         setStep("handoff-done");
       } catch (err) {
@@ -232,8 +219,8 @@ export function EmbedApp() {
   };
 
   const startPhoneScan = async (calibration: CalibrationReference) => {
-    if (!config.handoff?.sessionId) {
-      setHandoffError("Missing handoff session id.");
+    if (!config.handoff?.sessionId || !config.handoff?.publishToken) {
+      setHandoffError("Missing handoff session credentials.");
       setStep("intro");
       return;
     }
@@ -430,6 +417,7 @@ export function EmbedApp() {
                   qrUrl={handoffSession.qrUrl}
                   status={handoffSession.status}
                   transportKind={handoffSession.transportKind}
+                  error={handoffSession.error}
                   onCancel={() => setStep("intro")}
                 />
               </motion.div>
@@ -604,11 +592,13 @@ function HandoffDesktop({
   qrUrl,
   status,
   transportKind,
+  error,
   onCancel,
 }: {
   qrUrl: string;
-  status: "waiting" | "received";
+  status: "waiting" | "received" | "error";
   transportKind: "http" | "broadcast";
+  error: string | null;
   onCancel: () => void;
 }) {
   return (
@@ -618,28 +608,34 @@ function HandoffDesktop({
         Scan this QR with your phone camera to capture your foot. The size will appear
         here as soon as it's done.
       </p>
-      <div className="fs-qr-wrap">
-        <QrCode value={qrUrl} size={220} />
-      </div>
-      <div className="fs-handoff-status">
-        {status === "waiting" ? (
-          <>
-            <Loader2 className="fs-spin" size={16} />
-            <span>Waiting for phone…</span>
-          </>
-        ) : (
-          <>
-            <CheckCircle2 size={16} />
-            <span>Result received</span>
-          </>
-        )}
-      </div>
-      <p className="fs-muted fs-small">
-        Or open this link on any device:{" "}
-        <a href={qrUrl} target="_blank" rel="noreferrer" className="fs-link">
-          {shortHost(qrUrl)}
-        </a>
-      </p>
+      {status === "error" ? (
+        <p className="fs-error">{error ?? "Could not start handoff session."}</p>
+      ) : (
+        <>
+          <div className="fs-qr-wrap">
+            <QrCode value={qrUrl} size={220} />
+          </div>
+          <div className="fs-handoff-status">
+            {status === "waiting" ? (
+              <>
+                <Loader2 className="fs-spin" size={16} />
+                <span>Waiting for phone…</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={16} />
+                <span>Result received</span>
+              </>
+            )}
+          </div>
+          <p className="fs-muted fs-small">
+            Or open this link on any device:{" "}
+            <a href={qrUrl} target="_blank" rel="noreferrer" className="fs-link">
+              {shortHost(qrUrl)}
+            </a>
+          </p>
+        </>
+      )}
       <button className="fs-btn fs-btn-ghost" onClick={onCancel}>
         <RefreshCw size={16} style={{ marginRight: 8 }} />
         Cancel
@@ -770,9 +766,8 @@ function SizeChip({
 // ─── Hooks ───────────────────────────────────────────────────────────────
 
 /**
- * Manages the desktop side of a handoff session: generates the session id,
- * subscribes to the chosen transport, and tears everything down on unmount
- * or when disabled.
+ * Manages the desktop side of a handoff session: creates a server session,
+ * embeds publishToken in the QR URL, and consumes with the consume token.
  */
 function useDesktopHandoff({
   enabled,
@@ -784,55 +779,87 @@ function useDesktopHandoff({
   onPayload: (payload: HandoffPayload) => void;
 }): {
   qrUrl: string;
-  status: "waiting" | "received";
+  status: "waiting" | "received" | "error";
   transportKind: "http" | "broadcast";
+  error: string | null;
 } | null {
-  const sessionIdRef = useRef<string | null>(null);
-  const transportRef = useRef<HandoffTransport | null>(null);
-  const [status, setStatus] = useState<"waiting" | "received">("waiting");
+  const [session, setSession] = useState<{
+    sessionId: string;
+    publishToken: string;
+    consumeToken: string;
+  } | null>(null);
+  const [status, setStatus] = useState<"waiting" | "received" | "error">("waiting");
+  const [error, setError] = useState<string | null>(null);
+  const [transportKind, setTransportKind] = useState<"http" | "broadcast">("broadcast");
 
-  // Stable session id for the lifetime of the desktop handoff step.
-  if (enabled && !sessionIdRef.current) {
-    sessionIdRef.current = newSessionId();
-  }
-  if (!enabled && sessionIdRef.current) {
-    sessionIdRef.current = null;
-    transportRef.current = null;
-  }
+  useEffect(() => {
+    if (!enabled) {
+      setSession(null);
+      setStatus("waiting");
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    const transport = createHandoffTransport(config.handoff);
+    setTransportKind(transport.kind);
 
-  // QR URL is the same embed URL with this session injected.
+    (async () => {
+      try {
+        const created = await transport.createSession();
+        if (cancelled) {
+          await transport.cancel?.(created.sessionId, created.consumeToken);
+          return;
+        }
+        setSession({
+          sessionId: created.sessionId,
+          publishToken: created.publishToken,
+          consumeToken: created.consumeToken,
+        });
+        unsubscribe = transport.subscribe(
+          created.sessionId,
+          created.consumeToken,
+          (payload) => {
+            setStatus("received");
+            onPayload(payload);
+          },
+        );
+      } catch (err) {
+        if (!cancelled) {
+          setStatus("error");
+          setError(err instanceof Error ? err.message : "Could not start handoff.");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, config.handoff?.baseUrl, config.handoff?.transport]);
+
   const qrUrl = useMemo(() => {
-    if (!enabled || !sessionIdRef.current) return "";
+    if (!enabled || !session) return "";
     const base = `${window.location.origin}${window.location.pathname}`;
-    // Strip session/handoff query-params from this iframe's URL so they
-    // don't leak into the new phone URL incorrectly.
     const child: EmbedConfig = {
       ...config,
       handoff: resolveEmbedHandoffConfig({
         ...(config.handoff ?? {}),
-        sessionId: sessionIdRef.current,
+        sessionId: session.sessionId,
+        publishToken: session.publishToken,
       }),
     };
     return buildEmbedUrl(base, child);
-  }, [enabled, config]);
+  }, [enabled, config, session]);
 
-  useEffect(() => {
-    if (!enabled || !sessionIdRef.current) return;
-    const transport = createHandoffTransport(config.handoff);
-    transportRef.current = transport;
-    const unsubscribe = transport.subscribe(sessionIdRef.current, (payload) => {
-      setStatus("received");
-      onPayload(payload);
-    });
-    return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, config.handoff?.baseUrl, config.handoff?.transport]);
-
-  if (!enabled || !sessionIdRef.current || !transportRef.current) return null;
+  if (!enabled) return null;
+  if (!session && status !== "error") return null;
   return {
     qrUrl,
     status,
-    transportKind: transportRef.current.kind,
+    transportKind,
+    error,
   };
 }
 

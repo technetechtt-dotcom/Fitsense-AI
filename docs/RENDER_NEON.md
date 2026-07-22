@@ -33,6 +33,7 @@ Set these secret values when Render prompts (or under each service → Environme
 ```env
 DATABASE_URL=<your Neon pooled Postgres URL>
 AUTH_SECRET=<long random secret>
+HANDOFF_SECRET=<different long random secret>
 CORS_ORIGIN=https://fitsense-web.onrender.com
 ```
 
@@ -50,15 +51,22 @@ DATABASE_SSL=true
 DATABASE_SSL_REJECT_UNAUTHORIZED=true
 ```
 
+Production requires both `AUTH_SECRET` and `HANDOFF_SECRET`. Later product phases
+are listed in [ROADMAP.md](./ROADMAP.md).
+
 ### fitsense-web
 
 `VITE_API_BASE_URL` is wired from the API service's `RENDER_EXTERNAL_URL` in
-`render.yaml`. No Firebase variables are required.
+`render.yaml`.
 
-## 3. Auth
+## 3. Auth + handoff
 
-Cloud sync uses FitSense API device session tokens (`AUTH_SECRET`). Handoff
-publish tokens also require `AUTH_SECRET`.
+Cloud sync uses **device challenge-response** (`AUTH_SECRET`): register → challenge →
+token → refresh. Handoff sessions use **separate** publish/consume tokens signed with
+`HANDOFF_SECRET` (hashed at rest; consume is one-time).
+
+Critical gates vs later milestones: [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md),
+[ROADMAP.md](./ROADMAP.md).
 
 ## 4. Verify
 

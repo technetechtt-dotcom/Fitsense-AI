@@ -1,25 +1,25 @@
 # Production Readiness
 
-This repo now includes the production controls that can be implemented in code:
+Critical security and CI gates for this repo:
 
 - Backend request IDs, structured access logs, security headers, rate limits, payload limits, and schema validation.
-- Production startup guards for unsafe CORS, `SKIP_AUTH`, and in-memory handoff.
-- Upstash Redis REST handoff storage for multi-instance deploys.
-- Backend tests and CI for web, SDK, API, and container builds.
-- Firebase Firestore/Storage rules for owner-scoped user data.
+- Production startup guards for unsafe CORS, `SKIP_AUTH`, missing `AUTH_SECRET` / `HANDOFF_SECRET`, and in-memory handoff.
+- Device challenge-response auth (server-issued devices, hashed refresh rotation, security event audit).
+- Secure handoff (publish/consume Bearer tokens, hashed at rest, atomic one-time consume).
+- Postgres sync store; Upstash or Postgres handoff for multi-instance deploys.
+- Backend tests and CI for web, SDK, API, and Android (`assembleDebug` + unit tests).
 - Demo scan gating so production builds do not silently return simulated measurements.
-- Pinned Node/npm runtimes, zero-audit dependency locks, strict TypeScript, ESLint, Prettier, and code ownership.
+- Pinned Node/npm runtimes, dependency locks, strict TypeScript, ESLint, Prettier, and code ownership.
 - Dual-foot reference/WebXR flow; recommendations are withheld until both feet are accepted.
-- Individual cloud-scan deletion for Firestore and PostgreSQL sync stores.
+
+Phases 2–12 (measurement study, merchant, POPIA, ops, store release) are tracked in [ROADMAP.md](./ROADMAP.md) and are **not** coded as part of the critical security pass.
 
 ## Required Environment
 
 Web:
 
 - `VITE_API_BASE_URL=https://api.your-domain.example`
-- Firebase web config values from the production Firebase project.
-- `VITE_ENABLE_DEMO_SCAN=false` or unset.
-- Google sign-in enabled in Firebase Authentication for portable account linking.
+- `VITE_ENABLE_DEMO_SCAN=false` or unset
 - `VITE_PRIVACY_CONTROLLER_NAME`
 - `VITE_PRIVACY_CONTACT_URL`
 
@@ -27,22 +27,23 @@ API:
 
 - `NODE_ENV=production`
 - `CORS_ORIGIN=https://app.your-domain.example,https://partner.example`
-- `HANDOFF_STORE=upstash`
-- `UPSTASH_REDIS_REST_URL`
-- `UPSTASH_REDIS_REST_TOKEN`
-- `GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`
+- `DATABASE_URL` (Neon/Postgres)
+- `AUTH_SECRET` (long random; access/device sessions)
+- `HANDOFF_SECRET` (long random; distinct from `AUTH_SECRET`)
+- `HANDOFF_STORE=postgres` or `upstash` (+ Upstash REST credentials when used)
 - `SKIP_AUTH=false`
+
+See [RENDER_NEON.md](./RENDER_NEON.md) and [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md).
 
 ## Go-Live Blockers Outside Code
 
-- Accuracy validation on a measured device matrix and a known-foot-size test set.
-- Android CameraX/OpenCV calibration integration. Android currently refuses to create a result rather than store a simulated measurement.
-- Physical-device validation of the four-point WebXR and iOS ARKit length/width workflows; both remain experimental.
-- Legal controller details, privacy policy, retention periods, DPA/vendor review, and store terms.
-- Production merchant catalogue/feed contracts with stock, regional size systems, and price/currency data.
-- App Store / Play Store signing, privacy nutrition labels, screenshots, and review submissions.
-- Monitoring targets, alert routing, backup/restore drills, and incident owner rotation.
-- Android Gradle wrapper jar or a documented internal build image containing the expected Gradle version.
+- Accuracy validation on a measured device matrix and a known-foot-size test set (Phase 3).
+- Physical-device validation of WebXR / ARKit / ARCore length/width workflows.
+- Legal controller details, privacy policy, retention periods, DPA/vendor review (Phase 9).
+- Production merchant catalogue/feed contracts (Phases 6–7).
+- App Store / Play Store signing and review submissions (Phase 12).
+- Monitoring, alert routing, backup/restore drills (Phase 11).
+- External pen-test and account-linking (email/passkey) (Phase 10).
 
 ## Release Gate
 
@@ -50,17 +51,17 @@ Run before shipping:
 
 ```bash
 npm ci
-npm run check
+npm run format:check
+npm run typecheck
+npm run lint
+npm run test:web
+npm run build:all
 
-cd backend
-npm ci
-npm run check
-docker build -t fitsense-api:release .
+npm run check --prefix backend
 ```
 
-For Firebase:
+Android (CI or local JDK 17):
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage
-firebase deploy --only hosting
+cd android && ./gradlew assembleDebug test
 ```

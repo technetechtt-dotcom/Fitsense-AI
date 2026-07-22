@@ -7,11 +7,7 @@ import { hasCloudSyncConsent } from "../lib/consent";
 import { restoreFromCloud } from "../lib/cloud/restore";
 import { ApiConnectionStatus } from "../components/ApiConnectionStatus";
 import { canUseCloudSync, isApiConfigured } from "../lib/api/config";
-import {
-  getOrCreateProfile,
-  signOut,
-  updatePreferences,
-} from "../lib/storage";
+import { getOrCreateProfile, signOut, updatePreferences } from "../lib/storage";
 import { signOutCloudAccount } from "../lib/cloud/auth";
 import { SHOE_CATALOG } from "../data/catalog";
 import type { CalibrationReference, MeasurementUnit, UserProfile } from "../types";

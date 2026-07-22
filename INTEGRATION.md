@@ -231,24 +231,22 @@ an HTTP relay.
 
 ### Relay HTTP contract
 
-The relay needs three endpoints (CORS-enabled for the partner origin):
+The FitSense API owns session creation and token issuance:
 
 ```
-PUT    /v1/handoff/:sessionId          body: { payload }   → 204
-GET    /v1/handoff/:sessionId          → 200 { payload?: HandoffPayload }
-DELETE /v1/handoff/:sessionId          → 204
+POST   /v1/handoff/sessions              → 201 { sessionId, publishToken, consumeToken, expiresAtEpochMs }
+PUT    /v1/handoff/:sessionId            Authorization: Bearer <publishToken>  body: { payload } → 204
+POST   /v1/handoff/:sessionId/consume    Authorization: Bearer <consumeToken> → 200 { payload?: HandoffPayload }
+DELETE /v1/handoff/:sessionId            Authorization: Bearer <consumeToken> → 204
 ```
 
 Behaviour:
 
-- **PUT** stores the payload keyed by `sessionId`. Reject payloads larger
-  than ~4 KB and unknown JSON shapes.
-- **GET** returns `{ payload }` if one was published, otherwise `{ payload: null }`.
-  Implement short-polling (default 1.5 s) or upgrade to long-polling /
-  Server-Sent Events for lower latency.
-- **DELETE** clears the slot after the desktop has consumed the payload.
-- All sessions **must** expire automatically after ~5 minutes regardless
-  of consumption to bound memory.
+- **POST /sessions** creates the session server-side and returns publish + consume tokens (hashed at rest).
+- **PUT** requires a valid publish Bearer bound to that session. Reject missing tokens, oversized payloads, and unknown JSON shapes. Write-once.
+- **POST /consume** is the only read path; it atomically returns the payload at most once. Poll while `{ payload: null }`.
+- **DELETE** cancels with the consume token (or after successful consume the slot is already gone).
+- All sessions **must** expire automatically after ~5 minutes regardless of consumption.
 
 ### Payload schema
 

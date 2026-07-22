@@ -1,9 +1,11 @@
 import type { NextFunction, Request, Response } from "express";
 import { config } from "../config.js";
-import { verifySessionToken } from "../services/sessionAuth.js";
+import { isAccessJtiRevoked } from "../services/deviceAuthStore.js";
+import { verifyAccessToken } from "../services/sessionAuth.js";
 
 export interface AuthedRequest extends Request {
   uid?: string;
+  accessJti?: string;
 }
 
 export async function requireAuth(
@@ -37,7 +39,13 @@ export async function requireAuth(
       return;
     }
 
-    req.uid = verifySessionToken(token);
+    const payload = verifyAccessToken(token);
+    if (await isAccessJtiRevoked(payload.jti)) {
+      res.status(401).json({ error: "unauthorized", message: "Token revoked" });
+      return;
+    }
+    req.uid = payload.uid;
+    req.accessJti = payload.jti;
     next();
   } catch (err) {
     res.status(401).json({

@@ -1,8 +1,15 @@
+import "./env.js";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import type { Server } from "node:http";
 import { createApp } from "../src/app.js";
-import { MemoryHandoffStore } from "../src/services/handoffStore.js";
+import {
+  MemoryHandoffStore,
+  generateHandoffSessionId,
+  mintHandoffSessionTokens,
+  verifyHandoffOpToken,
+} from "../src/services/handoffStore.js";
+import { sha256Hex } from "../src/services/sessionAuth.js";
 import type { HandoffPayload } from "../src/types.js";
 
 const payload: HandoffPayload = {
@@ -27,11 +34,37 @@ const payload: HandoffPayload = {
 
 test("memory handoff store expires and rejects duplicate publishes", async () => {
   const store = new MemoryHandoffStore(15);
-  assert.equal(await store.set("ABCDEFGHIJKLMNOP", payload), "stored");
-  assert.equal(await store.set("ABCDEFGHIJKLMNOP", payload), "exists");
-  assert.deepEqual(await store.get("ABCDEFGHIJKLMNOP"), payload);
+  const sessionId = generateHandoffSessionId();
+  const tokens = mintHandoffSessionTokens(sessionId);
+  await store.createSession({
+    sessionId,
+    publishTokenHash: tokens.publishTokenHash,
+    consumeTokenHash: tokens.consumeTokenHash,
+    expiresAt: new Date(Date.now() + 15),
+  });
+  assert.equal(
+    await store.publish(sessionId, tokens.publishTokenHash, payload),
+    "stored",
+  );
+  assert.equal(
+    await store.publish(sessionId, tokens.publishTokenHash, payload),
+    "exists",
+  );
+  assert.deepEqual(await store.consume(sessionId, tokens.consumeTokenHash), payload);
   await new Promise((resolve) => setTimeout(resolve, 20));
-  assert.equal(await store.get("ABCDEFGHIJKLMNOP"), null);
+  assert.equal(await store.consume(sessionId, tokens.consumeTokenHash), "missing");
+});
+
+test("handoff op tokens bind session and operation", () => {
+  const sessionId = generateHandoffSessionId();
+  const tokens = mintHandoffSessionTokens(sessionId);
+  assert.equal(verifyHandoffOpToken(tokens.publishToken, sessionId, "publish"), true);
+  assert.equal(verifyHandoffOpToken(tokens.publishToken, sessionId, "consume"), false);
+  assert.equal(verifyHandoffOpToken(tokens.consumeToken, sessionId, "consume"), true);
+  assert.equal(
+    verifyHandoffOpToken(tokens.consumeToken, "OTHERSESSIONID123456", "consume"),
+    false,
+  );
 });
 
 let server: Server;
@@ -53,48 +86,142 @@ after(async () => {
   });
 });
 
-test("handoff route stores, reads, blocks overwrite, and deletes payloads", async () => {
-  const sessionId = "ABCDEFGHIJKLMNOPQRSTUV";
+async function createSession(): Promise<{
+  sessionId: string;
+  publishToken: string;
+  consumeToken: string;
+}> {
+  const res = await fetch(`${baseUrl}/v1/handoff/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(res.status, 201);
+  return (await res.json()) as {
+    sessionId: string;
+    publishToken: string;
+    consumeToken: string;
+  };
+}
+
+test("unsigned PUT is rejected", async () => {
+  const { sessionId } = await createSession();
+  const put = await fetch(`${baseUrl}/v1/handoff/${sessionId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ payload }),
+  });
+  assert.equal(put.status, 401);
+});
+
+test("handoff publish/consume is write-once and consume is one-time", async () => {
+  const { sessionId, publishToken, consumeToken } = await createSession();
   const url = `${baseUrl}/v1/handoff/${sessionId}`;
+
+  const empty = await fetch(`${url}/consume`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${consumeToken}` },
+  });
+  assert.equal(empty.status, 200);
+  assert.deepEqual(await empty.json(), { payload: null });
 
   const put = await fetch(url, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${publishToken}`,
+    },
     body: JSON.stringify({ payload }),
   });
   assert.equal(put.status, 204);
 
   const duplicate = await fetch(url, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${publishToken}`,
+    },
     body: JSON.stringify({ payload }),
   });
   assert.equal(duplicate.status, 409);
 
-  const get = await fetch(url);
-  assert.equal(get.status, 200);
-  assert.deepEqual(await get.json(), { payload });
+  const consume = await fetch(`${url}/consume`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${consumeToken}` },
+  });
+  assert.equal(consume.status, 200);
+  assert.deepEqual(await consume.json(), { payload });
 
-  const del = await fetch(url, { method: "DELETE" });
-  assert.equal(del.status, 204);
-
-  const empty = await fetch(url);
-  assert.equal(empty.status, 200);
-  assert.deepEqual(await empty.json(), { payload: null });
+  const second = await fetch(`${url}/consume`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${consumeToken}` },
+  });
+  assert.ok(second.status === 404 || second.status === 409);
 });
 
-test("handoff route rejects invalid session ids and oversized shapes", async () => {
-  const invalidId = await fetch(`${baseUrl}/v1/handoff/short`, {
+test("wrong publish token and open GET are rejected", async () => {
+  const { sessionId, consumeToken } = await createSession();
+  const badPut = await fetch(`${baseUrl}/v1/handoff/${sessionId}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${consumeToken}`,
+    },
     body: JSON.stringify({ payload }),
   });
-  assert.equal(invalidId.status, 400);
+  assert.equal(badPut.status, 401);
 
-  const invalidPayload = await fetch(`${baseUrl}/v1/handoff/ZYXWVUTSRQPONMLK`, {
+  const get = await fetch(`${baseUrl}/v1/handoff/${sessionId}`);
+  assert.equal(get.status, 410);
+});
+
+test("concurrent consume yields a single winner", async () => {
+  const { sessionId, publishToken, consumeToken } = await createSession();
+  const url = `${baseUrl}/v1/handoff/${sessionId}`;
+  const put = await fetch(url, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ payload: { ...payload, extra: true } }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${publishToken}`,
+    },
+    body: JSON.stringify({ payload }),
   });
-  assert.equal(invalidPayload.status, 400);
+  assert.equal(put.status, 204);
+
+  const results = await Promise.all(
+    Array.from({ length: 8 }, () =>
+      fetch(`${url}/consume`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${consumeToken}` },
+      }).then(async (res) => ({
+        status: res.status,
+        body: await res.json().catch(() => null),
+      })),
+    ),
+  );
+  const winners = results.filter(
+    (r) => r.status === 200 && (r.body as { payload?: unknown })?.payload,
+  );
+  assert.equal(winners.length, 1);
+});
+
+test("cancel requires consume token", async () => {
+  const { sessionId, consumeToken } = await createSession();
+  const unauthorized = await fetch(`${baseUrl}/v1/handoff/${sessionId}`, {
+    method: "DELETE",
+  });
+  assert.equal(unauthorized.status, 401);
+
+  const cancelled = await fetch(`${baseUrl}/v1/handoff/${sessionId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${consumeToken}` },
+  });
+  assert.equal(cancelled.status, 204);
+});
+
+test("token hash helper matches store hashing", () => {
+  const sessionId = generateHandoffSessionId();
+  const tokens = mintHandoffSessionTokens(sessionId);
+  assert.equal(sha256Hex(tokens.publishToken), tokens.publishTokenHash);
+  assert.equal(sha256Hex(tokens.consumeToken), tokens.consumeTokenHash);
 });

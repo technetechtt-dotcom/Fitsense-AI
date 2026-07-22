@@ -1,54 +1,405 @@
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { HandoffPayload } from "../types.js";
 import { config } from "../config.js";
 import { getPostgresPool } from "./postgres.js";
+import { sha256Hex, timingSafeEqualString } from "./sessionAuth.js";
 
-interface SessionEntry {
-  payload: HandoffPayload;
-  createdAt: number;
-}
+export type HandoffOp = "publish" | "consume";
 
 export interface HandoffStore {
-  set(sessionId: string, payload: HandoffPayload): Promise<"stored" | "exists">;
-  get(sessionId: string): Promise<HandoffPayload | null>;
-  delete(sessionId: string): Promise<void>;
+  createSession(input: {
+    sessionId: string;
+    publishTokenHash: string;
+    consumeTokenHash: string;
+    expiresAt: Date;
+  }): Promise<void>;
+  publish(
+    sessionId: string,
+    publishTokenHash: string,
+    payload: HandoffPayload,
+  ): Promise<"stored" | "exists" | "unauthorized" | "expired" | "missing">;
+  consume(
+    sessionId: string,
+    consumeTokenHash: string,
+  ): Promise<
+    | HandoffPayload
+    | "unauthorized"
+    | "expired"
+    | "missing"
+    | "pending"
+    | "already_consumed"
+  >;
+  cancel(
+    sessionId: string,
+    consumeTokenHash: string,
+  ): Promise<"cancelled" | "unauthorized" | "expired" | "missing">;
+}
+
+function getHandoffSecret(): string {
+  const secret = config.handoffSecret;
+  if (!secret) throw new Error("HANDOFF_SECRET is not configured");
+  return secret;
+}
+
+export function generateHandoffSessionId(): string {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const bytes = randomBytes(24);
+  let out = "";
+  for (let i = 0; i < 24; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
+export function issueHandoffOpToken(sessionId: string, op: HandoffOp): string {
+  const secret = getHandoffSecret();
+  const payload = {
+    sessionId,
+    op,
+    exp: Date.now() + config.handoffTtlMs,
+    kid: config.handoffKid,
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
+  return `${body}.${sig}`;
+}
+
+export function verifyHandoffOpToken(
+  token: string,
+  sessionId: string,
+  op: HandoffOp,
+): boolean {
+  const secret = config.handoffSecret;
+  if (!secret) return false;
+  const [body, sig] = token.split(".");
+  if (!body || !sig) return false;
+  const expected = createHmac("sha256", secret).update(body).digest("base64url");
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expected);
+  if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
+    return false;
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
+      sessionId?: string;
+      op?: string;
+      exp?: number;
+    };
+    return (
+      payload.sessionId === sessionId &&
+      payload.op === op &&
+      Number.isFinite(payload.exp) &&
+      (payload.exp ?? 0) > Date.now()
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function mintHandoffSessionTokens(sessionId: string): {
+  publishToken: string;
+  consumeToken: string;
+  publishTokenHash: string;
+  consumeTokenHash: string;
+  expiresAt: Date;
+} {
+  const publishToken = issueHandoffOpToken(sessionId, "publish");
+  const consumeToken = issueHandoffOpToken(sessionId, "consume");
+  return {
+    publishToken,
+    consumeToken,
+    publishTokenHash: sha256Hex(publishToken),
+    consumeTokenHash: sha256Hex(consumeToken),
+    expiresAt: new Date(Date.now() + config.handoffTtlMs),
+  };
+}
+
+interface MemorySession {
+  publishTokenHash: string;
+  consumeTokenHash: string;
+  payload: HandoffPayload | null;
+  expiresAt: number;
+  consumedAt: number | null;
+  cancelledAt: number | null;
 }
 
 export class MemoryHandoffStore implements HandoffStore {
-  private readonly sessions = new Map<string, SessionEntry>();
+  private readonly sessions = new Map<string, MemorySession>();
 
-  constructor(private readonly ttlMs: number) {}
+  constructor(_ttlMs?: number) {}
 
   prune(): void {
     const now = Date.now();
     for (const [id, entry] of this.sessions) {
-      if (now - entry.createdAt > this.ttlMs) {
-        this.sessions.delete(id);
-      }
+      if (entry.expiresAt <= now) this.sessions.delete(id);
     }
   }
 
-  async set(sessionId: string, payload: HandoffPayload): Promise<"stored" | "exists"> {
+  async createSession(input: {
+    sessionId: string;
+    publishTokenHash: string;
+    consumeTokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
     this.prune();
-    if (this.sessions.has(sessionId)) return "exists";
-    this.sessions.set(sessionId, { payload, createdAt: Date.now() });
+    this.sessions.set(input.sessionId, {
+      publishTokenHash: input.publishTokenHash,
+      consumeTokenHash: input.consumeTokenHash,
+      payload: null,
+      expiresAt: input.expiresAt.getTime(),
+      consumedAt: null,
+      cancelledAt: null,
+    });
+  }
+
+  async publish(
+    sessionId: string,
+    publishTokenHash: string,
+    payload: HandoffPayload,
+  ): Promise<"stored" | "exists" | "unauthorized" | "expired" | "missing"> {
+    this.prune();
+    const entry = this.sessions.get(sessionId);
+    if (!entry) return "missing";
+    if (entry.expiresAt <= Date.now() || entry.cancelledAt) return "expired";
+    if (!timingSafeEqualString(entry.publishTokenHash, publishTokenHash)) {
+      return "unauthorized";
+    }
+    if (entry.payload) return "exists";
+    entry.payload = payload;
     return "stored";
   }
 
-  async get(sessionId: string): Promise<HandoffPayload | null> {
+  async consume(
+    sessionId: string,
+    consumeTokenHash: string,
+  ): Promise<
+    | HandoffPayload
+    | "unauthorized"
+    | "expired"
+    | "missing"
+    | "pending"
+    | "already_consumed"
+  > {
     this.prune();
     const entry = this.sessions.get(sessionId);
-    if (!entry || Date.now() - entry.createdAt > this.ttlMs) {
-      this.sessions.delete(sessionId);
-      return null;
+    if (!entry) return "missing";
+    if (entry.expiresAt <= Date.now() || entry.cancelledAt) return "expired";
+    if (!timingSafeEqualString(entry.consumeTokenHash, consumeTokenHash)) {
+      return "unauthorized";
     }
-    return entry.payload;
+    if (entry.consumedAt) return "already_consumed";
+    if (!entry.payload) return "pending";
+    entry.consumedAt = Date.now();
+    const payload = entry.payload;
+    this.sessions.delete(sessionId);
+    return payload;
   }
 
-  async delete(sessionId: string): Promise<void> {
+  async cancel(
+    sessionId: string,
+    consumeTokenHash: string,
+  ): Promise<"cancelled" | "unauthorized" | "expired" | "missing"> {
+    this.prune();
+    const entry = this.sessions.get(sessionId);
+    if (!entry) return "missing";
+    if (entry.expiresAt <= Date.now()) return "expired";
+    if (!timingSafeEqualString(entry.consumeTokenHash, consumeTokenHash)) {
+      return "unauthorized";
+    }
+    entry.cancelledAt = Date.now();
     this.sessions.delete(sessionId);
+    return "cancelled";
   }
 }
 
+export class PostgresHandoffStore implements HandoffStore {
+  private schemaReady: Promise<void> | null = null;
+
+  constructor(_ttlMs?: number) {}
+
+  async createSession(input: {
+    sessionId: string;
+    publishTokenHash: string;
+    consumeTokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    await this.ensureSchema();
+    await this.prune();
+    await getPostgresPool().query(
+      `
+        INSERT INTO handoff_sessions (
+          session_id, publish_token_hash, consume_token_hash, expires_at
+        ) VALUES ($1, $2, $3, $4)
+      `,
+      [
+        input.sessionId,
+        input.publishTokenHash,
+        input.consumeTokenHash,
+        input.expiresAt,
+      ],
+    );
+  }
+
+  async publish(
+    sessionId: string,
+    publishTokenHash: string,
+    payload: HandoffPayload,
+  ): Promise<"stored" | "exists" | "unauthorized" | "expired" | "missing"> {
+    await this.ensureSchema();
+    await this.prune();
+    const existing = await getPostgresPool().query<{
+      publish_token_hash: string;
+      payload: HandoffPayload | null;
+      cancelled_at: Date | null;
+      expires_at: Date;
+    }>(
+      `
+        SELECT publish_token_hash, payload, cancelled_at, expires_at
+        FROM handoff_sessions
+        WHERE session_id = $1
+      `,
+      [sessionId],
+    );
+    const row = existing.rows[0];
+    if (!row) return "missing";
+    if (row.cancelled_at || row.expires_at.getTime() <= Date.now()) return "expired";
+    if (!timingSafeEqualString(row.publish_token_hash, publishTokenHash)) {
+      return "unauthorized";
+    }
+    if (row.payload) return "exists";
+    const result = await getPostgresPool().query(
+      `
+        UPDATE handoff_sessions
+        SET payload = $2::jsonb
+        WHERE session_id = $1 AND payload IS NULL
+      `,
+      [sessionId, JSON.stringify(payload)],
+    );
+    return result.rowCount === 1 ? "stored" : "exists";
+  }
+
+  async consume(
+    sessionId: string,
+    consumeTokenHash: string,
+  ): Promise<
+    | HandoffPayload
+    | "unauthorized"
+    | "expired"
+    | "missing"
+    | "pending"
+    | "already_consumed"
+  > {
+    await this.ensureSchema();
+    await this.prune();
+    const existing = await getPostgresPool().query<{
+      consume_token_hash: string;
+      payload: HandoffPayload | null;
+      consumed_at: Date | null;
+      cancelled_at: Date | null;
+      expires_at: Date;
+    }>(
+      `
+        SELECT consume_token_hash, payload, consumed_at, cancelled_at, expires_at
+        FROM handoff_sessions
+        WHERE session_id = $1
+      `,
+      [sessionId],
+    );
+    const row = existing.rows[0];
+    if (!row) return "missing";
+    if (row.cancelled_at || row.expires_at.getTime() <= Date.now()) return "expired";
+    if (!timingSafeEqualString(row.consume_token_hash, consumeTokenHash)) {
+      return "unauthorized";
+    }
+    if (row.consumed_at) return "already_consumed";
+    if (!row.payload) return "pending";
+
+    const consumed = await getPostgresPool().query<{ payload: HandoffPayload }>(
+      `
+        UPDATE handoff_sessions
+        SET consumed_at = now()
+        WHERE session_id = $1
+          AND consume_token_hash = $2
+          AND consumed_at IS NULL
+          AND cancelled_at IS NULL
+          AND expires_at > now()
+          AND payload IS NOT NULL
+        RETURNING payload
+      `,
+      [sessionId, consumeTokenHash],
+    );
+    if (!consumed.rows[0]?.payload) return "already_consumed";
+    await getPostgresPool().query(
+      "DELETE FROM handoff_sessions WHERE session_id = $1",
+      [sessionId],
+    );
+    return consumed.rows[0].payload;
+  }
+
+  async cancel(
+    sessionId: string,
+    consumeTokenHash: string,
+  ): Promise<"cancelled" | "unauthorized" | "expired" | "missing"> {
+    await this.ensureSchema();
+    const existing = await getPostgresPool().query<{
+      consume_token_hash: string;
+      expires_at: Date;
+    }>(
+      `SELECT consume_token_hash, expires_at FROM handoff_sessions WHERE session_id = $1`,
+      [sessionId],
+    );
+    const row = existing.rows[0];
+    if (!row) return "missing";
+    if (row.expires_at.getTime() <= Date.now()) return "expired";
+    if (!timingSafeEqualString(row.consume_token_hash, consumeTokenHash)) {
+      return "unauthorized";
+    }
+    await getPostgresPool().query(
+      "DELETE FROM handoff_sessions WHERE session_id = $1",
+      [sessionId],
+    );
+    return "cancelled";
+  }
+
+  private async prune(): Promise<void> {
+    await getPostgresPool().query(
+      "DELETE FROM handoff_sessions WHERE expires_at <= now()",
+    );
+  }
+
+  private async ensureSchema(): Promise<void> {
+    this.schemaReady ??= getPostgresPool()
+      .query(
+        `
+          CREATE TABLE IF NOT EXISTS handoff_sessions (
+            session_id text PRIMARY KEY,
+            publish_token_hash text NOT NULL,
+            consume_token_hash text NOT NULL,
+            payload jsonb,
+            created_at timestamptz NOT NULL DEFAULT now(),
+            expires_at timestamptz NOT NULL,
+            consumed_at timestamptz,
+            cancelled_at timestamptz
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_handoff_sessions_expires_at
+            ON handoff_sessions (expires_at);
+        `,
+      )
+      .then(async () => {
+        await getPostgresPool().query(`
+          ALTER TABLE handoff_sessions
+            ADD COLUMN IF NOT EXISTS publish_token_hash text,
+            ADD COLUMN IF NOT EXISTS consume_token_hash text,
+            ADD COLUMN IF NOT EXISTS consumed_at timestamptz,
+            ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;
+          ALTER TABLE handoff_sessions ALTER COLUMN payload DROP NOT NULL;
+        `);
+      })
+      .then(() => undefined);
+    await this.schemaReady;
+  }
+}
+
+/** Upstash: JSON blob with token hashes; atomic consume via GETDEL after verify. */
 export class UpstashRedisHandoffStore implements HandoffStore {
   private readonly baseUrl: string;
   private readonly token: string;
@@ -62,31 +413,103 @@ export class UpstashRedisHandoffStore implements HandoffStore {
     this.token = token;
   }
 
-  async set(sessionId: string, payload: HandoffPayload): Promise<"stored" | "exists"> {
-    const result = await this.command<string | null>([
+  async createSession(input: {
+    sessionId: string;
+    publishTokenHash: string;
+    consumeTokenHash: string;
+    expiresAt: Date;
+  }): Promise<void> {
+    const record = {
+      publishTokenHash: input.publishTokenHash,
+      consumeTokenHash: input.consumeTokenHash,
+      payload: null as HandoffPayload | null,
+      consumed: false,
+      cancelled: false,
+      expiresAt: input.expiresAt.getTime(),
+    };
+    await this.command([
       "SET",
-      this.key(sessionId),
-      JSON.stringify(payload),
+      this.key(input.sessionId),
+      JSON.stringify(record),
       "PX",
       this.ttlMs,
-      "NX",
     ]);
-    return result === "OK" ? "stored" : "exists";
   }
 
-  async get(sessionId: string): Promise<HandoffPayload | null> {
-    const result = await this.command<string | null>(["GET", this.key(sessionId)]);
-    if (!result) return null;
-    try {
-      return JSON.parse(result) as HandoffPayload;
-    } catch {
-      await this.delete(sessionId);
-      return null;
+  async publish(
+    sessionId: string,
+    publishTokenHash: string,
+    payload: HandoffPayload,
+  ): Promise<"stored" | "exists" | "unauthorized" | "expired" | "missing"> {
+    const raw = await this.command<string | null>(["GET", this.key(sessionId)]);
+    if (!raw) return "missing";
+    const record = JSON.parse(raw) as {
+      publishTokenHash: string;
+      consumeTokenHash: string;
+      payload: HandoffPayload | null;
+      consumed: boolean;
+      cancelled: boolean;
+      expiresAt: number;
+    };
+    if (record.cancelled || record.expiresAt <= Date.now()) return "expired";
+    if (!timingSafeEqualString(record.publishTokenHash, publishTokenHash)) {
+      return "unauthorized";
     }
+    if (record.payload) return "exists";
+    record.payload = payload;
+    const ttl = Math.max(1, record.expiresAt - Date.now());
+    await this.command(["SET", this.key(sessionId), JSON.stringify(record), "PX", ttl]);
+    return "stored";
   }
 
-  async delete(sessionId: string): Promise<void> {
-    await this.command<number>(["DEL", this.key(sessionId)]);
+  async consume(
+    sessionId: string,
+    consumeTokenHash: string,
+  ): Promise<
+    | HandoffPayload
+    | "unauthorized"
+    | "expired"
+    | "missing"
+    | "pending"
+    | "already_consumed"
+  > {
+    const raw = await this.command<string | null>(["GET", this.key(sessionId)]);
+    if (!raw) return "missing";
+    const record = JSON.parse(raw) as {
+      publishTokenHash: string;
+      consumeTokenHash: string;
+      payload: HandoffPayload | null;
+      consumed: boolean;
+      cancelled: boolean;
+      expiresAt: number;
+    };
+    if (record.cancelled || record.expiresAt <= Date.now()) return "expired";
+    if (!timingSafeEqualString(record.consumeTokenHash, consumeTokenHash)) {
+      return "unauthorized";
+    }
+    if (record.consumed) return "already_consumed";
+    if (!record.payload) return "pending";
+    const deleted = await this.command<string | null>(["GETDEL", this.key(sessionId)]);
+    if (!deleted) return "already_consumed";
+    return record.payload;
+  }
+
+  async cancel(
+    sessionId: string,
+    consumeTokenHash: string,
+  ): Promise<"cancelled" | "unauthorized" | "expired" | "missing"> {
+    const raw = await this.command<string | null>(["GET", this.key(sessionId)]);
+    if (!raw) return "missing";
+    const record = JSON.parse(raw) as {
+      consumeTokenHash: string;
+      expiresAt: number;
+    };
+    if (record.expiresAt <= Date.now()) return "expired";
+    if (!timingSafeEqualString(record.consumeTokenHash, consumeTokenHash)) {
+      return "unauthorized";
+    }
+    await this.command(["DEL", this.key(sessionId)]);
+    return "cancelled";
   }
 
   private key(sessionId: string): string {
@@ -102,82 +525,10 @@ export class UpstashRedisHandoffStore implements HandoffStore {
       },
       body: JSON.stringify(command),
     });
-    if (!res.ok) {
-      throw new Error(`upstash_handoff_failed:${res.status}`);
-    }
+    if (!res.ok) throw new Error(`upstash_handoff_failed:${res.status}`);
     const body = (await res.json()) as { result?: T; error?: string };
-    if (body.error) {
-      throw new Error(`upstash_handoff_failed:${body.error}`);
-    }
+    if (body.error) throw new Error(`upstash_handoff_failed:${body.error}`);
     return body.result as T;
-  }
-}
-
-export class PostgresHandoffStore implements HandoffStore {
-  private schemaReady: Promise<void> | null = null;
-
-  constructor(private readonly ttlMs: number) {}
-
-  async set(sessionId: string, payload: HandoffPayload): Promise<"stored" | "exists"> {
-    await this.ensureSchema();
-    await this.prune();
-    const expiresAt = new Date(Date.now() + this.ttlMs);
-    const result = await getPostgresPool().query(
-      `
-        INSERT INTO handoff_sessions (session_id, payload, expires_at)
-        VALUES ($1, $2::jsonb, $3)
-        ON CONFLICT (session_id) DO NOTHING
-      `,
-      [sessionId, JSON.stringify(payload), expiresAt],
-    );
-    return result.rowCount === 1 ? "stored" : "exists";
-  }
-
-  async get(sessionId: string): Promise<HandoffPayload | null> {
-    await this.ensureSchema();
-    await this.prune();
-    const result = await getPostgresPool().query<{ payload: HandoffPayload }>(
-      `
-        SELECT payload
-        FROM handoff_sessions
-        WHERE session_id = $1 AND expires_at > now()
-      `,
-      [sessionId],
-    );
-    return result.rows[0]?.payload ?? null;
-  }
-
-  async delete(sessionId: string): Promise<void> {
-    await this.ensureSchema();
-    await getPostgresPool().query(
-      "DELETE FROM handoff_sessions WHERE session_id = $1",
-      [sessionId],
-    );
-  }
-
-  private async prune(): Promise<void> {
-    await getPostgresPool().query(
-      "DELETE FROM handoff_sessions WHERE expires_at <= now()",
-    );
-  }
-
-  private async ensureSchema(): Promise<void> {
-    this.schemaReady ??= getPostgresPool()
-      .query(
-        `
-          CREATE TABLE IF NOT EXISTS handoff_sessions (
-            session_id text PRIMARY KEY,
-            payload jsonb NOT NULL,
-            created_at timestamptz NOT NULL DEFAULT now(),
-            expires_at timestamptz NOT NULL
-          );
-
-          CREATE INDEX IF NOT EXISTS idx_handoff_sessions_expires_at
-            ON handoff_sessions (expires_at);
-        `,
-      )
-      .then(() => undefined);
-    await this.schemaReady;
   }
 }
 

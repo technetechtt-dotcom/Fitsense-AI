@@ -10,18 +10,18 @@ length & width using ARCore + OpenCV, then maps those measurements to UK / US
 
 ## Tech stack
 
-| Layer           | Technology                                                 |
-| --------------- | ---------------------------------------------------------- |
-| Language        | Kotlin 1.9                                                 |
-| UI              | Jetpack Compose + Material 3 + Navigation Compose          |
-| Architecture    | MVVM + Clean (Repository ports / adapters)                 |
-| Async           | Coroutines + StateFlow                                     |
-| DI              | Hilt (Dagger)                                              |
-| Camera          | CameraX 1.3.x (PreviewView + ImageAnalysis + ImageCapture) |
-| AR              | ARCore 1.42 (plane detection + camera intrinsics)          |
-| Computer Vision | OpenCV 4.9 (Maven Central artifact `org.opencv:opencv`)    |
-| Backend         | Firebase Auth (anon), Firestore, Storage                   |
-| Build           | AGP 8.4 + Kotlin DSL + Version Catalog                     |
+| Layer           | Technology                                                                  |
+| --------------- | --------------------------------------------------------------------------- |
+| Language        | Kotlin 1.9                                                                  |
+| UI              | Jetpack Compose + Material 3 + Navigation Compose                           |
+| Architecture    | MVVM + Clean (Repository ports / adapters)                                  |
+| Async           | Coroutines + StateFlow                                                      |
+| DI              | Hilt (Dagger)                                                               |
+| Camera          | CameraX 1.3.x (PreviewView + ImageAnalysis + ImageCapture)                  |
+| AR              | ARCore 1.42 (plane detection + camera intrinsics)                           |
+| Computer Vision | OpenCV 4.9 (Maven Central artifact `org.opencv:opencv`)                     |
+| Backend         | FitSense API (Postgres sync + secure handoff); Keystore-backed device creds |
+| Build           | AGP 8.4 + Kotlin DSL + Version Catalog                                      |
 
 ---
 
@@ -40,8 +40,9 @@ android/
 │       │   ├── MainActivity.kt          # Hosts Compose nav graph
 │       │   ├── ar/                      # ARCore session + plane state
 │       │   ├── camera/                  # CameraX controller + frame analyzer
-│       │   ├── di/                      # Hilt modules (App, Firebase, Repo)
-│       │   ├── firebase/                # Auth / Firestore / Storage services
+│       │   ├── di/                      # Hilt modules (App, Repo)
+│       │   ├── handoff/                 # FitSense API handoff client
+│       │   ├── local/                   # DataStore + EncryptedSharedPreferences
 │       │   ├── measurement/             # Calibration + measurement engines
 │       │   ├── models/                  # Domain models (data classes)
 │       │   ├── recommendation/          # Size table + recommendation engine
@@ -91,42 +92,23 @@ The Gradle wrapper jar is intentionally omitted from source control. On first
 sync Android Studio will download it automatically. If you want to build from
 the command line first, run:
 
-```bash
+````bash
 The Gradle wrapper (`gradlew`, `gradlew.bat`, `gradle/wrapper/*`) is committed. Build with:
 
 ```bash
 cd android
 ./gradlew :app:assembleDebug
 ./gradlew :app:test
-```
-```
-
-### 3. Firebase
-
-1. Create a Firebase project at <https://console.firebase.google.com>.
-2. Add an Android app with package id `com.fitsense.ai` (and a second one,
-   `com.fitsense.ai.debug`, for the debug build flavour).
-3. Enable **Anonymous Authentication**, **Cloud Firestore** (start in
-   _production_ mode and apply the rules below), and **Storage**.
-4. Download `google-services.json` and drop it into `android/app/`.
-   A template lives at `android/app/google-services.example.json`.
-
-Suggested Firestore rules (read/write only your own scans):
+````
 
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{db}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      match /scans/{scanId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-    }
-    match /products/{productId} { allow read: if true; }
-  }
-}
-```
+
+### 3. FitSense API (optional cloud sync / handoff)
+
+Point the app at your deployed API (`VITE_API_BASE_URL` equivalent / build config).
+Device credentials for future sync use Keystore-backed
+`SecureDeviceCredentialStore`. Handoff publish uses `HandoffClient` with the
+publish Bearer from a server-created session.
 
 ### 4. Run
 
@@ -148,7 +130,7 @@ Each feature screen has:
 - **Hilt ViewModel** (`viewmodel/<Feature>ViewModel.kt`) — owns `StateFlow`s
   and orchestrates repository calls.
 - **Repository interface** (`repository/`) — domain port.
-- **Repository implementation** — Firestore + Firebase Storage adapter.
+- **Repository implementation** — local DataStore / FitSense API adapters.
 
 The `DataResult` envelope (`utils/Result.kt`) is used end-to-end instead of
 throwing across coroutine boundaries, so the ViewModels can map errors into
@@ -186,24 +168,15 @@ Brand placeholder catalogue (`ShoeCatalog`) includes Nike (Pegasus, Air Max),
 Adidas (Ultraboost, Samba), Puma (Velocity Nitro, Suede), New Balance, and
 two local brands (Bata Power, North Star).
 
-### Firebase model
+### Local + API data model
 
-```
-users/{uid}
-  ├── userId, displayName, email, isAnonymous
-  ├── cachedFootLengthMm, cachedFootWidthMm
-  ├── preferences: { units, defaultCalibration, analyticsOptIn, preferredBrands }
-  └── scans/{scanId}
-        ├── createdAtEpochMs, deviceModel, arcoreUsed
-        ├── leftFoot, rightFoot:  { lengthMm, widthMm, confidence, calibration, ... }
-        └── recommendation:       { uk, us, eu, mondopointMm, matches[] }
+Local profile and scans live in DataStore. Cloud sync (when configured) uses the
+FitSense API Postgres store (`fit_profiles`, `scans`, `fit_events`) with
+challenge-response device auth. Cross-device embed handoff uses one-time
+publish/consume tokens — see `docs/ROADMAP.md` Phase 4 for full mobile sync.
 
-products/{productId}
-  └── { brand, model, category, fitType, sizeRangeEu, priceUsd, imageUrl, ... }
-```
-
-When `products/` is empty (fresh project), `ProductRepository` falls back to
-the bundled `ShoeCatalog` so the demo flow always has something to show.
+When the remote catalogue is empty, `ProductRepository` falls back to the
+bundled `ShoeCatalog` so the demo flow always has something to show.
 
 ---
 
@@ -248,11 +221,12 @@ through `org.opencv.*` packages.
   metadata).
 - **Phone-based ML** (TensorFlow Lite) for foot segmentation, replacing the
   current Canny + contour approach for cluttered backgrounds.
-- **Sign-in providers** (Google, Email/password) and account-merge from anon.
-- **Retailer dashboard** (Firestore-backed admin app).
+- **Account linking** (passkey / verified email) per `docs/ROADMAP.md` Phase 10.
+- **Retailer dashboard** (merchant catalogue admin).
 
 ---
 
 ## License
 
 Internal / proprietary — see your organisation's policy.
+```

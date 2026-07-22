@@ -54,12 +54,17 @@ Payloads are stored as `jsonb` after request validation.
 
 ## Authentication
 
-Production sync routes require a signed device session token issued by
-`POST /v1/auth/session`. Set a strong secret:
+Production sync routes require a short-lived access token from device
+challenge-response auth. Set secrets:
 
 ```env
 AUTH_SECRET=replace-with-a-long-random-string
+HANDOFF_SECRET=replace-with-a-different-long-random-string
 ```
+
+Flow: `POST /v1/auth/devices/register` → `POST /v1/auth/challenge` →
+`POST /v1/auth/token` → `POST /v1/auth/refresh`. Legacy
+`POST /v1/auth/session` returns 410.
 
 Local sync testing can bypass auth:
 
@@ -72,20 +77,24 @@ Then pass `X-Debug-Uid: test-user-123` instead of a Bearer token. Never enable
 
 ## Endpoints
 
-| Method | Path                           | Auth   | Description                            |
-| ------ | ------------------------------ | ------ | -------------------------------------- |
-| GET    | `/health`                      | no     | Liveness and selected storage backends |
-| POST   | `/v1/auth/session`             | no     | Issue device session token             |
-| POST   | `/v1/handoff/sessions`         | no     | Issue signed one-time publish token    |
-| PUT    | `/v1/handoff/:sessionId`       | Bearer | Publish handoff payload (one-time)     |
-| GET    | `/v1/handoff/:sessionId`       | no     | Poll payload `{ payload? }`            |
-| DELETE | `/v1/handoff/:sessionId`       | no     | Remove session                         |
-| GET    | `/v1/sync`                     | Bearer | Pull profile, events, scans            |
-| PUT    | `/v1/sync/fit-profile`         | Bearer | Upsert fit profile                     |
-| PUT    | `/v1/sync/scans/:scanId`       | Bearer | Upsert scan                            |
-| DELETE | `/v1/sync/scans/:scanId`       | Bearer | Delete one scan                        |
-| PUT    | `/v1/sync/fit-events/:eventId` | Bearer | Upsert event                           |
-| DELETE | `/v1/sync`                     | Bearer | Erase all user cloud data              |
+| Method | Path                             | Auth           | Description                             |
+| ------ | -------------------------------- | -------------- | --------------------------------------- |
+| GET    | `/health`                        | no             | Liveness and selected storage backends  |
+| POST   | `/v1/auth/devices/register`      | no             | Server-issued deviceId + deviceSecret   |
+| POST   | `/v1/auth/challenge`             | no             | Issue challenge nonce                   |
+| POST   | `/v1/auth/token`                 | no             | Exchange proof for access + refresh     |
+| POST   | `/v1/auth/refresh`               | no             | Rotate refresh; issue new access        |
+| POST   | `/v1/auth/logout`                | no             | Revoke refresh / access jti             |
+| POST   | `/v1/handoff/sessions`           | no             | Create session + publish/consume tokens |
+| PUT    | `/v1/handoff/:sessionId`         | publish Bearer | Publish payload (one-time)              |
+| POST   | `/v1/handoff/:sessionId/consume` | consume Bearer | Atomic one-time consume                 |
+| DELETE | `/v1/handoff/:sessionId`         | consume Bearer | Cancel session                          |
+| GET    | `/v1/sync`                       | Bearer         | Pull profile, events, scans             |
+| PUT    | `/v1/sync/fit-profile`           | Bearer         | Upsert fit profile                      |
+| PUT    | `/v1/sync/scans/:scanId`         | Bearer         | Upsert scan                             |
+| DELETE | `/v1/sync/scans/:scanId`         | Bearer         | Delete one scan                         |
+| PUT    | `/v1/sync/fit-events/:eventId`   | Bearer         | Upsert event                            |
+| DELETE | `/v1/sync`                       | Bearer         | Erase all user cloud data               |
 
 ## Scripts
 

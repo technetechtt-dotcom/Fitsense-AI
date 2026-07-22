@@ -155,8 +155,8 @@ export function Privacy() {
             </p>
             <p>
               <strong className="text-ink">Retention.</strong> Local data remains until
-              you delete it or sign out. Cloud copies are removed when you erase
-              cloud data or sign out while sync is enabled.
+              you delete it or sign out. Cloud copies are removed when you erase cloud
+              data or sign out while sync is enabled.
             </p>
             <p>
               <strong className="text-ink">Your rights.</strong> Export, delete, and

@@ -1,53 +1,23 @@
-import { randomBytes, createHmac, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { createHandoffStore } from "../services/handoffStore.js";
+import {
+  createHandoffStore,
+  generateHandoffSessionId,
+  mintHandoffSessionTokens,
+  verifyHandoffOpToken,
+} from "../services/handoffStore.js";
+import { sha256Hex } from "../services/sessionAuth.js";
 import { handoffPayloadSchema, sessionIdSchema } from "../validation/schemas.js";
 
 const store = createHandoffStore();
 
-const publishTokenSchema = z.string().min(16).max(512);
+const bearerTokenSchema = z.string().min(16).max(2048);
 
-function issuePublishToken(sessionId: string): string {
-  const secret = config.authSecret;
-  if (!secret) throw new Error("AUTH_SECRET is not configured");
-  const body = Buffer.from(
-    JSON.stringify({ sessionId, exp: Date.now() + config.handoffTtlMs }),
-  ).toString("base64url");
-  const sig = createHmac("sha256", secret).update(body).digest("base64url");
-  return `${body}.${sig}`;
-}
-
-function verifyPublishToken(token: string, sessionId: string): boolean {
-  const secret = config.authSecret;
-  if (!secret) return false;
-  const [body, sig] = token.split(".");
-  if (!body || !sig) return false;
-  const expected = createHmac("sha256", secret).update(body).digest("base64url");
-  const sigBuf = Buffer.from(sig);
-  const expectedBuf = Buffer.from(expected);
-  if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
-    return false;
-  }
-  try {
-    const payload = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as {
-      sessionId?: string;
-      exp?: number;
-    };
-    return payload.sessionId === sessionId && (payload.exp ?? 0) > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-function generateSessionId(): string {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const bytes = randomBytes(24);
-  let out = "";
-  for (let i = 0; i < 24; i++) out += alphabet[bytes[i] % alphabet.length];
-  return out;
+function readBearer(req: { header: (name: string) => string | undefined }): string {
+  const auth = req.header("authorization");
+  return auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
 }
 
 export const handoffRouter = Router();
@@ -64,21 +34,30 @@ const writeLimit = rateLimit({
   key: (req) => `${req.ip}:${req.params.sessionId ?? ""}`,
 });
 
-handoffRouter.post("/handoff/sessions", writeLimit, (req, res, next) => {
+handoffRouter.post("/handoff/sessions", writeLimit, async (_req, res, next) => {
   try {
-    if (!config.authSecret) {
+    if (!config.handoffSecret) {
       res.status(503).json({
         error: "handoff_auth_unavailable",
-        message: "Configure AUTH_SECRET to issue signed handoff sessions.",
+        message:
+          "Configure HANDOFF_SECRET (or AUTH_SECRET in local/dev) to issue handoff sessions.",
       });
       return;
     }
-    const sessionId = generateSessionId();
-    const publishToken = issuePublishToken(sessionId);
-    res.json({
+    const sessionId = generateHandoffSessionId();
+    const tokens = mintHandoffSessionTokens(sessionId);
+    await store.createSession({
       sessionId,
-      publishToken,
-      expiresAtEpochMs: Date.now() + config.handoffTtlMs,
+      publishTokenHash: tokens.publishTokenHash,
+      consumeTokenHash: tokens.consumeTokenHash,
+      expiresAt: tokens.expiresAt,
+    });
+    res.status(201).json({
+      sessionId,
+      publishToken: tokens.publishToken,
+      consumeToken: tokens.consumeToken,
+      expiresAtEpochMs: tokens.expiresAt.getTime(),
+      kid: config.handoffKid,
     });
   } catch (err) {
     next(err);
@@ -88,19 +67,32 @@ handoffRouter.post("/handoff/sessions", writeLimit, (req, res, next) => {
 handoffRouter.put("/handoff/:sessionId", writeLimit, async (req, res, next) => {
   try {
     const sessionId = sessionIdSchema.parse(req.params.sessionId);
-    const auth = req.header("authorization");
-    const token = auth?.startsWith("Bearer ") ? auth.slice("Bearer ".length).trim() : "";
-    if (token) {
-      publishTokenSchema.parse(token);
-      if (!verifyPublishToken(token, sessionId)) {
-        res.status(401).json({ error: "invalid_publish_token" });
-        return;
-      }
+    const raw = readBearer(req);
+    if (!raw) {
+      res.status(401).json({ error: "invalid_publish_token" });
+      return;
+    }
+    const token = bearerTokenSchema.parse(raw);
+    if (!verifyHandoffOpToken(token, sessionId, "publish")) {
+      res.status(401).json({ error: "invalid_publish_token" });
+      return;
     }
     const body = req.body as { payload?: unknown };
     const candidate = body?.payload ?? req.body;
     const payload = handoffPayloadSchema.parse(candidate);
-    const result = await store.set(sessionId, payload);
+    const result = await store.publish(sessionId, sha256Hex(token), payload);
+    if (result === "unauthorized") {
+      res.status(401).json({ error: "invalid_publish_token" });
+      return;
+    }
+    if (result === "expired") {
+      res.status(410).json({ error: "handoff_expired" });
+      return;
+    }
+    if (result === "missing") {
+      res.status(404).json({ error: "handoff_not_found" });
+      return;
+    }
     if (result === "exists") {
       res.status(409).json({ error: "handoff_already_published" });
       return;
@@ -111,24 +103,80 @@ handoffRouter.put("/handoff/:sessionId", writeLimit, async (req, res, next) => {
   }
 });
 
-handoffRouter.get("/handoff/:sessionId", readLimit, async (req, res, next) => {
+handoffRouter.post("/handoff/:sessionId/consume", readLimit, async (req, res, next) => {
   try {
     const sessionId = sessionIdSchema.parse(req.params.sessionId);
-    const payload = await store.get(sessionId);
-    if (!payload) {
+    const raw = readBearer(req);
+    if (!raw) {
+      res.status(401).json({ error: "invalid_consume_token" });
+      return;
+    }
+    const token = bearerTokenSchema.parse(raw);
+    if (!verifyHandoffOpToken(token, sessionId, "consume")) {
+      res.status(401).json({ error: "invalid_consume_token" });
+      return;
+    }
+    const result = await store.consume(sessionId, sha256Hex(token));
+    if (result === "unauthorized") {
+      res.status(401).json({ error: "invalid_consume_token" });
+      return;
+    }
+    if (result === "expired") {
+      res.status(410).json({ error: "handoff_expired" });
+      return;
+    }
+    if (result === "already_consumed") {
+      res.status(409).json({ error: "handoff_already_consumed" });
+      return;
+    }
+    if (result === "missing") {
+      res.status(404).json({ error: "handoff_not_found" });
+      return;
+    }
+    if (result === "pending") {
       res.json({ payload: null });
       return;
     }
-    res.json({ payload });
+    res.json({ payload: result });
   } catch (err) {
     next(err);
   }
 });
 
+handoffRouter.get("/handoff/:sessionId", readLimit, (_req, res) => {
+  res.status(410).json({
+    error: "handoff_get_removed",
+    message:
+      "Open GET handoff is removed. Use POST /v1/handoff/:sessionId/consume with the consume Bearer token.",
+  });
+});
+
 handoffRouter.delete("/handoff/:sessionId", writeLimit, async (req, res, next) => {
   try {
     const sessionId = sessionIdSchema.parse(req.params.sessionId);
-    await store.delete(sessionId);
+    const raw = readBearer(req);
+    if (!raw) {
+      res.status(401).json({ error: "invalid_consume_token" });
+      return;
+    }
+    const token = bearerTokenSchema.parse(raw);
+    if (!verifyHandoffOpToken(token, sessionId, "consume")) {
+      res.status(401).json({ error: "invalid_consume_token" });
+      return;
+    }
+    const result = await store.cancel(sessionId, sha256Hex(token));
+    if (result === "unauthorized") {
+      res.status(401).json({ error: "invalid_consume_token" });
+      return;
+    }
+    if (result === "expired") {
+      res.status(410).json({ error: "handoff_expired" });
+      return;
+    }
+    if (result === "missing") {
+      res.status(404).json({ error: "handoff_not_found" });
+      return;
+    }
     res.status(204).end();
   } catch (err) {
     next(err);

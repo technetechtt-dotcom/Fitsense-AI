@@ -149,6 +149,9 @@ export function buildEmbedUrl(base: string, cfg: EmbedConfig): string {
   if (cfg.handoff?.sessionId) {
     url.searchParams.set("session", cfg.handoff.sessionId);
   }
+  if (cfg.handoff?.publishToken) {
+    url.searchParams.set("pt", cfg.handoff.publishToken);
+  }
   if (cfg.handoff?.baseUrl) {
     url.searchParams.set("handoffBase", cfg.handoff.baseUrl);
   }
@@ -175,14 +178,16 @@ export function readEmbedConfigFromUrl(href: string): EmbedConfig {
   const url = new URL(href);
   const themeRaw = url.searchParams.get("theme");
   const session = url.searchParams.get("session") ?? undefined;
+  const publishToken = url.searchParams.get("pt") ?? undefined;
   const handoffBase =
     url.searchParams.get("handoffBase") ?? resolveHandoffBaseUrl(undefined);
   const handoffMode = url.searchParams.get("handoffMode") as
     "http" | "broadcast" | null;
   const handoff: EmbedConfig["handoff"] =
-    session || handoffBase || handoffMode
+    session || publishToken || handoffBase || handoffMode
       ? {
           sessionId: session,
+          publishToken,
           baseUrl: handoffBase,
           transport: handoffMode ?? (handoffBase ? "auto" : undefined),
         }

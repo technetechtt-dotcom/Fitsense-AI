@@ -255,9 +255,10 @@ FitSense.init({
 });
 
 // Relay endpoints (built into backend/):
-//   PUT    /v1/handoff/:sessionId   body: { payload }   → 204
-//   GET    /v1/handoff/:sessionId   → 200 { payload? }
-//   DELETE /v1/handoff/:sessionId   → 204`}
+//   POST   /v1/handoff/sessions              → 201 { sessionId, publishToken, consumeToken }
+//   PUT    /v1/handoff/:sessionId            Authorization: Bearer publishToken  → 204
+//   POST   /v1/handoff/:sessionId/consume    Authorization: Bearer consumeToken  → 200 { payload? }
+//   DELETE /v1/handoff/:sessionId            Authorization: Bearer consumeToken  → 204`}
         />
         {isApiConfigured() ? (
           <p className="text-xs text-neon mt-2">
