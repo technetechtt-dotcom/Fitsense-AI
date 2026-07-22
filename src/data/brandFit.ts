@@ -1,17 +1,8 @@
 import type { BrandFitDelta } from "../types";
 
 /**
- * Per-brand fit deltas — the heart of the "Nike UK 8, Adidas UK 8.5,
- * Puma UK 9" cheat sheet shown in the Fit Profile.
- *
- * Numbers are derived from a small published dataset + the FitSense team's
- * own QA shoe-fit tests, normalised against the EU sizing scale (i.e. the
- * delta is in EU full-sizes, which is the same scale as US half-sizes).
- * Positive `euSizeDelta` means the brand runs *small* (size up). Negative
- * means it runs *large* (size down).
- *
- * The default delta (when a brand is missing) is the zero delta —
- * recommendation falls back to the global Mondopoint → size mapping.
+ * Per-brand (and optional model) fit deltas. Static seed data plus
+ * merchant-uploaded overrides from `/v1/merchants/.../brand-fit`.
  */
 
 export const BRAND_FIT_DELTAS: BrandFitDelta[] = [
@@ -95,15 +86,59 @@ const DEFAULT_DELTA: BrandFitDelta = {
   note: "No published fit data — using global size mapping.",
 };
 
-const byKey: Map<string, BrandFitDelta> = new Map(
-  BRAND_FIT_DELTAS.map((d) => [normalise(d.brand), d]),
-);
+type FitKey = string;
 
-/** Look up the brand delta, case-insensitively. */
-export function brandFitFor(brand: string): BrandFitDelta {
-  return byKey.get(normalise(brand)) ?? DEFAULT_DELTA;
+function keyOf(brand: string, model?: string): FitKey {
+  return `${normalise(brand)}::${normalise(model ?? "")}`;
 }
 
-function normalise(brand: string): string {
-  return brand.trim().toLowerCase();
+function normalise(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+const staticByKey: Map<FitKey, BrandFitDelta> = new Map(
+  BRAND_FIT_DELTAS.map((d) => [keyOf(d.brand), d]),
+);
+
+/** Merchant / model-specific overrides (brand+model, then brand). */
+const merchantByKey: Map<FitKey, BrandFitDelta> = new Map();
+
+export function registerMerchantBrandFits(
+  profiles: Array<
+    BrandFitDelta & {
+      model?: string;
+    }
+  >,
+): void {
+  merchantByKey.clear();
+  for (const p of profiles) {
+    merchantByKey.set(keyOf(p.brand, p.model), {
+      brand: p.brand,
+      euSizeDelta: p.euSizeDelta,
+      toeBoxWidth: p.toeBoxWidth,
+      midsoleFeel: p.midsoleFeel,
+      note: p.note,
+    });
+    // Also index bare brand if model empty.
+    if (!p.model) {
+      merchantByKey.set(keyOf(p.brand), {
+        brand: p.brand,
+        euSizeDelta: p.euSizeDelta,
+        toeBoxWidth: p.toeBoxWidth,
+        midsoleFeel: p.midsoleFeel,
+        note: p.note,
+      });
+    }
+  }
+}
+
+/** Look up brand/model delta — merchant model → merchant brand → static → default. */
+export function brandFitFor(brand: string, model?: string): BrandFitDelta {
+  if (model) {
+    const exact = merchantByKey.get(keyOf(brand, model));
+    if (exact) return exact;
+  }
+  const merchantBrand = merchantByKey.get(keyOf(brand));
+  if (merchantBrand) return merchantBrand;
+  return staticByKey.get(keyOf(brand)) ?? DEFAULT_DELTA;
 }

@@ -6,6 +6,8 @@ import { maybeAutoRestoreFromCloud } from "./cloud/restore";
 import { syncAnalyticsFromConsent } from "./analytics";
 import { acknowledgePolicy, hasCloudSyncConsent, loadConsent } from "./consent";
 import { installWebMonitoring } from "./monitoring";
+import { installSyncOutboxListeners, flushSyncOutbox } from "./cloud/syncOutbox";
+import { getMerchantOrgId, loadMerchantBrandFits } from "./api/merchantApi";
 
 let booted = false;
 
@@ -18,6 +20,7 @@ export async function bootstrapApp(): Promise<void> {
 
   initAnalytics();
   installWebMonitoring();
+  installSyncOutboxListeners();
 
   // Migrate legacy profiles that stored analytics on UserPreferences.
   const legacy = localStorage.getItem("fitsense:profile");
@@ -57,6 +60,12 @@ export async function bootstrapApp(): Promise<void> {
       console.warn(
         "[fitsense] API unreachable — handoff and sync via API will fail until the server is running (npm run dev:api).",
       );
+    } else if (getMerchantOrgId()) {
+      try {
+        await loadMerchantBrandFits();
+      } catch (err) {
+        console.warn("[fitsense] merchant brand-fit load failed", err);
+      }
     }
   }
 
@@ -65,6 +74,7 @@ export async function bootstrapApp(): Promise<void> {
       await ensureSignedIn();
     }
     await maybeAutoRestoreFromCloud();
+    await flushSyncOutbox();
   }
 }
 

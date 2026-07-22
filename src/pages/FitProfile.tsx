@@ -769,6 +769,8 @@ function describeEvent(e: FitEvent): string {
       return `Bought ${e.brand} (size ${e.size} ${e.sizeSystem.toUpperCase()})`;
     case "return":
       return `Returned ${e.brand} — ${e.reason.replace(/_/g, " ")}`;
+    case "exchange":
+      return `Exchanged ${e.brand} ${e.fromSize} → ${e.toSize} ${e.sizeSystem.toUpperCase()}`;
     case "rating":
       return `Rated ${e.brand} ${"★".repeat(e.stars)}${"☆".repeat(5 - e.stars)}`;
     case "fit_rating": {

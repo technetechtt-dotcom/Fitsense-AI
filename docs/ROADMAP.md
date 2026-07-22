@@ -32,6 +32,9 @@ See [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md), [RENDER_NEON.md](./RENDER_NE
 - Telemetry endpoint + Timber/web monitoring hooks
 - Backup/restore drill test + POPIA retention job + Privacy copy
 - Pen-test scope + key rotation docs
+- **Merchant orgs/roles, catalogue+inventory ingest, brand/model fit profiles, purchase/exchange/return outcomes, pilot metrics**
+- Regional locales (en-ZA / af / xh / zu) + UK sizing default; offline sync outbox; low-data mode
+- Kimberley / Northern Cape pilot runbook (`docs/ops/PILOT_KIMBERLEY.md`)
 
 ---
 

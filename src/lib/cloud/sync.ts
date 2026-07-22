@@ -44,7 +44,9 @@ export async function pushFitEvent(event: FitEvent): Promise<void> {
   try {
     await pushFitEventViaApi(event);
   } catch (err) {
-    console.warn("[fitsense] pushFitEvent (api) failed", err);
+    console.warn("[fitsense] pushFitEvent (api) failed — queuing", err);
+    const { enqueueFitEvent } = await import("./syncOutbox");
+    enqueueFitEvent(event);
   }
 }
 
@@ -53,7 +55,9 @@ export async function pushScan(scan: ScanResult): Promise<void> {
   try {
     await pushScanViaApi(scan);
   } catch (err) {
-    console.warn("[fitsense] pushScan (api) failed", err);
+    console.warn("[fitsense] pushScan (api) failed — queuing", err);
+    const { enqueueScan } = await import("./syncOutbox");
+    enqueueScan(scan);
   }
 }
 
