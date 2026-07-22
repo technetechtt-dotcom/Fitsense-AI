@@ -4,9 +4,10 @@ Node.js backend for FitSense AI:
 
 - Handoff relay: desktop to phone QR size transfer (`/v1/handoff/:sessionId`)
 - Cloud sync: profile, fit-event, and scan persistence (`/v1/sync/*`)
+- Merchant platform: orgs/roles, catalogue ingest, brand fit, outcomes (`/v1/merchants/*`)
 
 The web app contract mirrors `src/lib/cloud/sync.ts` and
-`src/embed/handoff.ts`.
+`src/embed/handoff.ts`. Merchant API: [docs/MERCHANT_PLATFORM.md](../docs/MERCHANT_PLATFORM.md).
 
 ## Quick Start
 

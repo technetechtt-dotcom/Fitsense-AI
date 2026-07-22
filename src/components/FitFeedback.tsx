@@ -68,6 +68,23 @@ export function FitFeedback({
     setStage("kept");
   };
 
+  const onExchanged = () => {
+    const profile = getOrCreateFitProfile();
+    log({
+      eventId: newEventId(),
+      fitId: profile.fitId,
+      epochMs: Date.now(),
+      kind: "exchange",
+      productId,
+      brand,
+      fromSize: size ?? "",
+      toSize: "adjusted",
+      sizeSystem,
+      reason: "other",
+    });
+    setStage("done");
+  };
+
   const onReturned = (reason: FitEventReturn["reason"]) => {
     const profile = getOrCreateFitProfile();
     log({
@@ -172,16 +189,22 @@ export function FitFeedback({
             <MessageSquareDashed className="w-3.5 h-3.5 text-neon" />
             How did this fit?
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={onKept}
-              className="rounded-xl px-3 py-2 text-xs font-semibold bg-lime/15 text-lime border border-lime/30 hover:bg-lime/20"
+              className="rounded-xl px-2 py-2 text-[11px] font-semibold bg-lime/15 text-lime border border-lime/30 hover:bg-lime/20"
             >
-              I kept them
+              Kept
+            </button>
+            <button
+              onClick={onExchanged}
+              className="rounded-xl px-2 py-2 text-[11px] font-semibold bg-neon/15 text-neon border border-neon/30 hover:bg-neon/20"
+            >
+              Exchanged
             </button>
             <button
               onClick={() => setStage("return-reason")}
-              className="rounded-xl px-3 py-2 text-xs font-semibold bg-coral/10 text-coral border border-coral/30 hover:bg-coral/20"
+              className="rounded-xl px-2 py-2 text-[11px] font-semibold bg-coral/10 text-coral border border-coral/30 hover:bg-coral/20"
             >
               Returned
             </button>

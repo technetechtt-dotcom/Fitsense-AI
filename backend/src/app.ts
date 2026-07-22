@@ -9,6 +9,7 @@ import { authRouter } from "./routes/auth.js";
 import { fitIdentityRouter } from "./routes/fitIdentity.js";
 import { healthRouter } from "./routes/health.js";
 import { handoffRouter } from "./routes/handoff.js";
+import { merchantRouter } from "./routes/merchants.js";
 import { syncRouter } from "./routes/sync.js";
 import { telemetryRouter } from "./routes/telemetry.js";
 
@@ -24,7 +25,12 @@ export function createApp() {
     cors({
       origin: config.corsOrigin,
       methods: ["GET", "PUT", "POST", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization", "X-Debug-Uid"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Debug-Uid",
+        "X-Api-Key",
+      ],
     }),
   );
   app.use(express.json({ limit: config.jsonLimit }));
@@ -34,6 +40,7 @@ export function createApp() {
   app.use("/v1", handoffRouter);
   app.use("/v1", syncRouter);
   app.use("/v1", fitIdentityRouter);
+  app.use("/v1", merchantRouter);
   app.use("/v1", telemetryRouter);
 
   app.use((_req, res) => {

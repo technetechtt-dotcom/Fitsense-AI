@@ -23,6 +23,7 @@ import { listenFromHost, postToHost } from "./bridge";
 import { useApplyEmbedTheme } from "./EmbedTheme";
 import { QrCode } from "./QrCode";
 import { resolveEmbedHandoffConfig } from "../lib/api/handoffConfig";
+import { sizeSystemForLocale } from "../lib/i18n/locale";
 import {
   buildEmbedUrl,
   readEmbedConfigFromUrl,
@@ -85,6 +86,11 @@ export function EmbedApp() {
   const activeFoot = pendingRightFoot ? "left" : "right";
 
   useApplyEmbedTheme(config.theme);
+
+  const sizeSystem = useMemo(
+    () => sizeSystemForLocale(config.locale, config.sizeSystem),
+    [config.locale, config.sizeSystem],
+  );
 
   const isPhoneReceiver = !!config.handoff?.sessionId && !!config.handoff?.publishToken;
   const demoScanEnabled = isDemoScanEnabled();
@@ -154,12 +160,12 @@ export function EmbedApp() {
       if (isDemo) return;
       const summary = toScanSummary(result);
       postToHost({ type: "fitsense:scan", scan: summary });
-      const size = toSizeResult(result, config.sizeSystem ?? "uk");
+      const size = toSizeResult(result, sizeSystem);
       if (size) {
         postToHost({ type: "fitsense:size", size, scan: summary });
       }
     },
-    [config.sizeSystem],
+    [sizeSystem],
   );
 
   const finalisePhone = useCallback(
@@ -172,7 +178,7 @@ export function EmbedApp() {
         return;
       }
       try {
-        const size = toSizeResult(result, config.sizeSystem ?? "uk");
+        const size = toSizeResult(result, sizeSystem);
         if (!size) {
           setHandoffError("Could not produce a size recommendation.");
           setStep("intro");
@@ -193,7 +199,7 @@ export function EmbedApp() {
         setStep("result");
       }
     },
-    [config.handoff, config.sizeSystem],
+    [config.handoff, sizeSystem],
   );
 
   const startLocalScan = async (calibration: CalibrationReference) => {
@@ -337,7 +343,7 @@ export function EmbedApp() {
 
   const apply = () => {
     if (!scan || demoResult) return;
-    const size = toSizeResult(scan, config.sizeSystem ?? "uk");
+    const size = toSizeResult(scan, sizeSystem);
     if (!size) return;
     const summary = toScanSummary(scan);
     postToHost({ type: "fitsense:apply", size, scan: summary });
@@ -424,14 +430,14 @@ export function EmbedApp() {
             )}
           {step === "handoff-done" && (
             <motion.div key="handoff-done" {...stepMotion} className="fs-step">
-              <HandoffDone scan={scan} sizeSystem={config.sizeSystem ?? "uk"} />
+              <HandoffDone scan={scan} sizeSystem={sizeSystem} />
             </motion.div>
           )}
           {step === "result" && scan && (
             <motion.div key="result" {...stepMotion} className="fs-step">
               <Result
                 scan={scan}
-                sizeSystem={config.sizeSystem ?? "uk"}
+                sizeSystem={sizeSystem}
                 onApply={apply}
                 onRescan={() => {
                   setScan(null);

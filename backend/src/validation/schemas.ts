@@ -91,6 +91,7 @@ export const fitEventSchema = z
       "scan",
       "purchase",
       "return",
+      "exchange",
       "rating",
       "fit_rating",
       "wear",

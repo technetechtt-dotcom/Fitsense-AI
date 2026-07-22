@@ -68,7 +68,7 @@ export const config = {
   isProduction,
   trustProxy: process.env.TRUST_PROXY === "true" || isProduction,
   corsOrigin,
-  jsonLimit: process.env.JSON_LIMIT ?? "64kb",
+  jsonLimit: process.env.JSON_LIMIT ?? "512kb",
   handoffTtlMs: parseNumber(process.env.HANDOFF_TTL_MS, 5 * 60 * 1000),
   handoffStore,
   allowMemoryHandoff: process.env.ALLOW_MEMORY_HANDOFF_IN_PRODUCTION === "true",

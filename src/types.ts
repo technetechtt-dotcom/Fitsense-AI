@@ -265,6 +265,7 @@ export type FitEvent =
   | FitEventScan
   | FitEventPurchase
   | FitEventReturn
+  | FitEventExchange
   | FitEventRating
   | FitEventFitRating
   | FitEventWearFeedback
@@ -308,6 +309,22 @@ export interface FitEventReturn extends FitEventBase {
     | "wrong_style"
     | "other";
   notes?: string;
+}
+
+/** Size exchange at the till / online — distinct from a full return refund. */
+export interface FitEventExchange extends FitEventBase {
+  kind: "exchange";
+  productId: string;
+  brand: string;
+  fromSize: string;
+  toSize: string;
+  sizeSystem: "uk" | "us" | "eu" | "mondopoint";
+  reason?:
+    | "too_small"
+    | "too_large"
+    | "too_narrow"
+    | "too_wide"
+    | "other";
 }
 
 export interface FitEventRating extends FitEventBase {
