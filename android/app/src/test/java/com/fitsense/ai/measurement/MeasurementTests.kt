@@ -24,7 +24,8 @@ class HomographyTest {
         val H = Homography.compute(src, dst)
         val mapped = Homography.apply(H, Point2D(50.0, 70.0))
         assertEquals(105.0, mapped.x, 1.0)
-        assertEquals(148.5, mapped.y, 1.0)
+        // 70/141 * 297 ≈ 147.45 (not half of 297)
+        assertEquals(147.45, mapped.y, 1.0)
     }
 }
 
