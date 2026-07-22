@@ -11,5 +11,5 @@
   ],
   "expectedAspect": 1.4142857142857144,
   "minConfidence": 0.6,
-  "notes": "Synthetic A4-aspect quad (210×297 mm ratio) for ReferenceDetector scoring regression."
+  "notes": "Synthetic A4-aspect quad (210x297 mm ratio) for ReferenceDetector scoring regression."
 }
