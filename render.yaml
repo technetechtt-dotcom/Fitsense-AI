@@ -9,8 +9,9 @@ services:
     healthCheckPath: /health
     autoDeployTrigger: commit
     envVars:
+      # Prefer 22 when available; Render static/native may still use 20.
       - key: NODE_VERSION
-        value: "22.16.0"
+        value: "22"
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
@@ -24,7 +25,6 @@ services:
       - key: DATABASE_SSL_REJECT_UNAUTHORIZED
         value: "true"
       # Set manually to your static site URL, e.g. https://fitsense-web.onrender.com
-      # (Avoids Blueprint circular dependency with fitsense-web.)
       - key: CORS_ORIGIN
         sync: false
       - key: AUTH_SECRET
@@ -38,7 +38,7 @@ services:
     autoDeployTrigger: commit
     envVars:
       - key: NODE_VERSION
-        value: "22.16.0"
+        value: "22"
       - key: VITE_API_BASE_URL
         fromService:
           name: fitsense-api

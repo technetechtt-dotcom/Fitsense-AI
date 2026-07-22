@@ -13,7 +13,7 @@
     "check": "npm run typecheck && npm run test && npm run build"
   },
   "engines": {
-    "node": ">=22.16.0 <23",
+    "node": ">=20.18.0 <23",
     "npm": ">=10.8.0 <12"
   },
   "dependencies": {
