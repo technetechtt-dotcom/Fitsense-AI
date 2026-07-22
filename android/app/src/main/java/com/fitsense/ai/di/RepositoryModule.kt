@@ -13,7 +13,7 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
 /**
- * Maps repository interfaces (ports) → Firebase-backed implementations (adapters).
+ * Maps repository interfaces (ports) → local persistence implementations.
  *
  * Using `@Binds` keeps the call sites depending only on the abstractions, which
  * makes it trivial to swap in fakes for ViewModel unit tests.

@@ -34,8 +34,8 @@ export function ApiConnectionStatus() {
       ? "Connected"
       : "Unreachable — start the API (`npm run dev:api`)";
   const syncNote =
-    health?.ok && health.firestore === false
-      ? " Handoff works; cloud sync needs Firebase Admin on the server."
+    health?.ok && health.syncReady === false
+      ? " Handoff works; cloud sync needs DATABASE_URL on the server."
       : "";
 
   return (

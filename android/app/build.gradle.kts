@@ -5,7 +5,7 @@
  *  • Hilt (Dagger) for DI
  *  • Jetpack Compose + Material 3
  *  • CameraX, ARCore, OpenCV for capture / sensing
- *  • Firebase (Auth, Firestore, Storage) for cloud data
+ *  • Local DataStore persistence for profile and scans
  *  • Kotlin Serialization for typed payloads
  */
 
@@ -17,7 +17,6 @@ plugins {
     alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
-    alias(libs.plugins.google.services)
 }
 
 // Read optional signing / API config from local.properties (never committed).
@@ -128,6 +127,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.splashscreen)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
@@ -155,10 +155,6 @@ dependencies {
     // If your build can't resolve this artifact (older mirrors), see
     // README "OpenCV fallback" for swapping to a local module / quickbird build.
     implementation(libs.opencv)
-
-    // Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.bundles.firebase)
 
     // Misc UX
     implementation(libs.accompanist.permissions)

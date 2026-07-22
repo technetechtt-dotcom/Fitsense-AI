@@ -41,6 +41,12 @@
     <string name="scan_calibration_a4">A4 paper</string>
     <string name="scan_calibration_card">Bank card</string>
     <string name="scan_calibration_arcore">AR plane</string>
+    <string name="scan_foot_label">Scanning %1$s foot</string>
+    <string name="scan_accept_measurement">Accept measurement</string>
+    <string name="scan_retake">Retake</string>
+    <string name="scan_other_foot">Scan other foot</string>
+    <string name="scan_save_measurement">Save accepted scan</string>
+    <string name="scan_review_title">Review accepted measurements</string>
     <string name="scan_permission_required">Camera permission is required to scan your foot.</string>
     <string name="scan_permission_request">Grant camera access</string>
     <string name="scan_error_no_arcore">AR not available — falling back to reference-card calibration.</string>

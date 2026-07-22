@@ -1,113 +1,95 @@
-import { tryGetFirebase } from "./firebaseClient";
+import { getApiBaseUrl, isApiConfigured } from "../api/config";
 
 /**
- * Anonymous auth wrapper.
+ * Device-scoped identity for API-backed cloud sync.
  *
- * We never ask the user to create an account. Firestore reads/writes are
- * gated by a uid that the SDK manages transparently. The uid is also
- * persisted to localStorage by Firebase itself, so revisits resume the
- * same identity automatically.
+ * Each browser gets a stable device id in localStorage. The FitSense API
+ * issues a signed session token for that id — no third-party auth provider.
  */
+
+const DEVICE_ID_KEY = "fitsense:deviceId";
+const SESSION_TOKEN_KEY = "fitsense:sessionToken";
 
 let signInPromise: Promise<string | null> | null = null;
 
-/** Sign the user in anonymously (or reuse the existing session). */
+function getOrCreateDeviceId(): string {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+
+function readCachedToken(): string | null {
+  return localStorage.getItem(SESSION_TOKEN_KEY);
+}
+
+function cacheToken(token: string): void {
+  localStorage.setItem(SESSION_TOKEN_KEY, token);
+}
+
+async function requestSessionToken(deviceId: string): Promise<string | null> {
+  const base = getApiBaseUrl();
+  if (base === null) return null;
+
+  const res = await fetch(`${base}/v1/auth/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ deviceId }),
+  });
+  if (!res.ok) {
+    console.warn("[fitsense] session issuance failed", res.status);
+    return null;
+  }
+  const body = (await res.json()) as { token?: string };
+  if (!body.token) return null;
+  cacheToken(body.token);
+  return body.token;
+}
+
+/** Ensure this device has a cloud session. Returns the device uid or null. */
 export function ensureSignedIn(): Promise<string | null> {
+  if (!isApiConfigured()) return Promise.resolve(null);
   if (signInPromise) return signInPromise;
+
   signInPromise = (async () => {
-    const fb = await tryGetFirebase();
-    if (!fb) return null;
-    const { signInAnonymously, onAuthStateChanged } = await import("firebase/auth");
-    // If we're already signed in this browser, use that uid.
-    const existing = fb.auth.currentUser;
-    if (existing) return existing.uid;
-    // Otherwise wait for either an existing persisted session to resolve
-    // or for the anonymous sign-in to complete.
-    const settled = await new Promise<string | null>((resolve) => {
-      const unsub = onAuthStateChanged(fb.auth, (u) => {
-        if (u) {
-          unsub();
-          resolve(u.uid);
-        }
-      });
-      signInAnonymously(fb.auth).catch((err) => {
-        console.warn("[fitsense] anonymous sign-in failed", err);
-        unsub();
-        resolve(null);
-      });
-    });
-    return settled;
+    const deviceId = getOrCreateDeviceId();
+    const cached = readCachedToken();
+    if (cached) return deviceId;
+    await requestSessionToken(deviceId);
+    return deviceId;
   })().catch(() => {
     signInPromise = null;
     return null;
   });
+
   return signInPromise;
 }
 
-/** Returns the current uid or null. Does not trigger sign-in. */
+/** Returns the current device uid or null. Does not trigger sign-in. */
 export async function currentUid(): Promise<string | null> {
-  const fb = await tryGetFirebase();
-  return fb?.auth.currentUser?.uid ?? null;
+  if (!isApiConfigured()) return null;
+  return localStorage.getItem(DEVICE_ID_KEY);
 }
 
-/** Firebase ID token for API requests (`Authorization: Bearer`). */
+/** Session bearer token for API requests (`Authorization: Bearer`). */
 export async function getIdToken(): Promise<string | null> {
-  const fb = await tryGetFirebase();
-  if (!fb) return null;
-  if (!fb.auth.currentUser) {
-    await ensureSignedIn();
-  }
-  const user = fb.auth.currentUser;
-  if (!user) return null;
-  try {
-    return await user.getIdToken();
-  } catch {
-    return null;
-  }
-}
-
-export interface LinkedAccount {
-  uid: string;
-  displayName?: string;
-  email?: string;
-}
-
-/**
- * Upgrade the current anonymous identity to Google without changing its uid,
- * preserving cloud data already written under that user.
- */
-export async function linkGoogleAccount(): Promise<LinkedAccount> {
-  const fb = await tryGetFirebase();
-  if (!fb) throw new Error("Firebase authentication is not configured.");
+  if (!isApiConfigured()) return null;
+  const cached = readCachedToken();
+  if (cached) return cached;
   await ensureSignedIn();
-  const current = fb.auth.currentUser;
-  if (!current) throw new Error("No current FitSense identity.");
-
-  const { GoogleAuthProvider, linkWithPopup, signInWithPopup } =
-    await import("firebase/auth");
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  const credential = current.isAnonymous
-    ? await linkWithPopup(current, provider)
-    : await signInWithPopup(fb.auth, provider);
-  signInPromise = Promise.resolve(credential.user.uid);
-  return {
-    uid: credential.user.uid,
-    displayName: credential.user.displayName ?? undefined,
-    email: credential.user.email ?? undefined,
-  };
+  return readCachedToken();
 }
 
 export async function signOutCloudAccount(): Promise<void> {
-  const fb = await tryGetFirebase();
-  if (fb) {
-    const { signOut } = await import("firebase/auth");
-    await signOut(fb.auth);
-  }
+  localStorage.removeItem(SESSION_TOKEN_KEY);
+  localStorage.removeItem(DEVICE_ID_KEY);
   resetAuthCache();
 }
 
 /** Force a re-auth on next call. Used by the erase flow. */
 export function resetAuthCache(): void {
   signInPromise = null;
+  localStorage.removeItem(SESSION_TOKEN_KEY);
 }

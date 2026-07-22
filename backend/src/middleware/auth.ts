@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { config } from "../config.js";
-import { verifyIdToken } from "../services/firestore.js";
+import { verifySessionToken } from "../services/sessionAuth.js";
 
 export interface AuthedRequest extends Request {
   uid?: string;
@@ -26,7 +26,18 @@ export async function requireAuth(
       return;
     }
 
-    req.uid = await verifyIdToken(req.header("authorization") ?? undefined);
+    const authorization = req.header("authorization");
+    if (!authorization?.startsWith("Bearer ")) {
+      res.status(401).json({ error: "unauthorized", message: "Missing Bearer token" });
+      return;
+    }
+    const token = authorization.slice("Bearer ".length).trim();
+    if (!token) {
+      res.status(401).json({ error: "unauthorized", message: "Empty Bearer token" });
+      return;
+    }
+
+    req.uid = verifySessionToken(token);
     next();
   } catch (err) {
     res.status(401).json({

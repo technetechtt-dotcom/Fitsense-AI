@@ -1,7 +1,7 @@
 package com.fitsense.ai.repository
 
-import com.fitsense.ai.firebase.FirebaseAuthService
-import com.fitsense.ai.firebase.FirestoreService
+import com.fitsense.ai.local.DeviceIdentityService
+import com.fitsense.ai.local.LocalUserStore
 import com.fitsense.ai.models.UserPreferences
 import com.fitsense.ai.models.UserProfile
 import com.fitsense.ai.utils.AppError
@@ -14,9 +14,8 @@ import javax.inject.Inject
 /**
  * Source of truth for the authenticated user.
  *
- * - Backed by [FirebaseAuthService] for identity.
- * - Backed by [FirestoreService] for profile + preferences.
- * - Exposes a hot [profile] [Flow] consumed by the home + settings screens.
+ * - Backed by [DeviceIdentityService] for a stable on-device identity.
+ * - Backed by [LocalUserStore] for profile + preferences.
  */
 interface UserRepository {
     val profile: Flow<UserProfile?>
@@ -27,30 +26,32 @@ interface UserRepository {
 }
 
 class UserRepositoryImpl @Inject constructor(
-    private val authService: FirebaseAuthService,
-    private val firestore: FirestoreService,
+    private val identityService: DeviceIdentityService,
+    private val userStore: LocalUserStore,
 ) : UserRepository {
 
     private val _profile = MutableStateFlow<UserProfile?>(null)
     override val profile: Flow<UserProfile?> = _profile.asStateFlow()
 
     override suspend fun ensureSignedIn(): DataResult<UserProfile> {
-        val signIn = authService.ensureSignedIn()
-        return when (signIn) {
-            is DataResult.Failure -> signIn
+        val deviceId = when (val id = identityService.getOrCreateDeviceId()) {
+            is DataResult.Failure -> return id
+            is DataResult.Success -> id.value
+        }
+
+        val existing = userStore.getUser(deviceId)
+        return when (existing) {
+            is DataResult.Failure -> existing
             is DataResult.Success -> {
-                val firebaseUser = signIn.value
-                val existing = firestore.getUser(firebaseUser.uid)
-                val profile = when (existing) {
-                    is DataResult.Failure -> {
-                        return existing
+                val profile = existing.value ?: run {
+                    val created = UserProfile(
+                        userId = deviceId,
+                        isAnonymous = true,
+                    )
+                    when (val saved = userStore.upsertUser(created)) {
+                        is DataResult.Failure -> return saved
+                        is DataResult.Success -> created
                     }
-                    is DataResult.Success -> existing.value ?: UserProfile(
-                        userId = firebaseUser.uid,
-                        displayName = firebaseUser.displayName,
-                        email = firebaseUser.email,
-                        isAnonymous = firebaseUser.isAnonymous,
-                    ).also { firestore.upsertUser(it) }
                 }
                 _profile.value = profile
                 DataResult.Success(profile)
@@ -65,7 +66,7 @@ class UserRepositoryImpl @Inject constructor(
             preferences = preferences,
             updatedAtEpochMs = System.currentTimeMillis(),
         )
-        return firestore.upsertUser(updated).onSuccess { _profile.value = updated }
+        return userStore.upsertUser(updated).onSuccess { _profile.value = updated }
     }
 
     override suspend fun cacheLatestFootMetrics(lengthMm: Double, widthMm: Double): DataResult<Unit> {
@@ -76,11 +77,11 @@ class UserRepositoryImpl @Inject constructor(
             cachedFootWidthMm = widthMm,
             updatedAtEpochMs = System.currentTimeMillis(),
         )
-        return firestore.upsertUser(updated).onSuccess { _profile.value = updated }
+        return userStore.upsertUser(updated).onSuccess { _profile.value = updated }
     }
 
     override suspend fun signOut(): DataResult<Unit> {
         _profile.value = null
-        return authService.signOut()
+        return identityService.clearDeviceId()
     }
 }

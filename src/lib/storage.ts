@@ -5,7 +5,7 @@ import { deleteScanFromCloud, pushScan } from "./cloud/sync";
 import { wipeSessionData } from "./session";
 
 /**
- * Web persistence layer — stands in for Firestore in the Android app.
+ * Web persistence layer — local-first storage for scans and profile data.
  * Uses localStorage so the demo works offline.
  */
 

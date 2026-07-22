@@ -1,5 +1,3 @@
-import { isFirebaseConfigured } from "../cloud/firebaseClient";
-
 /** Base URL of the FitSense API (`backend/`). No trailing slash. */
 export function getApiBaseUrl(): string | null {
   const raw = import.meta.env.VITE_API_BASE_URL;
@@ -33,7 +31,7 @@ export function resolveHandoffBaseUrl(explicit?: string): string | undefined {
   return api;
 }
 
-/** Cloud sync needs Firebase Auth for ID tokens (API proxies Firestore). */
+/** Cloud sync requires the FitSense API to be configured. */
 export function canUseCloudSync(): boolean {
-  return isFirebaseConfigured();
+  return isApiConfigured();
 }

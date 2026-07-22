@@ -38,8 +38,8 @@ const upstashRedisRestUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
 const upstashRedisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 const syncStore = parseChoice(
   process.env.SYNC_STORE?.trim(),
-  ["firestore", "postgres"],
-  databaseUrl ? "postgres" : "firestore",
+  ["postgres"],
+  "postgres",
   "SYNC_STORE",
 );
 const handoffStore = parseChoice(
@@ -86,10 +86,7 @@ export const config = {
     syncMax: parseNumber(process.env.RATE_LIMIT_SYNC_MAX, 120),
   },
   skipAuth: process.env.SKIP_AUTH === "true",
-  firebase: {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
-  },
+  authSecret: process.env.AUTH_SECRET?.trim(),
 } as const;
 
 export function assertProductionConfig(): void {
@@ -108,8 +105,11 @@ export function assertProductionConfig(): void {
   if (config.handoffStore === "postgres" && !config.database.url) {
     throw new Error("HANDOFF_STORE=postgres requires DATABASE_URL.");
   }
-  if (config.syncStore === "postgres" && !config.database.url) {
-    throw new Error("SYNC_STORE=postgres requires DATABASE_URL.");
+  if (!config.database.url) {
+    throw new Error("DATABASE_URL is required in production.");
+  }
+  if (!config.skipAuth && !config.authSecret) {
+    throw new Error("AUTH_SECRET is required in production when SKIP_AUTH is not enabled.");
   }
 }
 

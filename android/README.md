@@ -92,8 +92,13 @@ sync Android Studio will download it automatically. If you want to build from
 the command line first, run:
 
 ```bash
-gradle wrapper --gradle-version 8.7
+The Gradle wrapper (`gradlew`, `gradlew.bat`, `gradle/wrapper/*`) is committed. Build with:
+
+```bash
+cd android
 ./gradlew :app:assembleDebug
+./gradlew :app:test
+```
 ```
 
 ### 3. Firebase

@@ -54,19 +54,14 @@ Payloads are stored as `jsonb` after request validation.
 
 ## Authentication
 
-Production sync routes still require Firebase Admin for ID-token verification.
-This is separate from Firestore storage: you can use Firebase anonymous auth for
-identity and Neon/Postgres for persistence.
-
-Options:
+Production sync routes require a signed device session token issued by
+`POST /v1/auth/session`. Set a strong secret:
 
 ```env
-GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
-# or for containers:
-FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account",...}
+AUTH_SECRET=replace-with-a-long-random-string
 ```
 
-Local sync testing can bypass Firebase:
+Local sync testing can bypass auth:
 
 ```env
 SKIP_AUTH=true
@@ -80,7 +75,9 @@ Then pass `X-Debug-Uid: test-user-123` instead of a Bearer token. Never enable
 | Method | Path                           | Auth   | Description                            |
 | ------ | ------------------------------ | ------ | -------------------------------------- |
 | GET    | `/health`                      | no     | Liveness and selected storage backends |
-| PUT    | `/v1/handoff/:sessionId`       | no     | Publish handoff payload `{ payload }`  |
+| POST   | `/v1/auth/session`             | no     | Issue device session token             |
+| POST   | `/v1/handoff/sessions`         | no     | Issue signed one-time publish token    |
+| PUT    | `/v1/handoff/:sessionId`       | Bearer | Publish handoff payload (one-time)     |
 | GET    | `/v1/handoff/:sessionId`       | no     | Poll payload `{ payload? }`            |
 | DELETE | `/v1/handoff/:sessionId`       | no     | Remove session                         |
 | GET    | `/v1/sync`                     | Bearer | Pull profile, events, scans            |

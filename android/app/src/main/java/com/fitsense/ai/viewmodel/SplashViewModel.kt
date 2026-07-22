@@ -18,7 +18,7 @@ import javax.inject.Inject
 
 /**
  * Decides whether the user should land on onboarding or home on cold start.
- * Also kicks off the anonymous Firebase sign-in so the rest of the app has a
+ * Also ensures a stable on-device identity so the rest of the app has a
  * valid `userId` from the very first frame.
  */
 @HiltViewModel

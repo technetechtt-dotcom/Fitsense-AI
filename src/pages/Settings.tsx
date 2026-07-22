@@ -9,12 +9,10 @@ import { ApiConnectionStatus } from "../components/ApiConnectionStatus";
 import { canUseCloudSync, isApiConfigured } from "../lib/api/config";
 import {
   getOrCreateProfile,
-  saveProfile,
   signOut,
   updatePreferences,
 } from "../lib/storage";
-import { linkGoogleAccount, signOutCloudAccount } from "../lib/cloud/auth";
-import { isFirebaseConfigured } from "../lib/cloud/firebaseClient";
+import { signOutCloudAccount } from "../lib/cloud/auth";
 import { SHOE_CATALOG } from "../data/catalog";
 import type { CalibrationReference, MeasurementUnit, UserProfile } from "../types";
 import { CALIBRATION_META } from "../types";
@@ -24,8 +22,6 @@ export function Settings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
-  const [accountBusy, setAccountBusy] = useState(false);
-  const [accountMsg, setAccountMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setProfile(getOrCreateProfile());
@@ -64,42 +60,6 @@ export function Settings() {
             ? "Guest on this device"
             : (profile.email ?? "Signed in")}
         </div>
-        {profile.isAnonymous && isFirebaseConfigured() ? (
-          <button
-            type="button"
-            disabled={accountBusy}
-            onClick={async () => {
-              setAccountBusy(true);
-              setAccountMsg(null);
-              try {
-                const account = await linkGoogleAccount();
-                setProfile(
-                  saveProfile({
-                    ...profile,
-                    displayName: account.displayName,
-                    email: account.email,
-                    isAnonymous: false,
-                  }),
-                );
-                setAccountMsg(
-                  "Google account linked. Your Fit ID can be restored on another device.",
-                );
-              } catch (error) {
-                setAccountMsg(
-                  error instanceof Error
-                    ? error.message
-                    : "Could not link the Google account.",
-                );
-              } finally {
-                setAccountBusy(false);
-              }
-            }}
-            className="mt-3 w-full h-11 rounded-full bg-neon text-surface-0 text-sm font-semibold disabled:opacity-50"
-          >
-            {accountBusy ? "Linking…" : "Link Google account"}
-          </button>
-        ) : null}
-        {accountMsg ? <p className="text-xs text-ink-muted">{accountMsg}</p> : null}
         <button
           onClick={() => nav("/fit-profile")}
           className="mt-3 w-full rounded-2xl bg-surface-2 border border-white/5 px-4 py-3 text-left flex items-center justify-between hover:bg-surface-3"

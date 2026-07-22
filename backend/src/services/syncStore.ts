@@ -1,15 +1,5 @@
 import { config } from "../config.js";
-import {
-  deleteAuthUser,
-  eraseUserData as eraseFirestoreUserData,
-  fitEventRef,
-  fitProfileRef,
-  initFirestore,
-  isFirestoreReady,
-  pullUserData as pullFirestoreUserData,
-  scanRef,
-} from "./firestore.js";
-import { getPostgresPool } from "./postgres.js";
+import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
 
 export interface CloudPullResult {
   fitProfile: unknown | null;
@@ -18,7 +8,7 @@ export interface CloudPullResult {
 }
 
 export interface SyncStore {
-  readonly name: "firestore" | "postgres";
+  readonly name: "postgres";
   init(): Promise<void>;
   isReady(): boolean;
   pullUserData(uid: string): Promise<CloudPullResult>;
@@ -29,47 +19,15 @@ export interface SyncStore {
   eraseUserData(uid: string): Promise<void>;
 }
 
-class FirestoreSyncStore implements SyncStore {
-  readonly name = "firestore" as const;
-
-  async init(): Promise<void> {
-    initFirestore();
-  }
-
-  isReady(): boolean {
-    return isFirestoreReady();
-  }
-
-  pullUserData(uid: string): Promise<CloudPullResult> {
-    return pullFirestoreUserData(uid);
-  }
-
-  async upsertFitProfile(uid: string, profile: unknown): Promise<void> {
-    await fitProfileRef(uid).set(profile as object, { merge: true });
-  }
-
-  async upsertScan(uid: string, scanId: string, scan: unknown): Promise<void> {
-    await scanRef(uid, scanId).set(scan as object, { merge: true });
-  }
-
-  async deleteScan(uid: string, scanId: string): Promise<void> {
-    await scanRef(uid, scanId).delete();
-  }
-
-  async upsertFitEvent(uid: string, eventId: string, event: unknown): Promise<void> {
-    await fitEventRef(uid, eventId).set(event as object, { merge: true });
-  }
-
-  eraseUserData(uid: string): Promise<void> {
-    return eraseFirestoreUserData(uid);
-  }
-}
-
 class PostgresSyncStore implements SyncStore {
   readonly name = "postgres" as const;
   private ready = false;
 
   async init(): Promise<void> {
+    if (!isPostgresConfigured()) {
+      console.warn("[fitsense-api] Postgres sync disabled — DATABASE_URL is not set.");
+      return;
+    }
     await getPostgresPool().query(`
       CREATE TABLE IF NOT EXISTS fit_profiles (
         uid text PRIMARY KEY,
@@ -211,18 +169,18 @@ class PostgresSyncStore implements SyncStore {
     } finally {
       client.release();
     }
-
-    await deleteAuthUser(uid);
   }
 }
 
-const store: SyncStore =
-  config.syncStore === "postgres" ? new PostgresSyncStore() : new FirestoreSyncStore();
+const store: SyncStore = new PostgresSyncStore();
 
 export function getSyncStore(): SyncStore {
   return store;
 }
 
 export async function initSyncStore(): Promise<void> {
+  if (config.syncStore !== "postgres") {
+    throw new Error(`Unsupported SYNC_STORE: ${config.syncStore}`);
+  }
   await store.init();
 }

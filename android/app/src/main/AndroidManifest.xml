@@ -2,12 +2,12 @@
 <!--
   FitSense AI - App manifest.
   Declares the permissions, hardware features, and components required for
-  AR foot scanning, Firebase sync, and Compose UI rendering.
+  AR foot scanning, local persistence, and Compose UI rendering.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Camera, internet (Firebase), AR depth, and storage (scan thumbnails). -->
+    <!-- Camera, internet, AR depth, and storage (scan thumbnails). -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -43,9 +43,6 @@
              and use the OpenCV fallback measurement path. -->
         <meta-data android:name="com.google.ar.core" android:value="optional" />
         <meta-data android:name="com.google.ar.core.min_apk_version" android:value="240916000" />
-
-        <!-- Firebase analytics opt-in (off by default until user accepts). -->
-        <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
 
         <activity
             android:name=".MainActivity"

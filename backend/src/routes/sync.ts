@@ -18,10 +18,7 @@ syncRouter.use((_req, res, next) => {
   if (!store.isReady()) {
     res.status(503).json({
       error: `${store.name}_unavailable`,
-      message:
-        store.name === "postgres"
-          ? "Configure DATABASE_URL and ensure the database is reachable."
-          : "Configure Firebase Admin credentials to enable sync.",
+      message: "Configure DATABASE_URL and ensure the database is reachable.",
     });
     return;
   }

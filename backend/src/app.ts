@@ -5,6 +5,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 import { rateLimit } from "./middleware/rateLimit.js";
 import { requestContext } from "./middleware/requestContext.js";
 import { securityHeaders } from "./middleware/securityHeaders.js";
+import { authRouter } from "./routes/auth.js";
 import { healthRouter } from "./routes/health.js";
 import { handoffRouter } from "./routes/handoff.js";
 import { syncRouter } from "./routes/sync.js";
@@ -27,6 +28,7 @@ export function createApp() {
   app.use(express.json({ limit: config.jsonLimit }));
 
   app.use(healthRouter);
+  app.use("/v1", authRouter);
   app.use("/v1", handoffRouter);
   app.use("/v1", syncRouter);
 

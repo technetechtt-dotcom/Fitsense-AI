@@ -4,7 +4,8 @@ export interface ApiHealth {
   ok: boolean;
   service?: string;
   version?: string;
-  firestore?: boolean;
+  syncReady?: boolean;
+  postgres?: boolean;
 }
 
 /** GET /health — no auth. */

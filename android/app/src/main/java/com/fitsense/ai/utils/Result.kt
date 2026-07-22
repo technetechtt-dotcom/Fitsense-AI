@@ -30,6 +30,7 @@ sealed class AppError(open val message: String, open val cause: Throwable? = nul
     data class Auth(override val message: String, override val cause: Throwable? = null) : AppError(message, cause)
     data class Vision(override val message: String, override val cause: Throwable? = null) : AppError(message, cause)
     data class AR(override val message: String, override val cause: Throwable? = null) : AppError(message, cause)
+    data class Storage(override val message: String, override val cause: Throwable? = null) : AppError(message, cause)
     data class Unknown(override val message: String, override val cause: Throwable? = null) : AppError(message, cause)
 }
 

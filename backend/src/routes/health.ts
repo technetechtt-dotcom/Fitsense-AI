@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { isFirestoreReady } from "../services/firestore.js";
 import { config } from "../config.js";
 import { getSyncStore } from "../services/syncStore.js";
+import { isPostgresConfigured } from "../services/postgres.js";
 
 export const healthRouter = Router();
 
@@ -14,6 +14,6 @@ healthRouter.get("/health", (_req, res) => {
     handoffStore: config.handoffStore,
     syncStore: syncStore.name,
     syncReady: syncStore.isReady(),
-    firestore: isFirestoreReady(),
+    postgres: isPostgresConfigured(),
   });
 });

@@ -16,7 +16,7 @@ See [the product definition](docs/PRODUCT_DEFINITION.md) and
 - **React Router 6** — screen transitions via Framer Motion
 - **OpenCV.js + MediaPipe** — reference detection and foot landmarks on `/scan`
 - **WebXR** — immersive AR plane mode (Android Chrome) via `arSession.ts`
-- **Firebase** (optional) — guest-to-Google account linking, Firestore sync, Analytics
+- **FitSense API** (optional) — handoff relay and Postgres-backed cloud sync
 - **localStorage** — offline-first persistence
 
 ## Run
@@ -46,16 +46,11 @@ npm run dev:full     # from project root
 ```
 
 Handoff, embed QR flow, and cloud sync automatically use the API when
-`VITE_API_BASE_URL` is set. Sync still requires Firebase web config (ID tokens)
-plus Firebase Admin on the server — see [backend/README.md](backend/README.md).
+`VITE_API_BASE_URL` is set. The API issues signed device session tokens and
+stores sync data in Postgres — see [backend/README.md](backend/README.md).
 
 Neon/Postgres storage is supported through `DATABASE_URL`; see
 [docs/RENDER_NEON.md](docs/RENDER_NEON.md) for the Render Blueprint setup.
-
-### Firebase (optional)
-
-Copy `.env.example` to `.env.local` and fill in your Firebase web app config.
-Without it, the app runs fully offline; cloud sync and analytics stay disabled.
 
 ### Production
 
@@ -67,7 +62,6 @@ Production readiness assets live in:
 - `docs/RENDER_NEON.md` - Render Blueprint + Neon deployment guide
 - `docs/architecture/ADR-001-monorepo-migration.md` - staged target architecture
 - `render.yaml` - Render services for the API and static web app
-- `firebase.json`, `firestore.rules`, `storage.rules` - Firebase deployment rules
 - `backend/Dockerfile` - API container build
 - `.github/workflows/ci.yml` - web, SDK, backend, and container CI
 
@@ -100,15 +94,15 @@ src/
 ├── App.tsx              # router + error boundary + bootstrap
 ├── lib/
 │   ├── api/             # HTTP client, handoff defaults, health
-│   ├── cloud/           # Firebase sync + restore (via API or direct)
+│   ├── cloud/           # API-backed sync + restore
 │   ├── cv/              # OpenCV reference detection
 │   ├── ml/              # on-device learned ranker
 │   ├── consent.ts       # privacy consent state
-│   └── analytics.ts     # Firebase Analytics (consent-gated)
+│   └── analytics.ts     # consent-gated analytics hooks
 ├── embed/               # iframe SDK + EmbedApp
 ├── pages/               # routed screens
 └── components/          # shared UI
-backend/                 # FitSense API (Express + Firebase Admin)
+backend/                 # FitSense API (Express + Postgres sync)
 android/                 # native Kotlin app (ARCore pipeline)
 ```
 
