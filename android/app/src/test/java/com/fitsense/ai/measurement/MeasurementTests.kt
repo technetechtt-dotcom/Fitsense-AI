@@ -36,23 +36,24 @@ class ReferenceMeasurementTest {
     fun a4ReferenceProducesPlausibleFootDimensions() {
         val result = engine.measure(
             ReferenceMeasurement.TapPoints(
+                // Near-A4 aspect (800 x 1131 ≈ 210:297) with frame margin.
                 refCorners = listOf(
-                    Point2D(100.0, 120.0),
-                    Point2D(900.0, 130.0),
-                    Point2D(880.0, 1500.0),
-                    Point2D(120.0, 1480.0),
+                    Point2D(140.0, 200.0),
+                    Point2D(940.0, 200.0),
+                    Point2D(940.0, 1331.0),
+                    Point2D(140.0, 1331.0),
                 ),
-                heel = Point2D(500.0, 1300.0),
-                toe = Point2D(500.0, 700.0),
-                widthMedial = Point2D(420.0, 980.0),
-                widthLateral = Point2D(580.0, 980.0),
+                heel = Point2D(540.0, 1200.0),
+                toe = Point2D(540.0, 350.0),
+                widthMedial = Point2D(400.0, 750.0),
+                widthLateral = Point2D(680.0, 750.0),
                 foot = Foot.RIGHT,
                 imageWidthPx = 1080,
                 imageHeightPx = 1920,
             ),
             CalibrationReference.A4_PAPER,
         )
-        assertTrue(result.sanity.ok)
+        assertTrue(result.sanity.issue ?: "ok", result.sanity.ok)
         assertTrue(result.measurement.lengthMm in 120.0..360.0)
         assertTrue(result.measurement.widthMm in 45.0..160.0)
         assertTrue(result.widthMeasured)
