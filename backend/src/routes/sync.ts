@@ -3,7 +3,7 @@ import { config } from "../config.js";
 import type { AuthedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
-import { getSyncStore } from "../services/syncStore.js";
+import { getSyncStore, initSyncStore } from "../services/syncStore.js";
 import {
   documentIdSchema,
   fitEventSchema,
@@ -13,8 +13,16 @@ import {
 
 export const syncRouter = Router();
 
-syncRouter.use((_req, res, next) => {
+syncRouter.use(async (_req, res, next) => {
   const store = getSyncStore();
+  if (!store.isReady()) {
+    try {
+      await initSyncStore();
+    } catch (err) {
+      next(err);
+      return;
+    }
+  }
   if (!store.isReady()) {
     res.status(503).json({
       error: `${store.name}_unavailable`,

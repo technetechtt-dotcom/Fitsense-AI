@@ -1,7 +1,7 @@
 # Branch protection for `main`
 
-CODEOWNERS alone does not enforce reviews. Configure GitHub branch protection
-so critical security and measurement changes cannot land without CI and review.
+CODEOWNERS alone does not enforce reviews. **Do not re-enable Render
+`autoDeployTrigger: commit` until this protection is active.**
 
 ## Required settings (Settings → Branches → Branch protection rule → `main`)
 
@@ -11,6 +11,7 @@ so critical security and measurement changes cannot land without CI and review.
 4. **Require status checks to pass before merging**
    - `web-and-sdk`
    - `backend`
+   - `render-api-build`
    - `android-build`
 5. **Require conversation resolution before merging**
 6. **Do not allow bypassing the above settings** (except emergency admins)
@@ -18,25 +19,12 @@ so critical security and measurement changes cannot land without CI and review.
 ## Apply with GitHub CLI (repo admin)
 
 ```bash
-gh api repos/{owner}/{repo}/branches/main/protection \
+gh api repos/technetechtt-dotcom/Fitsense-AI/branches/main/protection \
   --method PUT \
-  --input - <<'EOF'
-{
-  "required_status_checks": {
-    "strict": true,
-    "contexts": ["web-and-sdk", "backend", "android-build"]
-  },
-  "enforce_admins": true,
-  "required_pull_request_reviews": {
-    "required_approving_review_count": 1,
-    "require_code_owner_reviews": true
-  },
-  "restrictions": null,
-  "required_conversation_resolution": true,
-  "allow_force_pushes": false,
-  "allow_deletions": false
-}
-EOF
+  --input docs/branch-protection-payload.json
 ```
 
-Replace `{owner}/{repo}` with `technetechtt-dotcom/Fitsense-AI` (or your fork).
+Payload file: [branch-protection-payload.json](./branch-protection-payload.json).
+
+After protection is confirmed, set Render Blueprint `autoDeployTrigger: commit`
+(or enable auto-deploy in the dashboard) for `fitsense-api` and `fitsense-web`.

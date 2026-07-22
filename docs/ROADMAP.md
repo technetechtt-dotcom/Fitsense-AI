@@ -1,90 +1,71 @@
-# FitSense product roadmap (Phases 2–12)
+# FitSense product roadmap
 
-Phase 1 (critical security + green CI) is implemented in the codebase. This document tracks **later milestones only** — measurement science, product surfaces, compliance, and ops. Nothing here is a deploy gate for the current auth/handoff repair.
+## Critical deploy gates (must stay green)
 
-## Critical gates (done / maintain)
+- Separate production secrets: `AUTH_SECRET` **and** distinct `HANDOFF_SECRET` (no fallback).
+- Render + CI: `npm ci --include=dev` then build; backend CI provisions Postgres; device-auth tests **must not skip**.
+- Required CI checks: `web-and-sdk`, `backend`, `render-api-build`, `android-build`.
+- Branch protection on `main` **before** re-enabling Render `autoDeployTrigger: commit`.
+- Staging smoke: health + auth + sync + handoff (`npm run staging:smoke --prefix backend`).
 
-- Anonymous **device challenge-response** auth (server-issued `deviceId`, hashed secrets, short-lived access + rotating refresh).
-- Secure phone↔web handoff (hashed publish/consume tokens, atomic one-time consume).
-- Green CI: format, typecheck, lint, `test:web`, backend check, Android assemble+test.
-- Branch protection for `main` — see [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md).
-
-Account linking (email/passkey/WebAuthn) and a production pen-test remain **deferred**.
-
----
-
-## Phase 2 — Measurement trust
-
-- Keep phone mm measurements geometric (reference object / AR depth), never silent invent.
-- Harden quality gates (blur, coplanarity, sanity) and manual refine UX.
-- Dual-foot acceptance before recommendations.
-- Expand accuracy logging without storing unnecessary PII.
-
-## Phase 3 — Accuracy study (Brannock / known sizes)
-
-- Formal study protocol against Brannock or known-foot set.
-- Device matrix report (phone models, lighting, floor types).
-- Publish internal acceptance thresholds for length/width error.
-
-## Phase 4 — Mobile sync
-
-- Android sync client using challenge-response + Keystore-backed credentials.
-- Conflict resolution for local vs cloud Fit ID / scans.
-- Offline queue with clear “not yet synced” states.
-
-## Phase 5 — Recommendations
-
-- Catalogue-backed fit scoring with confidence caps from measurement quality.
-- Prefer dual-foot width/length; withhold size when confidence is too low.
-- Explainability copy for shoppers (why this size).
-
-## Phase 6 — Catalogue
-
-- Merchant shoe feed contracts (SKU, last, regional size systems, stock).
-- Admin tools for ingest validation and last metadata.
-
-## Phase 7 — Merchant / clinic
-
-- Partner embed hardening and SLA docs.
-- Clinic/kiosk flows with operator roles (no silent demo mm).
-- Session handoff + print/share of Fit ID under consent.
-
-## Phase 8 — Regional sizing
-
-- UK / US / EU / Mondopoint consistency checks.
-- Region-specific last and width conventions.
-- Locale-aware recommendation presentation.
-
-## Phase 9 — POPIA / privacy
-
-- Lawful basis, retention schedules, DPA templates.
-- Data subject access/erasure end-to-end (web + API + Android).
-- Privacy nutrition labels for store listings.
-
-## Phase 10 — Platform security
-
-- Passkey / verified email account linking.
-- WebCrypto or IndexedDB hardening for web device secrets.
-- External pen-test and remediation pass.
-- Key rotation (`kid`) runbooks for `AUTH_SECRET` / `HANDOFF_SECRET`.
-
-## Phase 11 — Operations
-
-- Monitoring, alert routing, on-call rotation.
-- Backup/restore drills for Postgres (Neon) and handoff stores.
-- Incident response playbooks.
-
-## Phase 12 — Release engineering
-
-- Store signing, screenshots, review submissions.
-- Staged rollouts and feature flags for measurement paths.
-- Release checklist tied to accuracy gates (not marketing demos).
+See [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md), [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
 
 ---
 
-## Related docs
+## After deployment is stable (ordered)
 
-- [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md) — deploy blockers vs later phases
-- [RENDER_NEON.md](./RENDER_NEON.md) — Render + Neon env
-- [MEASUREMENT_PROTOCOL.md](./MEASUREMENT_PROTOCOL.md) — measurement rules
-- [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) — required CI checks
+1. **Android authentication and synchronization** — challenge-response client using Keystore-backed `SecureDeviceCredentialStore`; sync Fit ID / scans with conflict handling.
+2. **Harden measurement landmark and reference detection** — blur/coplanarity gates, manual refine, dual-foot acceptance; never invent millimetres.
+3. **Ground-truth accuracy study workflow** — Brannock / known-foot protocol, device matrix, acceptance thresholds (Phase 3).
+4. **Physical Android device testing** — CameraX + reference/ARCore on real hardware; refuse simulated results in production.
+5. **Passkey-backed Portable Fit Identity** — WebAuthn/passkey account linking on top of device sessions (Phase 10).
+6. **Catalogue and merchant-platform development** — feeds, last metadata, partner embed SLA (Phases 6–7).
+7. **Controlled Kimberley / Northern Cape pilot** — clinic/kiosk consent flows, regional sizing, POPIA-aligned retention, ops runbooks.
+
+---
+
+## Phases 2–12 (detail)
+
+### Phase 2 — Measurement trust
+
+- Geometric phone mm (reference / AR depth); quality gates; dual-foot before recommendations.
+
+### Phase 3 — Accuracy study
+
+- Formal Brannock/known-size study; thresholds for length/width error.
+
+### Phase 4 — Mobile sync
+
+- Android sync client; offline queue; clear not-yet-synced states.
+
+### Phase 5 — Recommendations
+
+- Catalogue-backed scoring; withhold size when confidence is too low.
+
+### Phase 6 — Catalogue
+
+- Merchant shoe feed contracts; ingest validation.
+
+### Phase 7 — Merchant / clinic
+
+- Partner embed; operator roles; Fit ID share under consent.
+
+### Phase 8 — Regional sizing
+
+- UK / US / EU / Mondopoint consistency; locale presentation.
+
+### Phase 9 — POPIA / privacy
+
+- Lawful basis, retention, access/erasure, store nutrition labels.
+
+### Phase 10 — Platform security
+
+- Passkeys; WebCrypto hardening; pen-test; key rotation runbooks.
+
+### Phase 11 — Operations
+
+- Monitoring, backups, incident playbooks.
+
+### Phase 12 — Release engineering
+
+- Store listings, staged rollouts, accuracy-tied release checklist.

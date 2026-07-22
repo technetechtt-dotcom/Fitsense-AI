@@ -4,14 +4,13 @@ services:
     runtime: node
     rootDir: backend
     plan: free
-    # Force type packages even if the dashboard still runs plain `npm install`
-    # under NODE_ENV=production (Blueprint buildCommand is often overridden).
-    buildCommand: node -v && npm -v && npm install && npm install typescript @types/node @types/express @types/cors @types/pg && npm run build
+    # Match CI: lockfile install including build-time TypeScript types.
+    buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
-    autoDeployTrigger: commit
+    # Keep off until branch protection + required CI checks are enforced on main.
+    autoDeployTrigger: off
     envVars:
-      # Prefer 22 when available; Render static/native may still use 20.
       - key: NODE_VERSION
         value: "22"
       - key: NODE_ENV
@@ -26,7 +25,6 @@ services:
         value: "true"
       - key: DATABASE_SSL_REJECT_UNAUTHORIZED
         value: "true"
-      # Set manually to your static site URL, e.g. https://fitsense-web.onrender.com
       - key: CORS_ORIGIN
         sync: false
       - key: AUTH_SECRET
@@ -37,9 +35,9 @@ services:
   - type: web
     name: fitsense-web
     runtime: static
-    buildCommand: node -v && npm -v && npm install && npm run build
+    buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
     staticPublishPath: dist
-    autoDeployTrigger: commit
+    autoDeployTrigger: off
     envVars:
       - key: NODE_VERSION
         value: "22"
