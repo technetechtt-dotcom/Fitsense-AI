@@ -9,6 +9,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
+    "render:build": "npm install && npm install typescript @types/node @types/express @types/cors @types/pg && npm run build",
     "test": "tsx --import ./test/env.ts --test test/handoff.test.ts test/handoffSession.test.ts test/validation.test.ts test/sessionAuth.test.ts test/deviceAuth.test.ts",
     "check": "npm run typecheck && npm run test && npm run build"
   },

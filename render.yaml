@@ -4,7 +4,9 @@ services:
     runtime: node
     rootDir: backend
     plan: free
-    buildCommand: node -v && npm -v && npm install --include=dev && npm run build
+    # Force type packages even if the dashboard still runs plain `npm install`
+    # under NODE_ENV=production (Blueprint buildCommand is often overridden).
+    buildCommand: node -v && npm -v && npm install && npm install typescript @types/node @types/express @types/cors @types/pg && npm run build
     startCommand: npm start
     healthCheckPath: /health
     autoDeployTrigger: commit
