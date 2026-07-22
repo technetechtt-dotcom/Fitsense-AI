@@ -2,10 +2,12 @@
 
 This repo includes `render.yaml` for a Render Blueprint with:
 
-- `fitsense-api`: Node/Express API from `backend/`
-- `fitsense-web`: static Vite frontend from `dist/`
+- `fitsense-api` / `fitsense-web`: production pair
+- `fitsense-api-staging` / `fitsense-web-staging`: **dedicated staging** pair
 
 Neon is used through `DATABASE_URL`; the connection string is not committed.
+Staging must use a **separate** Neon database (and distinct `AUTH_SECRET` /
+`HANDOFF_SECRET`) from production.
 
 ## 1. Neon
 
@@ -73,18 +75,30 @@ Later product phases: [ROADMAP.md](./ROADMAP.md).
 Cloud sync uses **device challenge-response** (`AUTH_SECRET`). Handoff sessions use
 **separate** publish/consume tokens signed with `HANDOFF_SECRET`.
 
-Staging smoke after deploy:
+### Staging Blueprint services
+
+After syncing the Blueprint, set secrets on **`fitsense-api-staging`** (separate
+Neon DB) and point `CORS_ORIGIN` at `fitsense-web-staging`. Then:
 
 ```bash
-STAGING_API_BASE_URL=https://<fitsense-api>.onrender.com npm run staging:smoke --prefix backend
+STAGING_API_BASE_URL=https://fitsense-api-staging.onrender.com \
+STAGING_SMOKE_RECORD=docs/records/staging-smoke-latest.json \
+  npm run staging:smoke --prefix backend
 ```
+
+Set GitHub repo variable `STAGING_API_BASE_URL` so CI job `staging-smoke` runs
+and uploads `staging-smoke-record`.
+
+Until the staging hostname is live, smoke may target the existing API origin
+from the web bundle (for example `https://fitsense-api-1rne.onrender.com`) —
+record which URL was used.
 
 ## 4. Verify
 
 After deploy, open:
 
 ```text
-https://<fitsense-api>.onrender.com/health
+https://fitsense-api-staging.onrender.com/health
 ```
 
 Expected storage fields:

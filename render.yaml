@@ -1,4 +1,7 @@
 services:
+  # ---------------------------------------------------------------------------
+  # Production
+  # ---------------------------------------------------------------------------
   - type: web
     name: fitsense-api
     runtime: node
@@ -50,6 +53,64 @@ services:
         value: "false"
       - key: VITE_PRIVACY_CONTROLLER_NAME
         value: FitSense AI
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # ---------------------------------------------------------------------------
+  # Staging (dedicated Neon DB + secrets — never share prod DATABASE_URL)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: fitsense-api-staging
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    # Manual / blueprint sync until a staging branch auto-deploy policy is chosen.
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SYNC_STORE
+        value: postgres
+      - key: HANDOFF_STORE
+        value: postgres
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: CORS_ORIGIN
+        sync: false
+      - key: AUTH_SECRET
+        sync: false
+      - key: HANDOFF_SECRET
+        sync: false
+
+  - type: web
+    name: fitsense-web-staging
+    runtime: static
+    buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: off
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_API_BASE_URL
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: VITE_ENABLE_DEMO_SCAN
+        value: "false"
+      - key: VITE_PRIVACY_CONTROLLER_NAME
+        value: FitSense AI (Staging)
     routes:
       - type: rewrite
         source: /*

@@ -1,22 +1,25 @@
 # Branch protection for `main`
 
-CODEOWNERS alone does not enforce reviews. **Do not re-enable Render
-`autoDeployTrigger: commit` until this protection is active.**
+## Current operating policy (direct push)
 
-## Required settings (Settings → Branches → Branch protection rule → `main`)
+Production deploys stay **manual** (`autoDeployTrigger: off` in `render.yaml`)
+until release gates are green. Day-to-day engineering **pushes directly to
+`main`**; GitHub PR merge gates are **not** enforced.
 
-1. **Require a pull request before merging**
-2. **Require approvals**: at least 1
-3. **Require review from Code Owners** (uses [`.github/CODEOWNERS`](../.github/CODEOWNERS))
-4. **Require status checks to pass before merging**
-   - `web-and-sdk`
-   - `backend`
-   - `render-api-build`
-   - `android-build`
-5. **Require conversation resolution before merging**
-6. **Do not allow bypassing the above settings** (except emergency admins)
+CI still runs on every push to `main`. Treat these four jobs as **release
+gates** before any production deploy:
 
-## Apply with GitHub CLI (repo admin)
+- `web-and-sdk`
+- `backend`
+- `render-api-build`
+- `android-build`
+
+Optional: `staging-smoke` when repo variable `STAGING_API_BASE_URL` is set.
+Artifacts: debug APK, Android unit-test reports, staging smoke JSON.
+
+## Optional PR protection (when the team wants reviews again)
+
+Use Settings → Branches → `main`, or:
 
 ```bash
 gh api repos/technetechtt-dotcom/Fitsense-AI/branches/main/protection \
@@ -24,7 +27,8 @@ gh api repos/technetechtt-dotcom/Fitsense-AI/branches/main/protection \
   --input docs/branch-protection-payload.json
 ```
 
-Payload file: [branch-protection-payload.json](./branch-protection-payload.json).
+Payload: [branch-protection-payload.json](./branch-protection-payload.json).
 
-After protection is confirmed, set Render Blueprint `autoDeployTrigger: commit`
-(or enable auto-deploy in the dashboard) for `fitsense-api` and `fitsense-web`.
+Required checks must include the four jobs above. **Do not** set Render
+`autoDeployTrigger: commit` until those gates are green on the commit you
+intend to ship.

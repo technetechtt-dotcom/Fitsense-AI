@@ -1,28 +1,34 @@
 # FitSense product roadmap
 
-## Critical deploy gates (must stay green)
+## Priority 0 — Deployed platform (release gates)
 
-- Separate production secrets: `AUTH_SECRET` **and** distinct `HANDOFF_SECRET` (no fallback).
-- Render + CI: `npm ci --include=dev` then build; backend CI provisions Postgres; device-auth tests **must not skip**.
-- Required CI checks: `web-and-sdk`, `backend`, `render-api-build`, `android-build`.
-- Branch protection on `main` **before** re-enabling Render `autoDeployTrigger: commit`.
-- Staging smoke: health + auth + sync + handoff (`npm run staging:smoke --prefix backend`).
+| Gate                                             | Status                                                              |
+| ------------------------------------------------ | ------------------------------------------------------------------- |
+| Separate staging + production Blueprint services | In repo (`render.yaml`); sync on Render + distinct Neon             |
+| Distinct `AUTH_SECRET` + `HANDOFF_SECRET`        | Required in prod/staging (no shared fallback)                       |
+| Auto production deploy                           | **Off** until gates green                                           |
+| Four CI jobs on every `main` push                | `web-and-sdk`, `backend`, `render-api-build`, `android-build`       |
+| APK + unit-test report artifacts                 | Uploaded from `android-build`                                       |
+| Staging smoke + record artifact                  | `staging-smoke` when `STAGING_API_BASE_URL` set                     |
+| Direct push to `main`                            | Current policy — see [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) |
 
-See [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md), [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md).
+See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md),
+[docs/records/](./records/).
 
 ---
 
-## After deployment is stable (ordered)
+## After Priority 0 (ordered)
 
-1. **Android authentication and synchronization** — challenge-response client using Keystore-backed `SecureDeviceCredentialStore`; sync Fit ID / scans with conflict handling.
-2. **Harden measurement landmark and reference detection** — blur/coplanarity gates, manual refine, dual-foot acceptance; never invent millimetres.
-3. **Ground-truth accuracy study workflow** — Brannock / known-foot protocol, device matrix, acceptance thresholds (Phase 3).
-4. **Physical Android device testing** — CameraX + reference/ARCore on real hardware; refuse simulated results in production.
-5. **Passkey-backed Portable Fit Identity** — WebAuthn/passkey account linking on top of device sessions (Phase 10).
-6. **Catalogue and merchant-platform development** — feeds, last metadata, partner embed SLA (Phases 6–7).
-7. **Controlled Kimberley / Northern Cape pilot** — clinic/kiosk consent flows, regional sizing, POPIA-aligned retention, ops runbooks.
+1. **Backend testing (P1)** — Postgres handoff/sync, concurrency, auth revocation, migrations tests.
+2. **Versioned DB migrations (P2)** — framework; remove runtime DDL from request paths.
+3. **Android cloud integration (P3)** — complete auth/sync/offline queue/conflict UX.
+4. **Harden measurement (P4)** — quality gates, reference, landmarks; never invent mm.
+5. **Physical device matrix (P5)** + **accuracy study (P6)** — Brannock ground truth.
+6. **Portable Fit Identity (P7)** — passkeys, multi-device, merchant consent.
+7. **Recommendations + catalogue + merchant (P8–11)** — real footwear data and outcomes.
+8. **Web UX, SA readiness, POPIA, security, ops (P12–16)** — then Kimberley pilot (P18).
 
-### In progress / landed in code
+### Landed in code (partial — continue hardening)
 
 - Android `DeviceAuthClient` + `SyncClient` + Settings cloud sync / erase
 - Recoverable Fit Identity via `/v1/fit-identity/recovery-codes` (one-time codes)
@@ -32,9 +38,10 @@ See [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md), [RENDER_NEON.md](./RENDER_NE
 - Telemetry endpoint + Timber/web monitoring hooks
 - Backup/restore drill test + POPIA retention job + Privacy copy
 - Pen-test scope + key rotation docs
-- **Merchant orgs/roles, catalogue+inventory ingest, brand/model fit profiles, purchase/exchange/return outcomes, pilot metrics**
-- Regional locales (en-ZA / af / xh / zu) + UK sizing default; offline sync outbox; low-data mode
+- Merchant orgs/roles, catalogue+inventory ingest, brand/model fit, outcomes, pilot metrics
+- Regional locales (en-ZA / af / xh / zu) + UK sizing; offline sync outbox; low-data mode
 - Kimberley / Northern Cape pilot runbook (`docs/ops/PILOT_KIMBERLEY.md`)
+- CI Postgres handoff/sync/schema tests; staging Blueprint; smoke record path
 
 ---
 

@@ -12,7 +12,7 @@
     "staging:smoke": "node scripts/staging-smoke.mjs",
     "retention:run": "node scripts/run-retention.mjs",
     "render:build": "npm ci --include=dev && npm run build",
-    "test": "tsx --import ./test/env.ts --test test/handoff.test.ts test/handoffSession.test.ts test/validation.test.ts test/sessionAuth.test.ts test/deviceAuth.test.ts test/fitIdentity.test.ts test/backupRestore.test.ts test/merchants.test.ts",
+    "test": "tsx --import ./test/env.ts --test test/handoff.test.ts test/handoffPostgres.test.ts test/handoffSession.test.ts test/validation.test.ts test/sessionAuth.test.ts test/deviceAuth.test.ts test/fitIdentity.test.ts test/backupRestore.test.ts test/merchants.test.ts test/syncCrud.test.ts test/schemaMigration.test.ts",
     "check": "npm run typecheck && npm run test && npm run build"
   },
   "engines": {
