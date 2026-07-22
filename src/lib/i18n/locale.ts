@@ -4,7 +4,7 @@
  * SizeSystem when the host does not set `sizeSystem` explicitly.
  */
 
-import type { SizeSystem } from "../../embed/types";
+import type { SizeSystem } from "../../types";
 
 export type LocaleId = "en-ZA" | "af-ZA" | "xh-ZA" | "zu-ZA" | "en";
 

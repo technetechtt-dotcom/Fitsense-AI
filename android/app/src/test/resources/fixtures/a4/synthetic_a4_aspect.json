@@ -5,11 +5,11 @@
   "imageHeight": 1414,
   "corners": [
     [100, 100],
-    [900, 100],
-    [900, 1314],
-    [100, 1314]
+    [940, 100],
+    [940, 1288],
+    [100, 1288]
   ],
-  "expectedAspect": 1.414,
+  "expectedAspect": 1.4142857142857144,
   "minConfidence": 0.6,
-  "notes": "Synthetic A4-aspect quad for ReferenceDetector scoring regression."
+  "notes": "Synthetic A4-aspect quad (210×297 mm ratio) for ReferenceDetector scoring regression."
 }

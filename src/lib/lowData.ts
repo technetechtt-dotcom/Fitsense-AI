@@ -32,6 +32,7 @@ export function setLowDataMode(enabled: boolean): void {
 /** Strip heavy fields from catalogue products for low-data UIs. */
 export function slimProductMedia<T extends { imageUrl?: string }>(product: T): T {
   if (!isLowDataMode()) return product;
-  const { imageUrl: _drop, ...rest } = product;
-  return rest as T;
+  const next = { ...product };
+  delete next.imageUrl;
+  return next;
 }

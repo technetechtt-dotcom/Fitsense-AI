@@ -7,6 +7,8 @@ export type MeasurementUnit = "mm" | "in";
 
 export type CalibrationReference = "arcore_plane" | "a4_paper" | "credit_card";
 
+export type SizeSystem = "uk" | "us" | "eu" | "mondopoint";
+
 export const CALIBRATION_META: Record<
   CalibrationReference,
   { label: string; widthMm: number; heightMm: number }
