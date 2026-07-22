@@ -1,0 +1,15 @@
+{
+  "id": "synthetic_a4_aspect",
+  "calibration": "a4_paper",
+  "imageWidth": 1000,
+  "imageHeight": 1414,
+  "corners": [
+    [100, 100],
+    [900, 100],
+    [900, 1314],
+    [100, 1314]
+  ],
+  "expectedAspect": 1.414,
+  "minConfidence": 0.6,
+  "notes": "Synthetic A4-aspect quad for ReferenceDetector scoring regression."
+}

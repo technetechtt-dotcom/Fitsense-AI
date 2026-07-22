@@ -5,6 +5,7 @@ import { ensureSignedIn } from "./cloud/auth";
 import { maybeAutoRestoreFromCloud } from "./cloud/restore";
 import { syncAnalyticsFromConsent } from "./analytics";
 import { acknowledgePolicy, hasCloudSyncConsent, loadConsent } from "./consent";
+import { installWebMonitoring } from "./monitoring";
 
 let booted = false;
 
@@ -16,6 +17,7 @@ export async function bootstrapApp(): Promise<void> {
   booted = true;
 
   initAnalytics();
+  installWebMonitoring();
 
   // Migrate legacy profiles that stored analytics on UserPreferences.
   const legacy = localStorage.getItem("fitsense:profile");

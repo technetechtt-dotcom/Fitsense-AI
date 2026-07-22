@@ -6,9 +6,11 @@ import { rateLimit } from "./middleware/rateLimit.js";
 import { requestContext } from "./middleware/requestContext.js";
 import { securityHeaders } from "./middleware/securityHeaders.js";
 import { authRouter } from "./routes/auth.js";
+import { fitIdentityRouter } from "./routes/fitIdentity.js";
 import { healthRouter } from "./routes/health.js";
 import { handoffRouter } from "./routes/handoff.js";
 import { syncRouter } from "./routes/sync.js";
+import { telemetryRouter } from "./routes/telemetry.js";
 
 export function createApp() {
   const app = express();
@@ -31,6 +33,8 @@ export function createApp() {
   app.use("/v1", authRouter);
   app.use("/v1", handoffRouter);
   app.use("/v1", syncRouter);
+  app.use("/v1", fitIdentityRouter);
+  app.use("/v1", telemetryRouter);
 
   app.use((_req, res) => {
     res.status(404).json({ error: "not_found" });

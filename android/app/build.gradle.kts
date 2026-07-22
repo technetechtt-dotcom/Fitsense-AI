@@ -43,6 +43,12 @@ android {
         // so they can be tweaked without touching production code.
         buildConfigField("float", "FIT_SCORE_TOLERANCE_MM", "5.0f")
         buildConfigField("float", "WIDE_FOOT_RATIO_THRESHOLD", "0.42f")
+        // Override via local.properties: fitsense.api.baseUrl=https://...
+        buildConfigField(
+            "String",
+            "API_BASE_URL",
+            "\"${localProps.getProperty("fitsense.api.baseUrl", "")}\"",
+        )
     }
 
     buildTypes {

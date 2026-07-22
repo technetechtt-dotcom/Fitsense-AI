@@ -22,6 +22,17 @@ See [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md), [RENDER_NEON.md](./RENDER_NE
 6. **Catalogue and merchant-platform development** — feeds, last metadata, partner embed SLA (Phases 6–7).
 7. **Controlled Kimberley / Northern Cape pilot** — clinic/kiosk consent flows, regional sizing, POPIA-aligned retention, ops runbooks.
 
+### In progress / landed in code
+
+- Android `DeviceAuthClient` + `SyncClient` + Settings cloud sync / erase
+- Recoverable Fit Identity via `/v1/fit-identity/recovery-codes` (one-time codes)
+- Explicit fallback landmark confirmation (web + Android)
+- Reference aspect scoring + photographic fixture metadata
+- Accuracy study JSONL + `scripts/analyze-accuracy-dataset.mjs`
+- Telemetry endpoint + Timber/web monitoring hooks
+- Backup/restore drill test + POPIA retention job + Privacy copy
+- Pen-test scope + key rotation docs
+
 ---
 
 ## Phases 2–12 (detail)

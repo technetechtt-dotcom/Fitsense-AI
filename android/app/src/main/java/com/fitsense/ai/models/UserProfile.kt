@@ -25,7 +25,13 @@ data class UserPreferences(
     val units: MeasurementUnit = MeasurementUnit.MILLIMETRES,
     val defaultCalibration: CalibrationReference = CalibrationReference.A4_PAPER,
     val analyticsOptIn: Boolean = false,
+    /** When true and API_BASE_URL is set, scans sync to FitSense cloud. */
+    val cloudSyncOptIn: Boolean = false,
     val preferredBrands: List<String> = emptyList(),
+    /** Optional Brannock / known-foot ground truth for accuracy study captures. */
+    val groundTruthLengthMm: Double? = null,
+    val groundTruthWidthMm: Double? = null,
+    val accuracyStudyNotes: String? = null,
 )
 
 enum class MeasurementUnit { MILLIMETRES, INCHES }

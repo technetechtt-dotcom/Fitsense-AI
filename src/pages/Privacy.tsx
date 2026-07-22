@@ -151,17 +151,21 @@ export function Privacy() {
             <p>
               <strong className="text-ink">Legal bases.</strong> Consent for cloud sync,
               AI personalisation, and analytics. Contractual necessity for core sizing
-              when you request a recommendation.
+              when you request a recommendation. Under POPIA (South Africa), processing
+              is limited to the purpose you consented to; we do not sell foot
+              measurement data.
             </p>
             <p>
               <strong className="text-ink">Retention.</strong> Local data remains until
               you delete it or sign out. Cloud copies are removed when you erase cloud
-              data or sign out while sync is enabled.
+              data, and server retention jobs purge inactive sync rows after configured
+              periods (default 730 days). Handoff sessions expire within minutes.
             </p>
             <p>
-              <strong className="text-ink">Your rights.</strong> Export, delete, and
-              withdraw consent at any time via Settings and this page (GDPR Arts. 15–17,
-              20–21).
+              <strong className="text-ink">Your rights (POPIA / GDPR).</strong> Access
+              (export), correction, deletion, and withdrawal of consent at any time via
+              Settings and this page. Portable Fit Identity recovery codes are one-time
+              and hashed at rest.
             </p>
           </div>
         </Section>

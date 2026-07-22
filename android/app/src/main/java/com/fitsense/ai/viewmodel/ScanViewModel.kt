@@ -47,6 +47,7 @@ class ScanViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val recommendationEngine: RecommendationEngine,
     private val accuracyDatasetStore: AccuracyDatasetStore,
+    private val cloudSyncCoordinator: com.fitsense.ai.sync.CloudSyncCoordinator,
 ) : ViewModel() {
 
     enum class ScanPhase { Camera, Markup, Review }
@@ -69,6 +70,12 @@ class ScanViewModel @Inject constructor(
         val previewLengthMm: Double? = null,
         val previewWidthMm: Double? = null,
         val previewConfidence: Float? = null,
+        val refSource: com.fitsense.ai.vision.LandmarkSource =
+            com.fitsense.ai.vision.LandmarkSource.DETECTED,
+        val footSource: com.fitsense.ai.vision.LandmarkSource =
+            com.fitsense.ai.vision.LandmarkSource.DETECTED,
+        val requiresFallbackConfirmation: Boolean = false,
+        val fallbackConfirmed: Boolean = false,
     )
 
     data class UiState(
@@ -130,9 +137,18 @@ class ScanViewModel @Inject constructor(
                     error(quality.issue ?: "Image quality check failed.")
                 }
                 _uiState.update { it.copy(captureProgress = 0.75f) }
-                val boot = landmarkBootstrap.bootstrap(bitmap, _uiState.value.activeFoot)
+                val boot = landmarkBootstrap.bootstrap(
+                    bitmap,
+                    _uiState.value.activeFoot,
+                    _uiState.value.calibration,
+                )
                 capturedBitmap?.recycle()
                 capturedBitmap = bitmap
+                val status = if (boot.requiresFallbackConfirmation) {
+                    "Auto-detect used fallback landmarks — confirm they look correct before accepting."
+                } else {
+                    "Drag each marker to the correct corner and foot point."
+                }
                 _uiState.update {
                     it.copy(
                         capturing = false,
@@ -147,8 +163,12 @@ class ScanViewModel @Inject constructor(
                             widthMedial = boot.widthMedial,
                             widthLateral = boot.widthLateral,
                             activeFoot = _uiState.value.activeFoot,
+                            refSource = boot.refSource,
+                            footSource = boot.footSource,
+                            requiresFallbackConfirmation = boot.requiresFallbackConfirmation,
+                            fallbackConfirmed = false,
                         ),
-                        statusMessage = "Drag each marker to the correct corner and foot point.",
+                        statusMessage = status,
                     )
                 }
             }.onFailure { err ->
@@ -217,8 +237,22 @@ class ScanViewModel @Inject constructor(
         }
     }
 
+    fun confirmFallbackLandmarks(confirmed: Boolean) {
+        _uiState.update { state ->
+            state.copy(markup = state.markup?.copy(fallbackConfirmed = confirmed))
+        }
+    }
+
     fun acceptMeasurement() {
         val markup = _uiState.value.markup ?: return
+        if (markup.requiresFallbackConfirmation && !markup.fallbackConfirmed) {
+            _uiState.update {
+                it.copy(
+                    errorMessage = "Confirm fallback landmarks before accepting millimetre results.",
+                )
+            }
+            return
+        }
         val result = runCatching {
             referenceMeasurement.measure(
                 ReferenceMeasurement.TapPoints(
@@ -270,6 +304,10 @@ class ScanViewModel @Inject constructor(
             )
         }
         viewModelScope.launch {
+            val prefs = when (val user = userRepository.ensureSignedIn()) {
+                is DataResult.Success -> user.value.preferences
+                is DataResult.Failure -> null
+            }
             accuracyDatasetStore.append(
                 AccuracyDatasetStore.AccuracyRecord(
                     recordedAtEpochMs = System.currentTimeMillis(),
@@ -279,6 +317,9 @@ class ScanViewModel @Inject constructor(
                     measuredLengthMm = result.measurement.lengthMm,
                     measuredWidthMm = result.measurement.widthMm,
                     confidence = result.measurement.confidence,
+                    groundTruthLengthMm = prefs?.groundTruthLengthMm,
+                    groundTruthWidthMm = prefs?.groundTruthWidthMm,
+                    notes = prefs?.accuracyStudyNotes,
                 ),
             )
         }
@@ -334,7 +375,22 @@ class ScanViewModel @Inject constructor(
                             _uiState.update { it.copy(errorMessage = saved.error.message) }
                         }
                         is DataResult.Success -> {
-                            _uiState.update { it.copy(savedScanId = scanId) }
+                            val cloudOk = cloudSyncCoordinator.pushScanIfEnabled(
+                                scan,
+                                user.value.preferences.cloudSyncOptIn,
+                            )
+                            _uiState.update {
+                                it.copy(
+                                    savedScanId = scanId,
+                                    statusMessage = if (cloudOk) {
+                                        "Scan saved and synced."
+                                    } else if (user.value.preferences.cloudSyncOptIn) {
+                                        "Scan saved locally; cloud sync pending or failed."
+                                    } else {
+                                        "Scan saved on device."
+                                    },
+                                )
+                            }
                             onComplete(scanId)
                         }
                     }

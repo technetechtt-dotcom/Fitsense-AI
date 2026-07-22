@@ -48,6 +48,7 @@ interface Props {
 }
 
 type Stage =
+  | "accept-suggestions" // explicit confirm when CV/fallback pre-filled points
   | "ref-corners" // 0..4 reference corners
   | "heel"
   | "toe"
@@ -123,6 +124,8 @@ export function TapMeasurement({
         return state.measureWidth
           ? "Tap the outermost edge of the ball of the foot"
           : "";
+      case "accept-suggestions":
+        return "Auto-detect placed these landmarks — confirm they look correct, or drag/reset to edit.";
       case "confirm":
         return "Looks good? Confirm to compute your measurement.";
     }
@@ -178,6 +181,8 @@ export function TapMeasurement({
             };
           }
           return { ...prev, toe: undefined, stage: "toe", error: null };
+        case "accept-suggestions":
+          return { ...prev, stage: "confirm", error: null };
       }
     });
 
@@ -390,13 +395,25 @@ export function TapMeasurement({
         Also tap foot width (more accurate)
       </label>
 
-      <PrimaryButton
-        disabled={!allTapped || state.stage !== "confirm"}
-        onClick={confirm}
-        leadingIcon={<Check className="w-5 h-5" />}
-      >
-        Confirm measurement
-      </PrimaryButton>
+      {state.stage === "accept-suggestions" ? (
+        <PrimaryButton
+          disabled={!allTapped}
+          onClick={() =>
+            setState((prev) => ({ ...prev, stage: "confirm", error: null }))
+          }
+          leadingIcon={<Check className="w-5 h-5" />}
+        >
+          I confirm these landmarks
+        </PrimaryButton>
+      ) : (
+        <PrimaryButton
+          disabled={!allTapped || state.stage !== "confirm"}
+          onClick={confirm}
+          leadingIcon={<Check className="w-5 h-5" />}
+        >
+          Confirm measurement
+        </PrimaryButton>
+      )}
     </div>
   );
 }
@@ -418,14 +435,16 @@ function seedState(
   // Don't clobber user-edited state once they've already started tapping.
   if (base.refCorners.length > 0 || base.heel || base.toe) return base;
   let next = base;
+  let usedSuggestions = false;
   if (suggestions.suggestedRefCorners && suggestions.suggestedRefCorners.length === 4) {
     next = {
       ...next,
       refCorners: sortCornersTL(suggestions.suggestedRefCorners),
       stage: "heel",
     };
+    usedSuggestions = true;
   }
-  if (suggestions.suggestedFoot && next.stage === "heel") {
+  if (suggestions.suggestedFoot && (next.stage === "heel" || usedSuggestions)) {
     next = {
       ...next,
       heel: suggestions.suggestedFoot.heel,
@@ -439,6 +458,11 @@ function seedState(
             ? "width-medial"
             : "confirm",
     };
+    usedSuggestions = true;
+  }
+  // Require explicit acceptance of auto/fallback landmarks before measuring.
+  if (usedSuggestions && next.heel && next.toe) {
+    return { ...next, stage: "accept-suggestions", error: null };
   }
   return next;
 }
@@ -480,6 +504,7 @@ function recordTap(state: State, p: Point): State {
       return { ...state, widthMedial: p, stage: "width-lateral", error: null };
     case "width-lateral":
       return { ...state, widthLateral: p, stage: "confirm", error: null };
+    case "accept-suggestions":
     case "confirm":
       return state;
   }

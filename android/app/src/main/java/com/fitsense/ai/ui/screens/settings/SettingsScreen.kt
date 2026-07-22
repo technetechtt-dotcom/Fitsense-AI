@@ -119,6 +119,67 @@ fun SettingsScreen(
             }
         }
 
+        val sync by viewModel.syncStatus.collectAsState()
+        SettingsSection(label = "Cloud sync") {
+            Text(
+                text = if (sync.apiConfigured) {
+                    if (sync.authenticated) "API connected"
+                    else "API configured — tap to authenticate"
+                } else {
+                    "Set fitsense.api.baseUrl in local.properties"
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = FitSenseColors.OnSurfaceMuted,
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Sync scans to FitSense cloud",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FitSenseColors.OnSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = prefs?.cloudSyncOptIn == true,
+                    onCheckedChange = {
+                        viewModel.setCloudSyncOptIn(it)
+                        if (it) viewModel.refreshSyncStatus()
+                    },
+                )
+            }
+            OutlinedButton(onClick = { viewModel.refreshSyncStatus() }) {
+                Text("Refresh auth status")
+            }
+            OutlinedButton(onClick = { viewModel.eraseCloudData() }) {
+                Text("Erase cloud data")
+            }
+        }
+
+        SettingsSection(label = "Accuracy study ground truth") {
+            Text(
+                text = "Optional Brannock / known-foot mm used when accepting scans.",
+                style = MaterialTheme.typography.bodySmall,
+                color = FitSenseColors.OnSurfaceMuted,
+            )
+            OutlinedButton(
+                onClick = {
+                    viewModel.setGroundTruth(
+                        lengthMm = prefs?.groundTruthLengthMm ?: 265.0,
+                        widthMm = prefs?.groundTruthWidthMm ?: 100.0,
+                        notes = prefs?.accuracyStudyNotes ?: "pilot",
+                    )
+                },
+            ) {
+                Text(
+                    text = "GT L=${prefs?.groundTruthLengthMm ?: "—"} W=${prefs?.groundTruthWidthMm ?: "—"} (tap to set defaults)",
+                )
+            }
+        }
+
+        val status by viewModel.statusMessage.collectAsState()
+        status?.let {
+            Text(text = it, style = MaterialTheme.typography.bodySmall, color = FitSenseColors.Neon)
+        }
+
         androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
 
         OutlinedButton(

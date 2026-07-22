@@ -20,7 +20,7 @@
 const STORAGE_KEY = "fitsense:consent";
 
 /** Bump whenever the consent contract changes. Re-prompts every user. */
-export const POLICY_VERSION = 1;
+export const POLICY_VERSION = 2;
 
 export type ConsentChoice = "granted" | "denied" | "unset";
 

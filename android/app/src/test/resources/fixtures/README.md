@@ -1,7 +1,18 @@
-# Synthetic and captured image fixtures for measurement regression tests.
+# Photographic regression fixtures
 
-#
+Place real captures under this folder for instrumented OpenCV regression:
 
-# Add PNG/JPEG captures here for instrumented tests. Current suite uses
+```
+fixtures/
+  a4/
+    well_lit_01.jpg
+    well_lit_01.json   # { "corners": [[x,y]×4], "lengthMm": …, "calibration": "a4_paper" }
+  card/
+    …
+```
 
-# programmatic bitmaps so CI does not depend on binary fixtures.
+CI unit tests use **programmatic** bitmaps so the suite stays binary-free.
+Instrumented tests may load assets from `androidTest/assets/fixtures/` when
+present (optional; skipped if missing).
+
+Never commit personally identifiable foot photos without study consent.

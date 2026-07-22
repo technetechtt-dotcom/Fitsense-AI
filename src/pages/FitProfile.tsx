@@ -30,6 +30,7 @@ import {
 import { deriveInsights } from "../lib/fitLearning";
 import { buildBrandSizeSheet, type BrandSizeRow } from "../lib/recommendation";
 import { exportFitToken, importFitToken } from "../lib/portableFitIdentity";
+import { issueFitRecoveryCode, recoverFitWithCode } from "../lib/cloud/fitIdentity";
 import { getOrCreateProfile } from "../lib/storage";
 import { formatLength, splitLength } from "../lib/format";
 import {
@@ -803,6 +804,9 @@ function PortableSection({
   const [copied, setCopied] = useState(false);
   const [importValue, setImportValue] = useState("");
   const [importError, setImportError] = useState<string | null>(null);
+  const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
+  const [recoveryInput, setRecoveryInput] = useState("");
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
 
   const copy = async () => {
     try {
@@ -827,6 +831,39 @@ function PortableSection({
     setImportValue("");
   };
 
+  const issueRecovery = async () => {
+    setRecoveryBusy(true);
+    setImportError(null);
+    try {
+      const issued = await issueFitRecoveryCode(profile);
+      if (!issued) {
+        setImportError("Could not issue a recovery code (API / consent).");
+        return;
+      }
+      setRecoveryCode(issued.recoveryCode);
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const doRecover = async () => {
+    setRecoveryBusy(true);
+    setImportError(null);
+    try {
+      const restored = await recoverFitWithCode(recoveryInput);
+      if (!restored) {
+        setImportError("Recovery code invalid or already used.");
+        return;
+      }
+      const userId = getOrCreateProfile().userId;
+      const saved = saveFitProfile({ ...restored, userId });
+      onImport(saved);
+      setRecoveryInput("");
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
   return (
     <section className="rounded-3xl bg-card-grad border border-white/8 p-5 space-y-4">
       <header className="flex items-start gap-3">
@@ -836,7 +873,7 @@ function PortableSection({
         <div>
           <h2 className="font-bold text-base">Portable fit identity</h2>
           <p className="text-xs text-ink-muted">
-            Take your profile to any FitSense-enabled store — no re-scan needed.
+            Share a token locally, or create a one-time recovery code after device loss.
           </p>
         </div>
       </header>
@@ -865,6 +902,37 @@ function PortableSection({
             {copied ? "Copied" : "Copy"}
           </button>
         </div>
+      </div>
+
+      <div className="rounded-2xl bg-surface-2 border border-white/5 p-3 space-y-2">
+        <div className="text-[10px] uppercase tracking-widest text-ink-muted">
+          Recoverable code (server)
+        </div>
+        <button
+          onClick={() => void issueRecovery()}
+          disabled={recoveryBusy}
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-neon/15 text-neon text-xs font-semibold hover:bg-neon/25 disabled:opacity-40"
+        >
+          Create recovery code
+        </button>
+        {recoveryCode ? (
+          <p className="text-[11px] font-mono break-all text-lime bg-black/30 rounded-xl px-3 py-2">
+            {recoveryCode}
+          </p>
+        ) : null}
+        <input
+          value={recoveryInput}
+          onChange={(e) => setRecoveryInput(e.target.value)}
+          placeholder="FSIR1.…"
+          className="w-full text-xs font-mono px-3 py-2 rounded-xl bg-black/30 border border-white/8 focus:outline-none focus:border-neon/40"
+        />
+        <button
+          onClick={() => void doRecover()}
+          disabled={recoveryBusy || recoveryInput.trim().length === 0}
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-surface-3 text-xs font-semibold hover:bg-ink-dim/30 disabled:opacity-40"
+        >
+          Recover with code
+        </button>
       </div>
 
       <div className="rounded-2xl bg-surface-2 border border-white/5 p-3 space-y-2">

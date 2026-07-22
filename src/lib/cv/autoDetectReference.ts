@@ -98,7 +98,7 @@ export async function autoDetectReference(
 
   // Require at least a modest confidence — better to fall back to taps
   // than confidently show wrong corners.
-  if (!best || best.confidence < 0.6) return null;
+  if (!best || best.confidence < 0.65) return null;
   return best;
 }
 

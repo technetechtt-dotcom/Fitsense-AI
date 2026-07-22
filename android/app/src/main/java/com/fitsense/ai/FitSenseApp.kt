@@ -23,9 +23,7 @@ class FitSenseApp : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        if (BuildConfig.DEBUG) {
-            Timber.plant(Timber.DebugTree())
-        }
+        com.fitsense.ai.monitoring.CrashReporting.install()
 
         // Kick off native library load on a background thread; the scan
         // screen blocks until [OpenCvInitializer.isReady] flips true.

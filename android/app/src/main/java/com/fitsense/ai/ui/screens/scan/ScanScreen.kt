@@ -25,6 +25,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -95,6 +96,7 @@ fun ScanScreen(
                     onCancel = onCancel,
                     onAccept = viewModel::acceptMeasurement,
                     onRetake = viewModel::retake,
+                    onConfirmFallback = viewModel::confirmFallbackLandmarks,
                 )
             }
 
@@ -235,7 +237,9 @@ private fun MarkupControls(
     onCancel: () -> Unit,
     onAccept: () -> Unit,
     onRetake: () -> Unit,
+    onConfirmFallback: (Boolean) -> Unit,
 ) {
+    val markup = state.markup
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -243,10 +247,48 @@ private fun MarkupControls(
             .padding(16.dp),
         verticalArrangement = Arrangement.Bottom,
     ) {
+        state.statusMessage?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.bodySmall,
+                color = FitSenseColors.OnSurfaceMuted,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+        }
+        if (markup?.requiresFallbackConfirmation == true) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+            ) {
+                Checkbox(
+                    checked = markup.fallbackConfirmed,
+                    onCheckedChange = onConfirmFallback,
+                )
+                Text(
+                    text = "I confirm these fallback landmarks are correct",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = FitSenseColors.OnSurface,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         state.errorMessage?.let { ErrorCard(it) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            PrimaryButton(text = stringResource(R.string.scan_retake), onClick = onRetake, modifier = Modifier.weight(1f))
-            PrimaryButton(text = stringResource(R.string.scan_accept_measurement), onClick = onAccept, modifier = Modifier.weight(1f))
+            PrimaryButton(
+                text = stringResource(R.string.scan_retake),
+                onClick = onRetake,
+                modifier = Modifier.weight(1f),
+            )
+            PrimaryButton(
+                text = stringResource(R.string.scan_accept_measurement),
+                onClick = onAccept,
+                enabled = markup == null ||
+                    !markup.requiresFallbackConfirmation ||
+                    markup.fallbackConfirmed,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }

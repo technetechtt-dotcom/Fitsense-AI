@@ -102,6 +102,15 @@ export const config = {
     30 * 24 * 60 * 60 * 1000,
   ),
   challengeTtlMs: parseNumber(process.env.AUTH_CHALLENGE_TTL_MS, 5 * 60 * 1000),
+  fitRecoveryTtlMs: parseNumber(
+    process.env.FIT_RECOVERY_TTL_MS,
+    90 * 24 * 60 * 60 * 1000,
+  ),
+  retention: {
+    scanDays: parseNumber(process.env.RETENTION_SCAN_DAYS, 730),
+    eventDays: parseNumber(process.env.RETENTION_EVENT_DAYS, 730),
+    profileDays: parseNumber(process.env.RETENTION_PROFILE_DAYS, 730),
+  },
 } as const;
 
 export function assertProductionConfig(): void {

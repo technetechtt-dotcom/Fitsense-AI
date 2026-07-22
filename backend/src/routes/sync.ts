@@ -11,9 +11,14 @@ import {
   scanSchema,
 } from "../validation/schemas.js";
 
+/**
+ * Sync routes are mounted under `/sync` only so `requireAuth` does not run for
+ * unrelated `/v1/*` routers mounted later on the same path prefix.
+ */
 export const syncRouter = Router();
+const sync = Router();
 
-syncRouter.use(async (_req, res, next) => {
+sync.use(async (_req, res, next) => {
   const store = getSyncStore();
   if (!store.isReady()) {
     try {
@@ -33,8 +38,8 @@ syncRouter.use(async (_req, res, next) => {
   next();
 });
 
-syncRouter.use(requireAuth);
-syncRouter.use(
+sync.use(requireAuth);
+sync.use(
   rateLimit({
     name: "sync",
     max: config.rateLimit.syncMax,
@@ -54,7 +59,7 @@ function requireUid(req: AuthedRequest, res: Response): string | null {
 }
 
 /** Pull fit profile, events, and scans (matches web `pullAll`). */
-syncRouter.get("/sync", async (req: AuthedRequest, res, next) => {
+sync.get("/", async (req: AuthedRequest, res, next) => {
   try {
     const uid = requireUid(req, res);
     if (!uid) return;
@@ -65,7 +70,7 @@ syncRouter.get("/sync", async (req: AuthedRequest, res, next) => {
   }
 });
 
-syncRouter.put("/sync/fit-profile", async (req: AuthedRequest, res, next) => {
+sync.put("/fit-profile", async (req: AuthedRequest, res, next) => {
   try {
     const uid = requireUid(req, res);
     if (!uid) return;
@@ -80,7 +85,7 @@ syncRouter.put("/sync/fit-profile", async (req: AuthedRequest, res, next) => {
   }
 });
 
-syncRouter.put("/sync/scans/:scanId", async (req: AuthedRequest, res, next) => {
+sync.put("/scans/:scanId", async (req: AuthedRequest, res, next) => {
   try {
     const uid = requireUid(req, res);
     if (!uid) return;
@@ -97,7 +102,7 @@ syncRouter.put("/sync/scans/:scanId", async (req: AuthedRequest, res, next) => {
   }
 });
 
-syncRouter.delete("/sync/scans/:scanId", async (req: AuthedRequest, res, next) => {
+sync.delete("/scans/:scanId", async (req: AuthedRequest, res, next) => {
   try {
     const uid = requireUid(req, res);
     if (!uid) return;
@@ -109,7 +114,7 @@ syncRouter.delete("/sync/scans/:scanId", async (req: AuthedRequest, res, next) =
   }
 });
 
-syncRouter.put("/sync/fit-events/:eventId", async (req: AuthedRequest, res, next) => {
+sync.put("/fit-events/:eventId", async (req: AuthedRequest, res, next) => {
   try {
     const uid = requireUid(req, res);
     if (!uid) return;
@@ -126,8 +131,8 @@ syncRouter.put("/sync/fit-events/:eventId", async (req: AuthedRequest, res, next
   }
 });
 
-/** Erase all cloud data for the authenticated user (GDPR delete). */
-syncRouter.delete("/sync", async (req: AuthedRequest, res, next) => {
+/** Erase all cloud data for the authenticated user (GDPR/POPIA delete). */
+sync.delete("/", async (req: AuthedRequest, res, next) => {
   try {
     const uid = requireUid(req, res);
     if (!uid) return;
@@ -137,3 +142,21 @@ syncRouter.delete("/sync", async (req: AuthedRequest, res, next) => {
     next(err);
   }
 });
+
+/** Access request: export all cloud data for the authenticated user. */
+sync.get("/export", async (req: AuthedRequest, res, next) => {
+  try {
+    const uid = requireUid(req, res);
+    if (!uid) return;
+    const data = await getSyncStore().pullUserData(uid);
+    res.json({
+      exportedAtEpochMs: Date.now(),
+      uid,
+      ...data,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+syncRouter.use("/sync", sync);
