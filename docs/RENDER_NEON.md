@@ -24,12 +24,21 @@ password in Neon before using it in production.
 Create a new Render Blueprint from this repo. Render reads `render.yaml` from
 the repository root.
 
-Set these secret values when Render prompts:
+Both services use **Node 22.16.0** (required by `engines` + `engine-strict=true`).
+
+Set these secret values when Render prompts (or under each service → Environment):
+
+### fitsense-api
 
 ```env
 DATABASE_URL=<your Neon pooled Postgres URL>
-FIREBASE_SERVICE_ACCOUNT_JSON=<single-line Firebase service account JSON>
+AUTH_SECRET=<long random secret>
+CORS_ORIGIN=https://fitsense-web.onrender.com
 ```
+
+`CORS_ORIGIN` must be the **exact** public URL of `fitsense-web` (no trailing slash).
+After the static site deploys, copy its URL from the Render dashboard and paste it
+here, then redeploy the API if needed.
 
 The API service already sets:
 
@@ -41,17 +50,15 @@ DATABASE_SSL=true
 DATABASE_SSL_REJECT_UNAUTHORIZED=true
 ```
 
-The frontend service already receives `VITE_API_BASE_URL` from the API service's
-`RENDER_EXTERNAL_URL`.
+### fitsense-web
 
-## 3. Firebase Auth
+`VITE_API_BASE_URL` is wired from the API service's `RENDER_EXTERNAL_URL` in
+`render.yaml`. No Firebase variables are required.
 
-Cloud sync still uses Firebase anonymous-auth ID tokens for user identity. For
-full production sync, set the public Firebase web variables on `fitsense-web`
-and `FIREBASE_SERVICE_ACCOUNT_JSON` on `fitsense-api`.
+## 3. Auth
 
-If Firebase is not configured, the app still runs locally/offline and handoff
-works, but authenticated `/v1/sync/*` calls will not succeed in production.
+Cloud sync uses FitSense API device session tokens (`AUTH_SECRET`). Handoff
+publish tokens also require `AUTH_SECRET`.
 
 ## 4. Verify
 
@@ -67,6 +74,9 @@ Expected storage fields:
 {
   "handoffStore": "postgres",
   "syncStore": "postgres",
-  "syncReady": true
+  "syncReady": true,
+  "postgres": true
 }
 ```
+
+Then open the static site URL and confirm the app loads.

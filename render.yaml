@@ -10,7 +10,7 @@ services:
     autoDeployTrigger: commit
     envVars:
       - key: NODE_VERSION
-        value: "20"
+        value: "22.16.0"
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
@@ -23,11 +23,10 @@ services:
         value: "true"
       - key: DATABASE_SSL_REJECT_UNAUTHORIZED
         value: "true"
+      # Set manually to your static site URL, e.g. https://fitsense-web.onrender.com
+      # (Avoids Blueprint circular dependency with fitsense-web.)
       - key: CORS_ORIGIN
-        fromService:
-          name: fitsense-web
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        sync: false
       - key: AUTH_SECRET
         sync: false
 
@@ -39,7 +38,7 @@ services:
     autoDeployTrigger: commit
     envVars:
       - key: NODE_VERSION
-        value: "20"
+        value: "22.16.0"
       - key: VITE_API_BASE_URL
         fromService:
           name: fitsense-api
