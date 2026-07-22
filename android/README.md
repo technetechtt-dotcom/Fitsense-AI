@@ -226,4 +226,7 @@ through `org.opencv.*` packages.
 ## License
 
 Internal / proprietary — see your organisation's policy.
+
+```
+
 ```

@@ -11,17 +11,17 @@ CI builds a **debug APK** and uploads it as the `app-debug-apk` artifact (plus
 
 ## Checklist (record pass/fail)
 
-| Check | Pass? | Notes |
-|-------|-------|-------|
-| Cold start → splash → home | | |
-| Camera permission granted | | |
-| Reference (A4/card) detect + mm readout looks plausible | | |
-| Blur / coplanarity quality gate surfaces when expected | | |
-| Manual landmark refine works when auto-detect is uncertain | | |
-| Dual-foot path before recommendations (if enabled) | | |
-| No unlabeled demo / simulated millimetres in release-like builds | | |
-| ARCore path on ARCore-capable hardware (optional) | | |
-| Handoff / sync against staging API (optional) | | |
+| Check                                                            | Pass? | Notes |
+| ---------------------------------------------------------------- | ----- | ----- |
+| Cold start → splash → home                                       |       |       |
+| Camera permission granted                                        |       |       |
+| Reference (A4/card) detect + mm readout looks plausible          |       |       |
+| Blur / coplanarity quality gate surfaces when expected           |       |       |
+| Manual landmark refine works when auto-detect is uncertain       |       |       |
+| Dual-foot path before recommendations (if enabled)               |       |       |
+| No unlabeled demo / simulated millimetres in release-like builds |       |       |
+| ARCore path on ARCore-capable hardware (optional)                |       |       |
+| Handoff / sync against staging API (optional)                    |       |       |
 
 ## Accuracy note
 
