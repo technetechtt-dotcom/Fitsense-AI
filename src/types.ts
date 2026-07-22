@@ -319,12 +319,7 @@ export interface FitEventExchange extends FitEventBase {
   fromSize: string;
   toSize: string;
   sizeSystem: "uk" | "us" | "eu" | "mondopoint";
-  reason?:
-    | "too_small"
-    | "too_large"
-    | "too_narrow"
-    | "too_wide"
-    | "other";
+  reason?: "too_small" | "too_large" | "too_narrow" | "too_wide" | "other";
 }
 
 export interface FitEventRating extends FitEventBase {

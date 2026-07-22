@@ -25,12 +25,7 @@ export function createApp() {
     cors({
       origin: config.corsOrigin,
       methods: ["GET", "PUT", "POST", "DELETE", "OPTIONS"],
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "X-Debug-Uid",
-        "X-Api-Key",
-      ],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Debug-Uid", "X-Api-Key"],
     }),
   );
   app.use(express.json({ limit: config.jsonLimit }));

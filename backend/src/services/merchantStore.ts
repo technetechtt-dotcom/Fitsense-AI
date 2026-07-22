@@ -1,5 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
-import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
+import {
+  getPostgresPool,
+  isPostgresConfigured,
+  withPostgresSchemaLock,
+} from "./postgres.js";
 
 export type OrgRole = "owner" | "admin" | "operator" | "viewer";
 
@@ -23,9 +27,8 @@ export async function ensureMerchantSchema(): Promise<void> {
   if (!isPostgresConfigured()) {
     throw new Error("DATABASE_URL is required for merchant APIs.");
   }
-  schemaReady ??= getPostgresPool()
-    .query(
-      `
+  schemaReady ??= withPostgresSchemaLock(async (client) => {
+    await client.query(`
         CREATE TABLE IF NOT EXISTS merchant_orgs (
           org_id text PRIMARY KEY,
           name text NOT NULL,
@@ -100,9 +103,8 @@ export async function ensureMerchantSchema(): Promise<void> {
 
         CREATE INDEX IF NOT EXISTS idx_merchant_outcomes_org_created
           ON merchant_outcomes (org_id, created_at DESC);
-      `,
-    )
-    .then(() => undefined);
+      `);
+  });
   await schemaReady;
 }
 

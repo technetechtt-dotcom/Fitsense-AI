@@ -8,12 +8,12 @@ stores — without inventing millimetres or skipping reference calibration.
 
 ## Success criteria (from PRODUCT_DEFINITION)
 
-| Metric | Target |
-|--------|--------|
-| Scan completion (usable dual-foot or accepted single) | ≥ 80% of consented sessions |
-| Length error vs Brannock / known foot (median) | ≤ 2 mm |
-| Size-related return / exchange rate vs baseline | Relative reduction ≥ 15% after 6 weeks |
-| Consent + erase path exercised | 100% of pilot stores trained |
+| Metric                                                | Target                                 |
+| ----------------------------------------------------- | -------------------------------------- |
+| Scan completion (usable dual-foot or accepted single) | ≥ 80% of consented sessions            |
+| Length error vs Brannock / known foot (median)        | ≤ 2 mm                                 |
+| Size-related return / exchange rate vs baseline       | Relative reduction ≥ 15% after 6 weeks |
+| Consent + erase path exercised                        | 100% of pilot stores trained           |
 
 Track merchant KPIs via `GET /v1/merchants/orgs/:orgId/pilot-metrics`.
 

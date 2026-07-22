@@ -1,6 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import { config } from "../config.js";
-import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
+import {
+  getPostgresPool,
+  isPostgresConfigured,
+  withPostgresSchemaLock,
+} from "./postgres.js";
 
 let schemaReady: Promise<void> | null = null;
 
@@ -8,9 +12,8 @@ async function ensureSchema(): Promise<void> {
   if (!isPostgresConfigured()) {
     throw new Error("DATABASE_URL is required for Fit Identity recovery.");
   }
-  schemaReady ??= getPostgresPool()
-    .query(
-      `
+  schemaReady ??= withPostgresSchemaLock(async (client) => {
+    await client.query(`
         CREATE TABLE IF NOT EXISTS fit_recovery_codes (
           code_hash text PRIMARY KEY,
           device_id text NOT NULL,
@@ -23,9 +26,8 @@ async function ensureSchema(): Promise<void> {
 
         CREATE INDEX IF NOT EXISTS idx_fit_recovery_codes_expires_at
           ON fit_recovery_codes (expires_at);
-      `,
-    )
-    .then(() => undefined);
+      `);
+  });
   await schemaReady;
 }
 

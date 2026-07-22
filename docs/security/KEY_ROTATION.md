@@ -2,9 +2,9 @@
 
 ## Secrets
 
-| Secret | Used for |
-|--------|----------|
-| `AUTH_SECRET` | Device access/refresh token HMAC |
+| Secret           | Used for                                         |
+| ---------------- | ------------------------------------------------ |
+| `AUTH_SECRET`    | Device access/refresh token HMAC                 |
 | `HANDOFF_SECRET` | Handoff publish/consume token HMAC (must differ) |
 
 ## Rotation steps
