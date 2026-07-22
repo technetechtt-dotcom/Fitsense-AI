@@ -58,8 +58,8 @@ const databaseSsl = parseBoolean(
 );
 
 const authSecret = process.env.AUTH_SECRET?.trim();
-const handoffSecret =
-  process.env.HANDOFF_SECRET?.trim() || (!isProduction ? authSecret : undefined);
+const handoffSecretExplicit = process.env.HANDOFF_SECRET?.trim();
+const handoffSecret = handoffSecretExplicit || authSecret;
 
 export const config = {
   port: parseNumber(process.env.PORT, 8787),
@@ -128,7 +128,14 @@ export function assertProductionConfig(): void {
     );
   }
   if (!config.handoffSecret) {
-    throw new Error("HANDOFF_SECRET is required in production.");
+    throw new Error(
+      "HANDOFF_SECRET or AUTH_SECRET is required in production for handoff signing.",
+    );
+  }
+  if (isProduction && !handoffSecretExplicit && authSecret) {
+    console.warn(
+      "[fitsense-api] HANDOFF_SECRET is unset; falling back to AUTH_SECRET. Set a distinct HANDOFF_SECRET when you can.",
+    );
   }
 }
 
