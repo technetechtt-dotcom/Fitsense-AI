@@ -1,5 +1,9 @@
 import { config } from "../config.js";
-import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
+import {
+  getPostgresPool,
+  isPostgresConfigured,
+  withPostgresSchemaLock,
+} from "./postgres.js";
 import {
   generateDeviceId,
   generateOpaqueToken,
@@ -20,9 +24,8 @@ export async function ensureAuthSchema(): Promise<void> {
   if (!isPostgresConfigured()) {
     throw new Error("DATABASE_URL is required for device authentication.");
   }
-  schemaReady ??= getPostgresPool()
-    .query(
-      `
+  schemaReady ??= withPostgresSchemaLock(async (client) => {
+    await client.query(`
         CREATE TABLE IF NOT EXISTS devices (
           device_id text PRIMARY KEY,
           secret_hash text NOT NULL,
@@ -70,9 +73,8 @@ export async function ensureAuthSchema(): Promise<void> {
           detail jsonb,
           created_at timestamptz NOT NULL DEFAULT now()
         );
-      `,
-    )
-    .then(() => undefined);
+      `);
+  });
   await schemaReady;
 }
 
