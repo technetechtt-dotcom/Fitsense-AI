@@ -19,7 +19,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Cloud sync client for `/v1/sync/*`. Requires prior consent in the UI layer;
+ * Cloud sync client for `/v1/sync` endpoints. Requires prior consent in the UI layer;
  * this class only performs HTTP when [ApiConfig] is configured and auth works.
  */
 @Singleton

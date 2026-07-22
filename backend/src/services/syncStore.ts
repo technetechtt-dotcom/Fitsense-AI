@@ -1,5 +1,9 @@
 import { config } from "../config.js";
-import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
+import {
+  getPostgresPool,
+  isPostgresConfigured,
+  withPostgresSchemaLock,
+} from "./postgres.js";
 
 export interface CloudPullResult {
   fitProfile: unknown | null;
@@ -28,7 +32,8 @@ class PostgresSyncStore implements SyncStore {
       console.warn("[fitsense-api] Postgres sync disabled — DATABASE_URL is not set.");
       return;
     }
-    await getPostgresPool().query(`
+    await withPostgresSchemaLock(async (client) => {
+      await client.query(`
       CREATE TABLE IF NOT EXISTS fit_profiles (
         uid text PRIMARY KEY,
         fit_id text NOT NULL,
@@ -61,6 +66,7 @@ class PostgresSyncStore implements SyncStore {
       CREATE INDEX IF NOT EXISTS idx_fit_events_uid_epoch_ms
         ON fit_events (uid, epoch_ms DESC);
     `);
+    });
     this.ready = true;
   }
 
