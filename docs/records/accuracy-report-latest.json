@@ -1,0 +1,59 @@
+{
+  "path": "docs/records/accuracy-sample.jsonl",
+  "mode": "product-definition",
+  "thresholds": {
+    "lengthMedianMm": 2,
+    "lengthP95Mm": 5,
+    "widthMedianMm": 3,
+    "widthP95Mm": 6
+  },
+  "n": 3,
+  "overall": {
+    "length": {
+      "n": 3,
+      "mae": 1.8333333333333333,
+      "median": 1.5,
+      "p95": 2.8000000000000114
+    },
+    "width": {
+      "n": 3,
+      "mae": 0.9000000000000009,
+      "median": 0.9000000000000057,
+      "p95": 1.2000000000000028
+    },
+    "pass": true
+  },
+  "cohorts": {
+    "SM-A546B | Android 14 | A4_PAPER": {
+      "length": {
+        "n": 2,
+        "mae": 1.3499999999999943,
+        "median": 1.5,
+        "p95": 1.5
+      },
+      "width": {
+        "n": 2,
+        "mae": 0.75,
+        "median": 0.9000000000000057,
+        "p95": 0.9000000000000057
+      },
+      "pass": true
+    },
+    "2201116SG | Android 13 | CREDIT_CARD": {
+      "length": {
+        "n": 1,
+        "mae": 2.8000000000000114,
+        "median": 2.8000000000000114,
+        "p95": 2.8000000000000114
+      },
+      "width": {
+        "n": 1,
+        "mae": 1.2000000000000028,
+        "median": 1.2000000000000028,
+        "p95": 1.2000000000000028
+      },
+      "pass": false
+    }
+  },
+  "pass": true
+}

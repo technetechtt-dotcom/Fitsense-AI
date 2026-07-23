@@ -28,4 +28,7 @@ CI builds a **debug APK** and uploads it as the `app-debug-apk` artifact (plus
 Phone millimetre results must come from geometric measurement (reference
 homography or AR depth). Never treat invented sizes as sizing truth.
 
+Fill the cohort table in [DEVICE_MATRIX.md](./DEVICE_MATRIX.md) and run
+[ACCURACY_STUDY.md](./ACCURACY_STUDY.md) analysis after physical sessions.
+
 Copy this table into the PR or a pilot runbook when signing off a build.

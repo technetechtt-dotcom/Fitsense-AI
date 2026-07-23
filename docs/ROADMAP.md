@@ -41,7 +41,9 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 - Reference detector: OpenCV Mat release, convexity, corner-angle, multi-quad ambiguity reject
 - Image quality: blur/exposure/glare + border-clipping proxy (web + Android)
 - Android markup undo / reset to auto-detect seeds
-- Accuracy study JSONL + `scripts/analyze-accuracy-dataset.mjs`
+- Accuracy study JSONL + `scripts/analyze-accuracy-dataset.mjs` (cohort + product/strict gates)
+- Device matrix template (`docs/DEVICE_MATRIX.md`) + Settings GT entry / JSONL export
+- Enriched accuracy rows: manufacturer, OS, SDK, app/algorithm version
 - Telemetry endpoint + Timber/web monitoring hooks
 - Backup/restore drill test + POPIA retention job + Privacy copy
 - Pen-test scope + key rotation docs
@@ -51,6 +53,8 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 - CI Postgres handoff/sync/schema tests; staging Blueprint; smoke record path
 
 **P4 still open:** live quality HUD before shutter, socks/footwear detector, true coplanarity / fold detection, magnified landmark loupe, floor suitability ML.
+
+**P5/P6 still open:** fill device matrix with real phones; complete Brannock participant study; per-foot GT; web/iOS study path.
 
 ---
 

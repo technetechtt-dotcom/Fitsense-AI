@@ -384,6 +384,11 @@ class ScanViewModel @Inject constructor(
                 AccuracyDatasetStore.AccuracyRecord(
                     recordedAtEpochMs = System.currentTimeMillis(),
                     deviceModel = Build.MODEL,
+                    manufacturer = Build.MANUFACTURER,
+                    osVersion = Build.VERSION.RELEASE,
+                    sdkInt = Build.VERSION.SDK_INT,
+                    appVersion = com.fitsense.ai.BuildConfig.VERSION_NAME,
+                    algorithmVersion = AccuracyDatasetStore.ALGORITHM_VERSION,
                     foot = foot,
                     calibration = _uiState.value.calibration,
                     measuredLengthMm = result.measurement.lengthMm,

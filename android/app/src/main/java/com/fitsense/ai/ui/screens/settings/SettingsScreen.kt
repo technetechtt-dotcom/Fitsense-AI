@@ -1,14 +1,19 @@
 package com.fitsense.ai.ui.screens.settings
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material3.Card
@@ -17,13 +22,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,13 +52,15 @@ fun SettingsScreen(
 ) {
     val profile by viewModel.profile.collectAsState()
     val prefs = profile?.preferences
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(FitSenseColors.Surface0)
             .systemBarsPadding()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 20.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -179,23 +192,97 @@ fun SettingsScreen(
         }
 
         SettingsSection(label = "Accuracy study ground truth") {
+            val accuracyCount by viewModel.accuracyRecordCount.collectAsState()
+            val shareUri by viewModel.accuracyShareUri.collectAsState()
+            var lengthText by remember {
+                mutableStateOf(prefs?.groundTruthLengthMm?.toString().orEmpty())
+            }
+            var widthText by remember {
+                mutableStateOf(prefs?.groundTruthWidthMm?.toString().orEmpty())
+            }
+            var notesText by remember {
+                mutableStateOf(prefs?.accuracyStudyNotes.orEmpty())
+            }
             Text(
-                text = "Optional Brannock / known-foot mm used when accepting scans.",
+                text = "Enter Brannock / caliper mm for the foot you will scan. Values are written into each accepted accuracy row.",
+                style = MaterialTheme.typography.bodySmall,
+                color = FitSenseColors.OnSurfaceMuted,
+            )
+            OutlinedTextField(
+                value = lengthText,
+                onValueChange = { lengthText = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                label = { Text("Ground-truth length (mm)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = widthText,
+                onValueChange = { widthText = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                label = { Text("Ground-truth width (mm)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = notesText,
+                onValueChange = { notesText = it },
+                label = { Text("Session notes (lighting / operator)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        val length = lengthText.toDoubleOrNull()
+                        val width = widthText.toDoubleOrNull()
+                        if (length == null || width == null || length !in 120.0..360.0 || width !in 45.0..160.0) {
+                            viewModel.reportInvalidGroundTruth()
+                            return@OutlinedButton
+                        }
+                        viewModel.setGroundTruth(length, width, notesText.ifBlank { null })
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Save GT")
+                }
+                OutlinedButton(
+                    onClick = {
+                        lengthText = ""
+                        widthText = ""
+                        notesText = ""
+                        viewModel.clearGroundTruth()
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Clear GT")
+                }
+            }
+            Text(
+                text = "Saved GT L=${prefs?.groundTruthLengthMm ?: "—"} W=${prefs?.groundTruthWidthMm ?: "—"} · records on device: $accuracyCount",
                 style = MaterialTheme.typography.bodySmall,
                 color = FitSenseColors.OnSurfaceMuted,
             )
             OutlinedButton(
-                onClick = {
-                    viewModel.setGroundTruth(
-                        lengthMm = prefs?.groundTruthLengthMm ?: 265.0,
-                        widthMm = prefs?.groundTruthWidthMm ?: 100.0,
-                        notes = prefs?.accuracyStudyNotes ?: "pilot",
-                    )
-                },
+                onClick = { viewModel.exportAccuracyDataset(context) },
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(
-                    text = "GT L=${prefs?.groundTruthLengthMm ?: "—"} W=${prefs?.groundTruthWidthMm ?: "—"} (tap to set defaults)",
-                )
+                Text("Export accuracy JSONL")
+            }
+            OutlinedButton(
+                onClick = { viewModel.clearAccuracyDataset() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Clear on-device accuracy dataset")
+            }
+            LaunchedEffect(shareUri) {
+                val uri = shareUri ?: return@LaunchedEffect
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/jsonl"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    putExtra(Intent.EXTRA_SUBJECT, "FitSense accuracy_dataset.jsonl")
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(intent, "Share accuracy dataset"))
+                viewModel.clearAccuracyShareUri()
             }
         }
 
@@ -204,7 +291,7 @@ fun SettingsScreen(
             Text(text = it, style = MaterialTheme.typography.bodySmall, color = FitSenseColors.Neon)
         }
 
-        androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(12.dp))
 
         OutlinedButton(
             onClick = { viewModel.signOut(onBack) },

@@ -23,6 +23,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val cloudSyncCoordinator: CloudSyncCoordinator,
+    private val accuracyDatasetStore: com.fitsense.ai.accuracy.AccuracyDatasetStore,
 ) : ViewModel() {
 
     val profile: StateFlow<UserProfile?> = userRepository.profile
@@ -42,10 +43,17 @@ class SettingsViewModel @Inject constructor(
     private val _exportPreview = MutableStateFlow<String?>(null)
     val exportPreview: StateFlow<String?> = _exportPreview.asStateFlow()
 
+    private val _accuracyRecordCount = MutableStateFlow(0)
+    val accuracyRecordCount: StateFlow<Int> = _accuracyRecordCount.asStateFlow()
+
+    private val _accuracyShareUri = MutableStateFlow<android.net.Uri?>(null)
+    val accuracyShareUri: StateFlow<android.net.Uri?> = _accuracyShareUri.asStateFlow()
+
     init {
         viewModelScope.launch {
             userRepository.ensureSignedIn()
             refreshSyncStatus()
+            refreshAccuracyCount()
             val enabled = profile.value?.preferences?.cloudSyncOptIn == true
             if (enabled) {
                 cloudSyncCoordinator.flushOutbox()
@@ -71,7 +79,7 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setGroundTruth(lengthMm: Double?, widthMm: Double?, notes: String?) =
+    fun setGroundTruth(lengthMm: Double?, widthMm: Double?, notes: String?) {
         mutatePrefs {
             it.copy(
                 groundTruthLengthMm = lengthMm,
@@ -79,6 +87,56 @@ class SettingsViewModel @Inject constructor(
                 accuracyStudyNotes = notes,
             )
         }
+        _statusMessage.value = if (lengthMm == null && widthMm == null) {
+            "Ground truth cleared."
+        } else {
+            "Ground truth saved: ${lengthMm}×${widthMm} mm."
+        }
+    }
+
+    fun clearGroundTruth() = setGroundTruth(null, null, null)
+
+    fun reportInvalidGroundTruth() {
+        _statusMessage.value =
+            "Enter plausible ground truth: length 120–360 mm, width 45–160 mm."
+    }
+
+    fun refreshAccuracyCount() {
+        viewModelScope.launch {
+            _accuracyRecordCount.value = accuracyDatasetStore.recordCount()
+        }
+    }
+
+    fun exportAccuracyDataset(context: android.content.Context) {
+        viewModelScope.launch {
+            val copy = accuracyDatasetStore.exportShareCopy()
+            if (copy == null) {
+                _statusMessage.value = "No accuracy records to export yet."
+                _accuracyShareUri.value = null
+                return@launch
+            }
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                copy,
+            )
+            _accuracyShareUri.value = uri
+            _statusMessage.value = "Accuracy dataset ready to share (${copy.length()} bytes)."
+            refreshAccuracyCount()
+        }
+    }
+
+    fun clearAccuracyShareUri() {
+        _accuracyShareUri.value = null
+    }
+
+    fun clearAccuracyDataset() {
+        viewModelScope.launch {
+            accuracyDatasetStore.clear()
+            _accuracyRecordCount.value = 0
+            _statusMessage.value = "Accuracy dataset cleared on device."
+        }
+    }
 
     fun refreshSyncStatus() {
         viewModelScope.launch {
