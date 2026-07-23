@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<full-backup-content>
-    <!-- Exclude tokens & cached scans from auto-backup; everything else syncs via Firebase. -->
-    <exclude domain="sharedpref" path="auth_tokens.xml" />
-    <exclude domain="file" path="scans/" />
-</full-backup-content>

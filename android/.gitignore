@@ -1,4 +1,4 @@
-*.iml
+﻿*.iml
 .gradle
 /local.properties
 /.idea
@@ -7,7 +7,6 @@
 /captures
 .externalNativeBuild
 .cxx
-local.properties
-
-# Firebase
+app/build/
+**/build/
 app/google-services.json
