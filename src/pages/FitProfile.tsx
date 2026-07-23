@@ -841,9 +841,13 @@ function PortableSection({
       setImportError("That doesn't look like a FitSense token.");
       return;
     }
+    if (imported.measurementProvenance === "unsigned_import") {
+      setImportError(
+        "Imported FSP1 preferences only — millimetres are unsigned and not trusted for sizing. Re-scan or use recovery.",
+      );
+    }
     const saved = saveFitProfile(imported);
     onImport(saved);
-    setImportError(null);
     setImportValue("");
   };
 

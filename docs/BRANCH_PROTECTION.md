@@ -1,25 +1,23 @@
 # Branch protection for `main`
 
-## Current operating policy (direct push)
+## Current operating policy (protected PRs)
 
-Production deploys stay **manual** (`autoDeployTrigger: off` in `render.yaml`)
-until release gates are green. Day-to-day engineering **pushes directly to
-`main`**; GitHub PR merge gates are **not** enforced.
-
-CI still runs on every push to `main`. Treat these four jobs as **release
-gates** before any production deploy:
+Engineering lands on `main` **only via pull requests**. Direct pushes and
+force-pushes to `main` are blocked. Required status checks must pass before
+merge:
 
 - `web-and-sdk`
 - `backend`
 - `render-api-build`
 - `android-build`
 
-Optional: `staging-smoke` when repo variable `STAGING_API_BASE_URL` is set.
-Artifacts: debug APK, Android unit-test reports, staging smoke JSON.
+Optional: `staging-smoke` when repo variable `STAGING_API_BASE_URL` is set
+(does not block merge unless added to the required contexts).
 
-## Optional PR protection (when the team wants reviews again)
+Production deploys stay **manual** (`autoDeployTrigger: off` in `render.yaml`)
+until those gates are green on the commit you intend to ship.
 
-Use Settings → Branches → `main`, or:
+## Enable / refresh protection
 
 ```bash
 gh api repos/technetechtt-dotcom/Fitsense-AI/branches/main/protection \
@@ -27,8 +25,12 @@ gh api repos/technetechtt-dotcom/Fitsense-AI/branches/main/protection \
   --input docs/branch-protection-payload.json
 ```
 
-Payload: [branch-protection-payload.json](./branch-protection-payload.json).
+Payload: [branch-protection-payload.json](./branch-protection-payload.json)
+(1 approving review, CODEOWNERS, conversation resolution, no force-push).
 
-Required checks must include the four jobs above. **Do not** set Render
-`autoDeployTrigger: commit` until those gates are green on the commit you
-intend to ship.
+## Release checklist before Render promote
+
+1. All four required CI jobs green on the merge commit.
+2. Staging smoke record attached when staging is available.
+3. No unsigned FSP1 millimetres treated as sizing truth.
+4. Accuracy / merchant metrics reviewed if the release touches measurement or pilot.

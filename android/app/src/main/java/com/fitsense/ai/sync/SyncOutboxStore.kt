@@ -2,6 +2,8 @@ package com.fitsense.ai.sync
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -10,15 +12,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Durable offline outbox for cloud sync ops. Prevents silent data loss when
- * push fails or the device is offline; flushed with exponential backoff.
+ * Durable offline outbox for cloud sync ops. Payloads (scan/profile mm JSON)
+ * are stored in EncryptedSharedPreferences — never plaintext at rest.
  */
 @Singleton
 class SyncOutboxStore @Inject constructor(
     @ApplicationContext context: Context,
 ) {
-    private val prefs: SharedPreferences =
-        context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = createEncryptedPrefs(context)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     enum class OpKind { UPSERT_SCAN, DELETE_SCAN, UPSERT_PROFILE }
@@ -37,6 +38,10 @@ class SyncOutboxStore @Inject constructor(
         val lastError: String? = null,
         val status: String = OpStatus.PENDING.name,
     )
+
+    init {
+        migratePlaintextIfNeeded(context)
+    }
 
     fun snapshot(): List<OutboxItem> = readAll()
 
@@ -125,8 +130,31 @@ class SyncOutboxStore @Inject constructor(
         prefs.edit().putString(KEY_ITEMS, json.encodeToString(items)).apply()
     }
 
+    private fun migratePlaintextIfNeeded(context: Context) {
+        val legacy = context.getSharedPreferences(LEGACY_FILE_NAME, Context.MODE_PRIVATE)
+        val raw = legacy.getString(KEY_ITEMS, null) ?: return
+        if (prefs.getString(KEY_ITEMS, null) == null) {
+            prefs.edit().putString(KEY_ITEMS, raw).apply()
+        }
+        legacy.edit().clear().apply()
+    }
+
     companion object {
-        private const val FILE_NAME = "fitsense_sync_outbox"
+        private const val LEGACY_FILE_NAME = "fitsense_sync_outbox"
+        private const val FILE_NAME = "fitsense_sync_outbox_enc"
         private const val KEY_ITEMS = "items"
+
+        private fun createEncryptedPrefs(context: Context): SharedPreferences {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+            return EncryptedSharedPreferences.create(
+                context,
+                FILE_NAME,
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
+            )
+        }
     }
 }

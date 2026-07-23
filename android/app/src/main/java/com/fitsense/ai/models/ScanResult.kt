@@ -13,6 +13,10 @@ data class ScanResult(
     val scanId: String,
     val userId: String,
     val createdAtEpochMs: Long = System.currentTimeMillis(),
+    /** Monotonic client revision for conflict resolution (bumped on each local edit). */
+    val revision: Long = 1L,
+    /** Last local/cloud update time; used with [revision] for merge. */
+    val updatedAtEpochMs: Long = createdAtEpochMs,
     val leftFoot: FootMeasurement? = null,
     val rightFoot: FootMeasurement? = null,
     val recommendation: SizeRecommendation? = null,

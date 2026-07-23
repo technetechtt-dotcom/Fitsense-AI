@@ -2,7 +2,6 @@ package com.fitsense.ai.sync
 
 import com.fitsense.ai.api.ApiConfig
 import com.fitsense.ai.auth.DeviceAuthClient
-import com.fitsense.ai.models.CalibrationReference
 import com.fitsense.ai.models.ScanResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -169,47 +168,7 @@ class SyncClient @Inject constructor(
     }
 
     private fun scanToJson(scan: ScanResult): String {
-        val payload = buildJsonObject {
-            put("scanId", scan.scanId)
-            put("userId", scan.userId)
-            put("createdAtEpochMs", scan.createdAtEpochMs)
-            put("arcoreUsed", scan.arcoreUsed)
-            scan.leftFoot?.let { foot ->
-                put(
-                    "leftFoot",
-                    buildJsonObject {
-                        put("lengthMm", foot.lengthMm)
-                        put("widthMm", foot.widthMm)
-                        put("confidence", foot.confidence.toDouble())
-                        put("foot", "left")
-                        put("calibration", when (foot.calibration) {
-                            CalibrationReference.A4_PAPER -> "a4_paper"
-                            CalibrationReference.CREDIT_CARD -> "credit_card"
-                            CalibrationReference.ARCORE_PLANE -> "arcore_plane"
-                        })
-                        put("pixelsPerMm", foot.pixelsPerMm)
-                    },
-                )
-            }
-            scan.rightFoot?.let { foot ->
-                put(
-                    "rightFoot",
-                    buildJsonObject {
-                        put("lengthMm", foot.lengthMm)
-                        put("widthMm", foot.widthMm)
-                        put("confidence", foot.confidence.toDouble())
-                        put("foot", "right")
-                        put("calibration", when (foot.calibration) {
-                            CalibrationReference.A4_PAPER -> "a4_paper"
-                            CalibrationReference.CREDIT_CARD -> "credit_card"
-                            CalibrationReference.ARCORE_PLANE -> "arcore_plane"
-                        })
-                        put("pixelsPerMm", foot.pixelsPerMm)
-                    },
-                )
-            }
-        }
-        return json.encodeToString(JsonObject.serializer(), payload)
+        return json.encodeToString(JsonObject.serializer(), ScanSyncCodec.encodeScan(scan))
     }
 
     private fun open(url: String, method: String, bearer: String): HttpURLConnection =

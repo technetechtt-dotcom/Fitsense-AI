@@ -119,6 +119,19 @@ export function recommend(
         "Measurement confidence is too low to publish a retail size. Retake with sharper lighting and clearer landmarks.",
     };
   }
+  if (profile?.measurementProvenance === "unsigned_import") {
+    return {
+      uk: "",
+      us: "",
+      eu: "",
+      mondopointMm: 0,
+      recommendationConfidence: 0,
+      matches: [],
+      sizeWithheld: true,
+      withholdReason:
+        "This Fit Profile came from an unsigned FSP1 token. Re-scan or recover with a server code before sizing.",
+    };
+  }
 
   const insights = profile?.insights;
 

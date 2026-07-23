@@ -8,8 +8,10 @@ import java.nio.charset.StandardCharsets
 
 /**
  * Portable Fit Identity token (FSP1) — shareable between devices.
- * Server recovery codes (see FitIdentityClient) are the recoverable path
- * after device loss.
+ *
+ * **Unsigned.** Imported millimetres must never be treated as measured sizing
+ * truth. Prefer [FitIdentityClient] recovery (`FSIR1.`) or merchant share
+ * (`FSMS1.`) for trusted restore.
  */
 object PortableFitIdentity {
     private const val SENTINEL = "FSP1."

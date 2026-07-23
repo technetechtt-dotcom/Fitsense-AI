@@ -179,11 +179,11 @@ class SettingsViewModel @Inject constructor(
                 _statusMessage.value = "Invalid FSP1 token."
                 return@launch
             }
-            if (payload.l != null && payload.w != null) {
-                userRepository.cacheLatestFootMetrics(payload.l, payload.w)
-            }
+            // FSP1 is unsigned — never treat forged millimetres as measured truth.
             _statusMessage.value =
-                "Imported Fit ID ${payload.fitId}. Length=${payload.l ?: "—"} Width=${payload.w ?: "—"}"
+                "FSP1 is unsigned and NOT trusted for sizing (preview only). " +
+                    "Use a recovery/share code or re-scan. FitId=${payload.fitId} " +
+                    "L=${payload.l ?: "—"} W=${payload.w ?: "—"}"
         }
     }
 

@@ -126,6 +126,75 @@ async function main() {
     }
     console.log("sync ok");
 
+    // Full round-trip: PUT scan with both feet → GET pull preserves millimetres.
+    const scanId = `smoke-scan-${randomBytes(4).toString("hex")}`;
+    const now = Date.now();
+    const scanPayload = {
+      scanId,
+      userId: device.deviceId,
+      createdAtEpochMs: now,
+      updatedAtEpochMs: now,
+      revision: 1,
+      arcoreUsed: false,
+      leftFoot: {
+        lengthMm: 255.5,
+        widthMm: 96.2,
+        confidence: 0.88,
+        foot: "left",
+        calibration: "a4_paper",
+        pixelsPerMm: 3.1,
+      },
+      rightFoot: {
+        lengthMm: 257.0,
+        widthMm: 97.0,
+        confidence: 0.9,
+        foot: "right",
+        calibration: "a4_paper",
+        pixelsPerMm: 3.1,
+      },
+    };
+    const putScan = await fetch(`${base}/v1/sync/scans/${scanId}`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bearer ${tokens.accessToken}`,
+        "content-type": "application/json",
+        "idempotency-key": `smoke-${scanId}`,
+      },
+      body: JSON.stringify(scanPayload),
+    });
+    steps.push({
+      name: "sync_put_scan",
+      ok: putScan.status === 200 || putScan.status === 201 || putScan.status === 204,
+      status: putScan.status,
+    });
+    if (!(putScan.status === 200 || putScan.status === 201 || putScan.status === 204)) {
+      const putBody = await json(putScan);
+      throw new Error(`sync put scan failed: ${putScan.status} ${JSON.stringify(putBody)}`);
+    }
+
+    const pull = await fetch(`${base}/v1/sync`, {
+      headers: { authorization: `Bearer ${tokens.accessToken}` },
+    });
+    const pullBody = await json(pull);
+    steps.push({ name: "sync_pull_roundtrip", ok: pull.ok, status: pull.status });
+    if (!pull.ok) {
+      throw new Error(`sync pull failed: ${pull.status} ${JSON.stringify(pullBody)}`);
+    }
+    const pulledScans = Array.isArray(pullBody?.scans) ? pullBody.scans : [];
+    const found = pulledScans.find((s) => s && s.scanId === scanId);
+    if (!found?.leftFoot || !found?.rightFoot) {
+      throw new Error(
+        `round-trip missing feet: ${JSON.stringify(found ?? pulledScans.slice(0, 1))}`,
+      );
+    }
+    if (Math.abs(found.leftFoot.lengthMm - 255.5) > 0.01) {
+      throw new Error(`left length mismatch: ${found.leftFoot.lengthMm}`);
+    }
+    if (Math.abs(found.rightFoot.lengthMm - 257.0) > 0.01) {
+      throw new Error(`right length mismatch: ${found.rightFoot.lengthMm}`);
+    }
+    console.log("sync round-trip ok", scanId);
+
     const sessionRes = await fetch(`${base}/v1/handoff/sessions`, {
       method: "POST",
       headers: { "content-type": "application/json" },

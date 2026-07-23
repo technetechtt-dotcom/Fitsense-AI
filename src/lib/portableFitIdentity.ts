@@ -64,6 +64,10 @@ export function exportFitToken(profile: FitProfile): string {
  * token is malformed; callers should preserve the existing profile in
  * that case.
  *
+ * FSP1 is **unsigned**. Imported millimetres are marked
+ * `measurementProvenance: "unsigned_import"` and must not drive retail
+ * sizing until a measured scan or server recovery/share replaces them.
+ *
  * The `userId` field is left to the caller — typically you'd splice in
  * the local user's id so the imported profile attaches to *this* device.
  */
@@ -112,6 +116,7 @@ export function importFitToken(token: string, userId: string): FitProfile | null
         typeof data.by === "number" && data.by > 1900 && data.by < 2100
           ? data.by
           : undefined,
+      measurementProvenance: "unsigned_import",
       createdAtEpochMs: now,
       updatedAtEpochMs: now,
     };

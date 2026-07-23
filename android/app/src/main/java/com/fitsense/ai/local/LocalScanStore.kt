@@ -34,6 +34,13 @@ class LocalScanStore @Inject constructor(
                 .take(50)
         }
 
+    suspend fun getScan(userId: String, scanId: String): ScanResult? {
+        val key = scansKey(userId)
+        val current = dataStore.data.first()[key] ?: return null
+        return json.decodeFromString(ListSerializer(ScanResult.serializer()), current)
+            .firstOrNull { it.scanId == scanId }
+    }
+
     suspend fun saveScan(scan: ScanResult): DataResult<Unit> = safeCall(
         errorFactory = { AppError.Storage(it.message ?: "Could not save scan", it) },
     ) {

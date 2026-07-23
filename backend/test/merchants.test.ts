@@ -90,8 +90,9 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
     body: JSON.stringify({ label: "pos" }),
   });
   assert.equal(keyRes.status, 201);
-  const keyBody = (await keyRes.json()) as { apiKey: string };
+  const keyBody = (await keyRes.json()) as { apiKey: string; keyId: string };
   assert.ok(keyBody.apiKey.startsWith("fs_live_"));
+  assert.ok(typeof keyBody.keyId === "string" && keyBody.keyId.startsWith("key_"));
 
   const ingest = await fetch(
     `${baseUrl}/v1/merchants/orgs/${org.orgId}/catalogue/ingest`,
@@ -192,5 +193,30 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
   assert.equal(body.purchases, 2);
   assert.equal(body.returns, 1);
   assert.equal(body.exchanges, 1);
-  assert.ok(body.returnRate !== null && body.returnRate > 0);
+  assert.equal(body.returnRate, 0.5);
+  assert.equal(body.exchangeRate, 0.5);
+  assert.equal(body.sizeRelatedRate, 1.0);
+
+  const listKeys = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/api-keys`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  assert.equal(listKeys.status, 200);
+  const keysBody = (await listKeys.json()) as {
+    keys: Array<{ keyId: string; revoked: boolean }>;
+  };
+  assert.ok(keysBody.keys.some((k) => k.keyId === keyBody.keyId));
+
+  const revoke = await fetch(
+    `${baseUrl}/v1/merchants/orgs/${org.orgId}/api-keys/${keyBody.keyId}/revoke`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  assert.equal(revoke.status, 204);
+
+  const afterRevoke = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/catalogue`, {
+    headers: { "X-Api-Key": keyBody.apiKey },
+  });
+  assert.equal(afterRevoke.status, 401);
 });

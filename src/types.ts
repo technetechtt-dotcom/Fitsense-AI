@@ -258,6 +258,12 @@ export interface FitProfile {
   /** Year of birth — only stored if user opts in. Used to project growth in kids. */
   birthYear?: number;
 
+  /**
+   * How length/width entered the profile. Unsigned FSP1 imports must not
+   * drive retail sizing until replaced by a measured scan or recovery/share.
+   */
+  measurementProvenance?: "measured" | "unsigned_import" | "recovered" | "unknown";
+
   /** Latest learned insight snapshot — derived from the event log. */
   insights?: FitInsights;
 }
@@ -477,4 +483,5 @@ export const FIT_PROFILE_DEFAULT: Omit<
   comfortFit: "standard",
   preferredMidsoleFeel: "unknown",
   favouriteBrands: [],
+  measurementProvenance: "unknown",
 };

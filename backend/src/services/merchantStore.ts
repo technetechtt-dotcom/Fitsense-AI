@@ -159,17 +159,68 @@ export async function listMembers(
 export async function createApiKey(input: {
   orgId: string;
   label: string;
-}): Promise<{ apiKey: string; label: string }> {
+}): Promise<{ keyId: string; apiKey: string; label: string }> {
   await ensureMerchantSchema();
+  const keyId = `key_${randomBytes(12).toString("hex")}`;
   const apiKey = `fs_live_${randomBytes(24).toString("base64url")}`;
   await getPostgresPool().query(
     `
-      INSERT INTO merchant_api_keys (key_hash, org_id, label)
-      VALUES ($1, $2, $3)
+      INSERT INTO merchant_api_keys (key_hash, org_id, label, key_id)
+      VALUES ($1, $2, $3, $4)
     `,
-    [sha256Hex(apiKey), input.orgId, input.label],
+    [sha256Hex(apiKey), input.orgId, input.label, keyId],
   );
-  return { apiKey, label: input.label };
+  return { keyId, apiKey, label: input.label };
+}
+
+export async function listApiKeys(orgId: string): Promise<
+  Array<{
+    keyId: string;
+    label: string;
+    createdAtEpochMs: number;
+    revoked: boolean;
+  }>
+> {
+  await ensureMerchantSchema();
+  const result = await getPostgresPool().query<{
+    key_id: string;
+    label: string;
+    created_at: Date;
+    revoked_at: Date | null;
+  }>(
+    `
+      SELECT key_id, label, created_at, revoked_at
+      FROM merchant_api_keys
+      WHERE org_id = $1
+      ORDER BY created_at DESC
+    `,
+    [orgId],
+  );
+  return result.rows.map((r) => ({
+    keyId: r.key_id,
+    label: r.label,
+    createdAtEpochMs: r.created_at.getTime(),
+    revoked: r.revoked_at != null,
+  }));
+}
+
+export async function revokeApiKey(input: {
+  orgId: string;
+  keyId: string;
+}): Promise<boolean> {
+  await ensureMerchantSchema();
+  const result = await getPostgresPool().query(
+    `
+      UPDATE merchant_api_keys
+      SET revoked_at = now()
+      WHERE org_id = $1
+        AND key_id = $2
+        AND revoked_at IS NULL
+      RETURNING key_id
+    `,
+    [input.orgId, input.keyId],
+  );
+  return Boolean(result.rows[0]);
 }
 
 export async function resolveApiKey(apiKey: string): Promise<{ orgId: string } | null> {
@@ -363,11 +414,14 @@ export async function pilotMetrics(
   exchanges: number;
   returnRate: number | null;
   exchangeRate: number | null;
+  sizeRelatedRate: number | null;
 }> {
   await ensureMerchantSchema();
-  const since = sinceEpochMs
-    ? new Date(sinceEpochMs)
-    : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  // Explicit 0 means "all time"; undefined/null defaults to last 90 days.
+  const since =
+    sinceEpochMs === undefined || sinceEpochMs === null
+      ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      : new Date(sinceEpochMs);
   const result = await getPostgresPool().query<{ kind: string; n: string }>(
     `
       SELECT kind, COUNT(*)::text AS n
@@ -384,12 +438,13 @@ export async function pilotMetrics(
   const purchases = counts.purchase ?? 0;
   const returns = counts.return ?? 0;
   const exchanges = counts.exchange ?? 0;
-  const denom = purchases + returns + exchanges;
+  // Retail rates are outcomes ÷ purchases (not diluted by mixing kinds).
   return {
     purchases,
     returns,
     exchanges,
-    returnRate: denom > 0 ? returns / denom : null,
-    exchangeRate: denom > 0 ? exchanges / denom : null,
+    returnRate: purchases > 0 ? returns / purchases : null,
+    exchangeRate: purchases > 0 ? exchanges / purchases : null,
+    sizeRelatedRate: purchases > 0 ? (returns + exchanges) / purchases : null,
   };
 }

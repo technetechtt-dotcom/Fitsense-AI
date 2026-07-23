@@ -7,12 +7,7 @@ import com.fitsense.ai.models.ScanResult
 import com.fitsense.ai.models.UserProfile
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -63,9 +58,13 @@ class CloudSyncCoordinator @Inject constructor(
     /** Enqueue scan for sync; attempt immediate flush. Never drops the op on failure. */
     suspend fun enqueueScan(scan: ScanResult, cloudSyncEnabled: Boolean): Boolean {
         if (!cloudSyncEnabled || !ApiConfig.isConfigured) return false
-        outbox.enqueueUpsertScan(scan.scanId, syncClient.encodeScan(scan))
+        val bumped = scan.copy(
+            revision = scan.revision + 1,
+            updatedAtEpochMs = System.currentTimeMillis(),
+        )
+        outbox.enqueueUpsertScan(bumped.scanId, syncClient.encodeScan(bumped))
         flushOutbox()
-        return outbox.snapshot().none { it.id == "scan:${scan.scanId}" }
+        return outbox.snapshot().none { it.id == "scan:${bumped.scanId}" }
     }
 
     suspend fun enqueueDeleteScan(scanId: String, cloudSyncEnabled: Boolean) {
@@ -132,34 +131,23 @@ class CloudSyncCoordinator @Inject constructor(
         )
     }
 
-    /** Pull cloud scans and merge into local store (upsert by scanId). */
+    /**
+     * Pull cloud scans and merge into local store.
+     * Never overwrites a measured local scan with a footless remote stub.
+     */
     suspend fun pullAndMerge(cloudSyncEnabled: Boolean): Int {
         if (!cloudSyncEnabled || !ApiConfig.isConfigured) return 0
         if (authClient.ensureAccessToken() == null) return 0
         val pull = syncClient.pull() ?: return 0
         var imported = 0
         for (element in pull.scans) {
-            val remote = scanFromJson(element.jsonObject) ?: continue
-            scanStore.saveScan(remote)
+            val remote = ScanSyncCodec.decodeScan(element.jsonObject) ?: continue
+            val local = scanStore.getScan(remote.userId, remote.scanId)
+            val merged = ScanSyncCodec.mergeScans(local, remote)
+            scanStore.saveScan(merged)
             imported++
         }
         return imported
-    }
-
-    private fun scanFromJson(obj: JsonObject): ScanResult? {
-        val scanId = obj["scanId"]?.jsonPrimitive?.contentOrNull ?: return null
-        val userId = obj["userId"]?.jsonPrimitive?.contentOrNull ?: return null
-        val created = obj["createdAtEpochMs"]?.jsonPrimitive?.longOrNull
-            ?: System.currentTimeMillis()
-        return ScanResult(
-            scanId = scanId,
-            userId = userId,
-            createdAtEpochMs = created,
-            arcoreUsed = obj["arcoreUsed"]?.jsonPrimitive?.booleanOrNull ?: false,
-            deviceModel = obj["deviceModel"]?.jsonPrimitive?.contentOrNull,
-            leftFoot = null,
-            rightFoot = null,
-        )
     }
 
     suspend fun eraseCloudIfEnabled(cloudSyncEnabled: Boolean): Boolean {

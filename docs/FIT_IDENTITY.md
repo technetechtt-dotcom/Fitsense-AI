@@ -34,3 +34,9 @@ WebAuthn / passkeys are **not implemented yet**. Do not invent client-side stub 
 - Android: Settings → Portable Fit Identity
 - API: `/v1/fit-identity/*`
 - Migration: `002_fit_share_grants.sql`
+
+## FSP1 trust rule
+
+`FSP1.` tokens are **unsigned**. Clients must not write imported millimetres
+into measured foot caches or publish retail sizes from them. Use recovery or
+merchant share tokens for trusted restore, or re-scan.

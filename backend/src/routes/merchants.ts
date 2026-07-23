@@ -9,12 +9,14 @@ import {
   createApiKey,
   createOrg,
   ingestProducts,
+  listApiKeys,
   listBrandFitProfiles,
   listMembers,
   listOrgsForDevice,
   listProducts,
   pilotMetrics,
   recordOutcome,
+  revokeApiKey,
   upsertBrandFitProfile,
   upsertInventory,
   upsertMember,
@@ -185,6 +187,38 @@ merchantRouter.post(
         .parse(req.body ?? {}).label;
       const issued = await createApiKey({ orgId: req.orgId!, label });
       res.status(201).json(issued);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.get(
+  "/merchants/orgs/:orgId/api-keys",
+  requireAuth,
+  requireOrgRole("admin"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      res.json({ keys: await listApiKeys(req.orgId!) });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.post(
+  "/merchants/orgs/:orgId/api-keys/:keyId/revoke",
+  requireAuth,
+  requireOrgRole("admin"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      const keyId = String(req.params.keyId ?? "").trim();
+      const ok = await revokeApiKey({ orgId: req.orgId!, keyId });
+      if (!ok) {
+        res.status(404).json({ error: "api_key_not_found" });
+        return;
+      }
+      res.status(204).end();
     } catch (err) {
       next(err);
     }

@@ -60,6 +60,9 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 
 **P7 still open:** WebAuthn passkeys / durable account linking (no stubs).
 
+Physical + commercial ops: [VALIDATION_COMMERCIAL_CHECKLIST.md](./VALIDATION_COMMERCIAL_CHECKLIST.md).
+Branch policy: [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) (PR-required).
+
 ---
 
 ## Phases 2–12 (detail)
