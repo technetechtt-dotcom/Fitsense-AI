@@ -123,14 +123,24 @@ fun SettingsScreen(
         SettingsSection(label = "Cloud sync") {
             Text(
                 text = if (sync.apiConfigured) {
-                    if (sync.authenticated) "API connected"
-                    else "API configured — tap to authenticate"
+                    if (sync.authenticated) {
+                        "API connected · pending ${sync.pendingOps} · failed ${sync.failedOps}"
+                    } else {
+                        "API configured — tap to authenticate"
+                    }
                 } else {
                     "Set fitsense.api.baseUrl in local.properties"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = FitSenseColors.OnSurfaceMuted,
             )
+            sync.lastError?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = "Sync scans to FitSense cloud",
@@ -140,17 +150,31 @@ fun SettingsScreen(
                 )
                 Switch(
                     checked = prefs?.cloudSyncOptIn == true,
-                    onCheckedChange = {
-                        viewModel.setCloudSyncOptIn(it)
-                        if (it) viewModel.refreshSyncStatus()
-                    },
+                    onCheckedChange = { viewModel.setCloudSyncOptIn(it) },
                 )
             }
             OutlinedButton(onClick = { viewModel.refreshSyncStatus() }) {
                 Text("Refresh auth status")
             }
+            OutlinedButton(onClick = { viewModel.retryPendingSync() }) {
+                Text("Retry pending sync")
+            }
+            OutlinedButton(onClick = { viewModel.pullFromCloud() }) {
+                Text("Pull & merge from cloud")
+            }
+            OutlinedButton(onClick = { viewModel.exportCloudData() }) {
+                Text("Export cloud data")
+            }
             OutlinedButton(onClick = { viewModel.eraseCloudData() }) {
                 Text("Erase cloud data")
+            }
+            val export by viewModel.exportPreview.collectAsState()
+            export?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FitSenseColors.OnSurfaceMuted,
+                )
             }
         }
 

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer scan ring -->
+    <path
+        android:strokeColor="#00E5C7"
+        android:strokeWidth="2.5"
+        android:strokeAlpha="0.85"
+        android:fillColor="#00000000"
+        android:pathData="M54,22m-26,0a26,26 0 1,0 52,0a26,26 0 1,0 -52,0" />
+
+    <!-- Inner scan ring -->
+    <path
+        android:strokeColor="#B8FF5C"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.55"
+        android:fillColor="#00000000"
+        android:pathData="M54,22m-18,0a18,18 0 1,0 36,0a18,18 0 1,0 -36,0" />
+
+    <!-- Foot silhouette - stylised -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30
+                          C 48,30 44,32 42,37
+                          C 40,42 41,48 42,52
+                          C 43,56 43,60 41,64
+                          C 39,68 38,72 41,76
+                          C 44,80 50,80 54,80
+                          C 58,80 64,80 67,76
+                          C 70,72 69,68 67,64
+                          C 65,60 65,56 66,52
+                          C 67,48 68,42 66,37
+                          C 64,32 60,30 54,30 Z" />
+
+    <!-- Toe accents -->
+    <path
+        android:fillColor="#00E5C7"
+        android:pathData="M48,34 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0" />
+    <path
+        android:fillColor="#00E5C7"
+        android:pathData="M54,33 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0" />
+    <path
+        android:fillColor="#00E5C7"
+        android:pathData="M60,34 m-1.5,0 a1.5,1.5 0 1,0 3,0 a1.5,1.5 0 1,0 -3,0" />
+</vector>

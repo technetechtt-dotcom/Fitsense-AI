@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.fitsense.ai.models.ScanResult
 import com.fitsense.ai.repository.ScanRepository
 import com.fitsense.ai.repository.UserRepository
+import com.fitsense.ai.sync.CloudSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,6 +20,7 @@ import javax.inject.Inject
 class MeasurementsViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val scanRepository: ScanRepository,
+    private val cloudSyncCoordinator: CloudSyncCoordinator,
 ) : ViewModel() {
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -30,6 +32,10 @@ class MeasurementsViewModel @Inject constructor(
         viewModelScope.launch {
             val user = userRepository.profile.firstOrNull() ?: return@launch
             scanRepository.deleteScan(user.userId, scanId)
+            cloudSyncCoordinator.enqueueDeleteScan(
+                scanId,
+                user.preferences.cloudSyncOptIn,
+            )
         }
     }
 }

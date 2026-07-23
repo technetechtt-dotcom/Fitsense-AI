@@ -31,6 +31,7 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 ### Landed in code (partial — continue hardening)
 
 - Android `DeviceAuthClient` + `SyncClient` + Settings cloud sync / erase
+- Android durable sync outbox with exponential backoff, pull/merge, export, server logout
 - Recoverable Fit Identity via `/v1/fit-identity/recovery-codes` (one-time codes)
 - Explicit fallback landmark confirmation (web + Android)
 - Reference aspect scoring + photographic fixture metadata

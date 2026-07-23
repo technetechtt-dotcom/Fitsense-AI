@@ -12,7 +12,7 @@ import javax.inject.Inject
  */
 interface ScanRepository {
     fun observeScans(userId: String?): Flow<List<ScanResult>>
-    suspend fun saveScan(scan: ScanResult, thumbnailJpegBytes: ByteArray? = null): DataResult<ScanResult>
+    suspend fun saveScan(scan: ScanResult): DataResult<ScanResult>
     suspend fun deleteScan(userId: String, scanId: String): DataResult<Unit>
 }
 
@@ -23,10 +23,7 @@ class ScanRepositoryImpl @Inject constructor(
     override fun observeScans(userId: String?): Flow<List<ScanResult>> =
         if (userId == null) flowOf(emptyList()) else scanStore.observeScans(userId)
 
-    override suspend fun saveScan(
-        scan: ScanResult,
-        thumbnailJpegBytes: ByteArray?,
-    ): DataResult<ScanResult> {
+    override suspend fun saveScan(scan: ScanResult): DataResult<ScanResult> {
         return when (val save = scanStore.saveScan(scan)) {
             is DataResult.Success -> DataResult.Success(scan)
             is DataResult.Failure -> DataResult.Failure(save.error)

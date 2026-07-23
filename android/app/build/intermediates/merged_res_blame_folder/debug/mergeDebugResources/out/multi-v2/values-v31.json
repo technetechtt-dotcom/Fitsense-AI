@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.fitsense.ai.app-mergeDebugResources-72:/values-v31/values-v31.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\ivanj\\.gradle\\caches\\transforms-4\\b5c4e5b31e5d466d9ebf584f3d10365f\\transformed\\core-splashscreen-1.0.1\\res\\values-v31\\values-v31.xml",
+                    "from": {
+                        "startLines": "2,9",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,473",
+                        "endLines": "8,13",
+                        "endColumns": "12,12",
+                        "endOffsets": "468,697"
+                    }
+                }
+            ]
+        }
+    ]
+}

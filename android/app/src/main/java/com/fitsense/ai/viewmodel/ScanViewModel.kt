@@ -369,13 +369,12 @@ class ScanViewModel @Inject constructor(
                         deviceModel = Build.MODEL,
                         arcoreUsed = false,
                     )
-                    val thumb = capturedBitmap?.let { thumbnailBytes(it) }
-                    when (val saved = scanRepository.saveScan(scan, thumb)) {
+                    when (val saved = scanRepository.saveScan(scan)) {
                         is DataResult.Failure -> {
                             _uiState.update { it.copy(errorMessage = saved.error.message) }
                         }
                         is DataResult.Success -> {
-                            val cloudOk = cloudSyncCoordinator.pushScanIfEnabled(
+                            val cloudOk = cloudSyncCoordinator.enqueueScan(
                                 scan,
                                 user.value.preferences.cloudSyncOptIn,
                             )
@@ -385,7 +384,7 @@ class ScanViewModel @Inject constructor(
                                     statusMessage = if (cloudOk) {
                                         "Scan saved and synced."
                                     } else if (user.value.preferences.cloudSyncOptIn) {
-                                        "Scan saved locally; cloud sync pending or failed."
+                                        "Scan saved locally; queued for cloud sync."
                                     } else {
                                         "Scan saved on device."
                                     },
@@ -423,13 +422,5 @@ class ScanViewModel @Inject constructor(
         capturedBitmap?.recycle()
         cameraController.shutdown()
         super.onCleared()
-    }
-
-    private fun thumbnailBytes(bitmap: Bitmap): ByteArray {
-        val scaled = Bitmap.createScaledBitmap(bitmap, 320, (bitmap.height * 320f / bitmap.width).toInt(), true)
-        val stream = java.io.ByteArrayOutputStream()
-        scaled.compress(Bitmap.CompressFormat.JPEG, 75, stream)
-        if (scaled !== bitmap) scaled.recycle()
-        return stream.toByteArray()
     }
 }

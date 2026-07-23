@@ -53,11 +53,60 @@ class DeviceAuthClient @Inject constructor(
         }
     }
 
+    /** Snapshot of in-memory access + stored refresh for server logout. */
+    suspend fun currentTokens(): Pair<String?, String?> = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            accessToken to credentialStore.readRefreshToken()
+        }
+    }
+
+    /**
+     * Revoke refresh/access on the server, then clear local credentials.
+     * Always clears local session even if the network call fails.
+     */
+    suspend fun logoutRemote(): Boolean = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            val base = ApiConfig.baseUrl
+            val access = accessToken
+            val refresh = credentialStore.readRefreshToken()
+            var ok = false
+            if (base != null && (access != null || refresh != null)) {
+                ok = runCatching {
+                    val conn = open("$base/v1/auth/logout", "POST")
+                    conn.doOutput = true
+                    val body = buildString {
+                        append("{")
+                        if (refresh != null) {
+                            append("\"refreshToken\":")
+                            append(json.encodeToString(refresh))
+                        }
+                        if (access != null) {
+                            if (refresh != null) append(",")
+                            append("\"accessToken\":")
+                            append(json.encodeToString(access))
+                        }
+                        append("}")
+                    }
+                    conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+                    conn.responseCode in 200..299 || conn.responseCode == 204
+                }.getOrDefault(false)
+            }
+            accessToken = null
+            credentialStore.clear()
+            ok
+        }
+    }
+
     suspend fun clearSession() = withContext(Dispatchers.IO) {
         mutex.withLock {
             accessToken = null
             credentialStore.clear()
         }
+    }
+
+    /** Force drop in-memory access so the next call re-mints/refreshes. */
+    suspend fun invalidateAccessToken() = withContext(Dispatchers.IO) {
+        mutex.withLock { accessToken = null }
     }
 
     private fun register(base: String): SecureDeviceCredentialStore.DeviceCredentials? {

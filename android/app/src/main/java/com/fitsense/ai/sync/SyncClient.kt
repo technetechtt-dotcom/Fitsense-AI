@@ -49,15 +49,108 @@ class SyncClient @Inject constructor(
         val body = scanToJson(scan)
         val conn = open("$base/v1/sync/scans/${scan.scanId}", "PUT", token)
         conn.doOutput = true
+        conn.setRequestProperty("Idempotency-Key", "scan:${scan.scanId}")
         conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-        conn.responseCode == HttpURLConnection.HTTP_NO_CONTENT
+        when (conn.responseCode) {
+            HttpURLConnection.HTTP_NO_CONTENT, HttpURLConnection.HTTP_OK -> true
+            401 -> {
+                authClient.invalidateAccessToken()
+                false
+            }
+            else -> false
+        }
+    }
+
+    suspend fun pushScanJson(scanId: String, payloadJson: String): Boolean = withContext(Dispatchers.IO) {
+        val base = ApiConfig.baseUrl ?: return@withContext false
+        val token = authClient.ensureAccessToken() ?: return@withContext false
+        val conn = open("$base/v1/sync/scans/$scanId", "PUT", token)
+        conn.doOutput = true
+        conn.setRequestProperty("Idempotency-Key", "scan:$scanId")
+        conn.outputStream.use { it.write(payloadJson.toByteArray(Charsets.UTF_8)) }
+        when (conn.responseCode) {
+            HttpURLConnection.HTTP_NO_CONTENT, HttpURLConnection.HTTP_OK -> true
+            401 -> {
+                authClient.invalidateAccessToken()
+                false
+            }
+            else -> false
+        }
+    }
+
+    suspend fun pushFitProfileJson(payloadJson: String): Boolean = withContext(Dispatchers.IO) {
+        val base = ApiConfig.baseUrl ?: return@withContext false
+        val token = authClient.ensureAccessToken() ?: return@withContext false
+        val conn = open("$base/v1/sync/fit-profile", "PUT", token)
+        conn.doOutput = true
+        conn.setRequestProperty("Idempotency-Key", "fit-profile")
+        conn.outputStream.use { it.write(payloadJson.toByteArray(Charsets.UTF_8)) }
+        when (conn.responseCode) {
+            HttpURLConnection.HTTP_NO_CONTENT, HttpURLConnection.HTTP_OK -> true
+            401 -> {
+                authClient.invalidateAccessToken()
+                false
+            }
+            else -> false
+        }
+    }
+
+    fun encodeScan(scan: ScanResult): String = scanToJson(scan)
+
+    fun encodeFitProfile(
+        userId: String,
+        cachedLengthMm: Double?,
+        cachedWidthMm: Double?,
+        favouriteBrands: List<String>,
+    ): String {
+        val now = System.currentTimeMillis()
+        return json.encodeToString(
+            JsonObject.serializer(),
+            buildJsonObject {
+                put("fitId", userId)
+                put("userId", userId)
+                put("version", 1)
+                put("createdAtEpochMs", now)
+                put("updatedAtEpochMs", now)
+                put("widthClass", widthClassFor(cachedLengthMm, cachedWidthMm))
+                put("archHeight", "unknown")
+                put("toeShape", "unknown")
+                put("comfortFit", "standard")
+                put("preferredMidsoleFeel", "unknown")
+                put(
+                    "favouriteBrands",
+                    kotlinx.serialization.json.JsonArray(
+                        favouriteBrands.take(100).map { kotlinx.serialization.json.JsonPrimitive(it) },
+                    ),
+                )
+                cachedLengthMm?.let { put("cachedFootLengthMm", it) }
+                cachedWidthMm?.let { put("cachedFootWidthMm", it) }
+            },
+        )
+    }
+
+    private fun widthClassFor(lengthMm: Double?, widthMm: Double?): String {
+        if (lengthMm == null || widthMm == null || lengthMm <= 0) return "regular"
+        val ratio = widthMm / lengthMm
+        return when {
+            ratio < 0.37 -> "narrow"
+            ratio > 0.45 -> "wide"
+            else -> "regular"
+        }
     }
 
     suspend fun deleteScan(scanId: String): Boolean = withContext(Dispatchers.IO) {
         val base = ApiConfig.baseUrl ?: return@withContext false
         val token = authClient.ensureAccessToken() ?: return@withContext false
         val conn = open("$base/v1/sync/scans/$scanId", "DELETE", token)
-        conn.responseCode == HttpURLConnection.HTTP_NO_CONTENT
+        when (conn.responseCode) {
+            HttpURLConnection.HTTP_NO_CONTENT, HttpURLConnection.HTTP_OK -> true
+            401 -> {
+                authClient.invalidateAccessToken()
+                false
+            }
+            else -> false
+        }
     }
 
     suspend fun eraseAll(): Boolean = withContext(Dispatchers.IO) {

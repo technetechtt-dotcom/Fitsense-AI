@@ -9,7 +9,7 @@ object Constants {
     const val PRODUCTS_COLLECTION = "products"
 
     // ---- Storage paths ------------------------------------------------------
-    const val SCAN_THUMBNAIL_PATH = "scan_thumbnails"
+    // Scan thumbnails are not persisted; cloud sync uses measurement payloads only.
 
     // ---- Sizing -------------------------------------------------------------
     /** Heel-space comfort margin appended to raw foot length when mapping → size. */
