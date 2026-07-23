@@ -39,6 +39,22 @@ class FitIdentityClient @Inject constructor(
     @Serializable
     private data class RecoverBody(val recoveryCode: String)
 
+    @Serializable
+    data class ShareIssueResponse(
+        val grantId: String,
+        val shareToken: String,
+        val expiresAtEpochMs: Long,
+        val orgId: String,
+        val purpose: String,
+    )
+
+    @Serializable
+    private data class ShareIssueBody(
+        val orgId: String,
+        val fitProfile: JsonObject,
+        val purpose: String = "sizing",
+    )
+
     suspend fun issueRecoveryCode(fitProfile: JsonObject): IssueResponse? =
         withContext(Dispatchers.IO) {
             val base = ApiConfig.baseUrl ?: return@withContext null
@@ -58,6 +74,22 @@ class FitIdentityClient @Inject constructor(
         conn.doOutput = true
         conn.outputStream.use {
             it.write(json.encodeToString(RecoverBody(recoveryCode.trim())).toByteArray())
+        }
+        if (conn.responseCode !in 200..299) return@withContext null
+        json.decodeFromString(readBody(conn))
+    }
+
+    suspend fun createShareGrant(
+        orgId: String,
+        fitProfile: JsonObject,
+        purpose: String = "in-store-sizing",
+    ): ShareIssueResponse? = withContext(Dispatchers.IO) {
+        val base = ApiConfig.baseUrl ?: return@withContext null
+        val token = authClient.ensureAccessToken() ?: return@withContext null
+        val conn = open("$base/v1/fit-identity/share-grants", "POST", token)
+        conn.doOutput = true
+        conn.outputStream.use {
+            it.write(json.encodeToString(ShareIssueBody(orgId, fitProfile, purpose)).toByteArray())
         }
         if (conn.responseCode !in 200..299) return@withContext null
         json.decodeFromString(readBody(conn))

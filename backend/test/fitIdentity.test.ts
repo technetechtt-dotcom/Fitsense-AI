@@ -114,6 +114,123 @@ test("Fit Identity recovery code issues and redeems once", async () => {
   assert.equal(second.status, 404);
 });
 
+test("merchant Fit ID share grant requires consent and org API key", async () => {
+  requireDb();
+  const accessToken = await authToken(baseUrl);
+  const now = Date.now();
+  const fitProfile = {
+    fitId: `fit_share_${now}`,
+    userId: `user_share_${now}`,
+    version: 1,
+    createdAtEpochMs: now,
+    updatedAtEpochMs: now,
+    widthClass: "regular",
+    archHeight: "medium",
+    toeShape: "egyptian",
+    comfortFit: "standard",
+    preferredMidsoleFeel: "balanced",
+    favouriteBrands: [],
+    lengthMm: 265,
+    widthMm: 100,
+  };
+
+  const orgRes = await fetch(`${baseUrl}/v1/merchants/orgs`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ name: `Pilot Shop ${now}`, region: "ZA-NC" }),
+  });
+  assert.equal(orgRes.status, 201);
+  const org = (await orgRes.json()) as { orgId: string };
+
+  const keyRes = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/api-keys`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ label: "pos" }),
+  });
+  assert.equal(keyRes.status, 201);
+  const keyBody = (await keyRes.json()) as { apiKey: string };
+
+  const missingOrg = await fetch(`${baseUrl}/v1/fit-identity/share-grants`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      orgId: "org_does_not_exist",
+      fitProfile,
+      purpose: "sizing",
+    }),
+  });
+  assert.equal(missingOrg.status, 404);
+
+  const grantRes = await fetch(`${baseUrl}/v1/fit-identity/share-grants`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      orgId: org.orgId,
+      fitProfile,
+      purpose: "in-store-sizing",
+    }),
+  });
+  assert.equal(grantRes.status, 201);
+  const grant = (await grantRes.json()) as {
+    grantId: string;
+    shareToken: string;
+  };
+  assert.ok(grant.shareToken.startsWith("FSMS1."));
+
+  const listRes = await fetch(`${baseUrl}/v1/fit-identity/share-grants`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  assert.equal(listRes.status, 200);
+  const listed = (await listRes.json()) as { grants: Array<{ grantId: string }> };
+  assert.ok(listed.grants.some((g) => g.grantId === grant.grantId));
+
+  const noKey = await fetch(`${baseUrl}/v1/fit-identity/share/redeem`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ shareToken: grant.shareToken }),
+  });
+  assert.equal(noKey.status, 401);
+
+  const redeem = await fetch(`${baseUrl}/v1/fit-identity/share/redeem`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Api-Key": keyBody.apiKey,
+    },
+    body: JSON.stringify({ shareToken: grant.shareToken }),
+  });
+  assert.equal(redeem.status, 200);
+  const redeemed = (await redeem.json()) as {
+    fitId: string;
+    fitProfile: { fitId: string };
+    purpose: string;
+  };
+  assert.equal(redeemed.fitId, fitProfile.fitId);
+  assert.equal(redeemed.purpose, "in-store-sizing");
+
+  const second = await fetch(`${baseUrl}/v1/fit-identity/share/redeem`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Api-Key": keyBody.apiKey,
+    },
+    body: JSON.stringify({ shareToken: grant.shareToken }),
+  });
+  assert.equal(second.status, 404);
+});
+
 test("sync export returns authenticated user payload", async () => {
   requireDb();
   const accessToken = await authToken(baseUrl);

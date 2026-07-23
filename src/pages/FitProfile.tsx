@@ -30,7 +30,14 @@ import {
 import { deriveInsights } from "../lib/fitLearning";
 import { buildBrandSizeSheet, type BrandSizeRow } from "../lib/recommendation";
 import { exportFitToken, importFitToken } from "../lib/portableFitIdentity";
-import { issueFitRecoveryCode, recoverFitWithCode } from "../lib/cloud/fitIdentity";
+import {
+  createFitShareGrant,
+  issueFitRecoveryCode,
+  listFitShareGrants,
+  recoverFitWithCode,
+  revokeFitShareGrant,
+  type FitShareGrantSummary,
+} from "../lib/cloud/fitIdentity";
 import { getOrCreateProfile } from "../lib/storage";
 import { formatLength, splitLength } from "../lib/format";
 import {
@@ -809,6 +816,13 @@ function PortableSection({
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [recoveryInput, setRecoveryInput] = useState("");
   const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [merchantOrgId, setMerchantOrgId] = useState("");
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [shareGrants, setShareGrants] = useState<FitShareGrantSummary[]>([]);
+
+  useEffect(() => {
+    void listFitShareGrants().then(setShareGrants);
+  }, []);
 
   const copy = async () => {
     try {
@@ -839,7 +853,9 @@ function PortableSection({
     try {
       const issued = await issueFitRecoveryCode(profile);
       if (!issued) {
-        setImportError("Could not issue a recovery code (API / consent).");
+        setImportError(
+          "Could not issue a recovery code. Sign in to the API (device auth) and try again.",
+        );
         return;
       }
       setRecoveryCode(issued.recoveryCode);
@@ -861,6 +877,38 @@ function PortableSection({
       const saved = saveFitProfile({ ...restored, userId });
       onImport(saved);
       setRecoveryInput("");
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const createShare = async () => {
+    setRecoveryBusy(true);
+    setImportError(null);
+    try {
+      const issued = await createFitShareGrant({
+        orgId: merchantOrgId.trim(),
+        fitProfile: profile,
+        purpose: "in-store-sizing",
+      });
+      if (!issued) {
+        setImportError(
+          "Could not create a merchant share grant. Check the org id and API sign-in.",
+        );
+        return;
+      }
+      setShareToken(issued.shareToken);
+      setShareGrants(await listFitShareGrants());
+    } finally {
+      setRecoveryBusy(false);
+    }
+  };
+
+  const revokeShare = async (grantId: string) => {
+    setRecoveryBusy(true);
+    try {
+      await revokeFitShareGrant(grantId);
+      setShareGrants(await listFitShareGrants());
     } finally {
       setRecoveryBusy(false);
     }
@@ -956,6 +1004,58 @@ function PortableSection({
         >
           Import token
         </button>
+      </div>
+
+      <div className="rounded-2xl bg-surface-2 border border-white/5 p-3 space-y-2">
+        <div className="text-[10px] uppercase tracking-widest text-ink-muted">
+          Merchant Fit ID share (consent)
+        </div>
+        <p className="text-[11px] text-ink-muted">
+          Grant a merchant organisation a one-time FSMS1 token. Only that org&apos;s API
+          key can redeem it. Revoke anytime before redeem.
+        </p>
+        <input
+          value={merchantOrgId}
+          onChange={(e) => setMerchantOrgId(e.target.value)}
+          placeholder="Merchant org id (org_…)"
+          className="w-full text-xs font-mono px-3 py-2 rounded-xl bg-black/30 border border-white/8 focus:outline-none focus:border-neon/40"
+        />
+        <button
+          onClick={() => void createShare()}
+          disabled={recoveryBusy || merchantOrgId.trim().length < 4}
+          className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-lime/15 text-lime text-xs font-semibold hover:bg-lime/25 disabled:opacity-40"
+        >
+          Create share grant
+        </button>
+        {shareToken ? (
+          <p className="text-[11px] font-mono break-all text-lime bg-black/30 rounded-xl px-3 py-2">
+            {shareToken}
+          </p>
+        ) : null}
+        {shareGrants.length > 0 ? (
+          <ul className="space-y-2">
+            {shareGrants.slice(0, 5).map((g) => (
+              <li
+                key={g.grantId}
+                className="text-[11px] text-ink-muted flex items-center justify-between gap-2"
+              >
+                <span className="truncate">
+                  {g.orgId} · {g.purpose}
+                  {g.revoked ? " · revoked" : g.redeemed ? " · redeemed" : " · active"}
+                </span>
+                {!g.revoked && !g.redeemed ? (
+                  <button
+                    type="button"
+                    onClick={() => void revokeShare(g.grantId)}
+                    className="text-coral shrink-0"
+                  >
+                    Revoke
+                  </button>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
     </section>
   );

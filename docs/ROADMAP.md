@@ -33,6 +33,8 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 - Android `DeviceAuthClient` + `SyncClient` + Settings cloud sync / erase
 - Android durable sync outbox with exponential backoff, pull/merge, export, server logout
 - Recoverable Fit Identity via `/v1/fit-identity/recovery-codes` (one-time codes)
+- Merchant Fit ID share grants (`FSMS1.`) under consent + org API key redeem (`docs/FIT_IDENTITY.md`)
+- Android Settings portable Fit Identity (FSP1 export/import, recovery, share)
 - Explicit fallback landmark confirmation (web + Android)
 - Reference aspect scoring + photographic fixture metadata
 - Contour↔manual landmark disagreement gate (retake when delta too large)
@@ -55,6 +57,8 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 **P4 still open:** live quality HUD before shutter, socks/footwear detector, true coplanarity / fold detection, magnified landmark loupe, floor suitability ML.
 
 **P5/P6 still open:** fill device matrix with real phones; complete Brannock participant study; per-foot GT; web/iOS study path.
+
+**P7 still open:** WebAuthn passkeys / durable account linking (no stubs).
 
 ---
 

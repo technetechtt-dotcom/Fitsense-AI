@@ -191,6 +191,95 @@ fun SettingsScreen(
             }
         }
 
+        SettingsSection(label = "Portable Fit Identity") {
+            val fitToken by viewModel.fitTokenPreview.collectAsState()
+            val recovery by viewModel.recoveryCode.collectAsState()
+            val share by viewModel.shareToken.collectAsState()
+            var importToken by remember { mutableStateOf("") }
+            var recoveryInput by remember { mutableStateOf("") }
+            var merchantOrg by remember { mutableStateOf("") }
+            Text(
+                text = "Move your fit between devices with FSP1 tokens or one-time recovery codes. Merchant share grants require explicit consent.",
+                style = MaterialTheme.typography.bodySmall,
+                color = FitSenseColors.OnSurfaceMuted,
+            )
+            OutlinedButton(
+                onClick = { viewModel.exportPortableFitToken() },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Export FSP1 token")
+            }
+            fitToken?.let { token ->
+                Text(
+                    text = token,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FitSenseColors.Neon,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            OutlinedTextField(
+                value = importToken,
+                onValueChange = { importToken = it },
+                label = { Text("Paste FSP1 or recovery code") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { viewModel.importPortableFitToken(importToken) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Import FSP1")
+                }
+                OutlinedButton(
+                    onClick = { viewModel.issueFitRecoveryCode() },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Issue recovery")
+                }
+            }
+            recovery?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FitSenseColors.Lime,
+                )
+            }
+            OutlinedTextField(
+                value = recoveryInput,
+                onValueChange = { recoveryInput = it },
+                label = { Text("Redeem recovery (FSIR1.…)") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedButton(
+                onClick = { viewModel.redeemFitRecoveryCode(recoveryInput) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Redeem recovery code")
+            }
+            OutlinedTextField(
+                value = merchantOrg,
+                onValueChange = { merchantOrg = it },
+                label = { Text("Merchant org id for share grant") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedButton(
+                onClick = { viewModel.createMerchantShareGrant(merchantOrg) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text("Create merchant share grant")
+            }
+            share?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = FitSenseColors.Lime,
+                )
+            }
+        }
+
         SettingsSection(label = "Accuracy study ground truth") {
             val accuracyCount by viewModel.accuracyRecordCount.collectAsState()
             val shareUri by viewModel.accuracyShareUri.collectAsState()

@@ -106,6 +106,11 @@ export const config = {
     process.env.FIT_RECOVERY_TTL_MS,
     90 * 24 * 60 * 60 * 1000,
   ),
+  /** Default TTL for merchant Fit ID share grants (7 days). */
+  fitShareTtlMs: parseNumber(
+    process.env.FIT_SHARE_TTL_MS,
+    7 * 24 * 60 * 60 * 1000,
+  ),
   retention: {
     scanDays: parseNumber(process.env.RETENTION_SCAN_DAYS, 730),
     eventDays: parseNumber(process.env.RETENTION_EVENT_DAYS, 730),

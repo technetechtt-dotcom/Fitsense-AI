@@ -9,6 +9,7 @@ import com.fitsense.ai.models.UserPreferences
 import com.fitsense.ai.models.UserProfile
 import com.fitsense.ai.repository.UserRepository
 import com.fitsense.ai.sync.CloudSyncCoordinator
+import com.fitsense.ai.utils.DataResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,6 +25,8 @@ class SettingsViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val cloudSyncCoordinator: CloudSyncCoordinator,
     private val accuracyDatasetStore: com.fitsense.ai.accuracy.AccuracyDatasetStore,
+    private val fitIdentityClient: com.fitsense.ai.identity.FitIdentityClient,
+    private val syncClient: com.fitsense.ai.sync.SyncClient,
 ) : ViewModel() {
 
     val profile: StateFlow<UserProfile?> = userRepository.profile
@@ -48,6 +51,15 @@ class SettingsViewModel @Inject constructor(
 
     private val _accuracyShareUri = MutableStateFlow<android.net.Uri?>(null)
     val accuracyShareUri: StateFlow<android.net.Uri?> = _accuracyShareUri.asStateFlow()
+
+    private val _fitTokenPreview = MutableStateFlow<String?>(null)
+    val fitTokenPreview: StateFlow<String?> = _fitTokenPreview.asStateFlow()
+
+    private val _recoveryCode = MutableStateFlow<String?>(null)
+    val recoveryCode: StateFlow<String?> = _recoveryCode.asStateFlow()
+
+    private val _shareToken = MutableStateFlow<String?>(null)
+    val shareToken: StateFlow<String?> = _shareToken.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -135,6 +147,134 @@ class SettingsViewModel @Inject constructor(
             accuracyDatasetStore.clear()
             _accuracyRecordCount.value = 0
             _statusMessage.value = "Accuracy dataset cleared on device."
+        }
+    }
+
+    fun exportPortableFitToken() {
+        viewModelScope.launch {
+            val profile = userRepository.ensureSignedIn().let {
+                when (it) {
+                    is DataResult.Success -> it.value
+                    is DataResult.Failure -> {
+                        _statusMessage.value = it.error.message
+                        return@launch
+                    }
+                }
+            }
+            val payload = com.fitsense.ai.identity.PortableFitIdentity.Payload(
+                fitId = profile.userId,
+                l = profile.cachedFootLengthMm,
+                w = profile.cachedFootWidthMm,
+            )
+            val token = com.fitsense.ai.identity.PortableFitIdentity.export(payload)
+            _fitTokenPreview.value = token
+            _statusMessage.value = "FSP1 token ready — copy and paste on another device."
+        }
+    }
+
+    fun importPortableFitToken(token: String) {
+        viewModelScope.launch {
+            val payload = com.fitsense.ai.identity.PortableFitIdentity.import(token.trim())
+            if (payload == null) {
+                _statusMessage.value = "Invalid FSP1 token."
+                return@launch
+            }
+            if (payload.l != null && payload.w != null) {
+                userRepository.cacheLatestFootMetrics(payload.l, payload.w)
+            }
+            _statusMessage.value =
+                "Imported Fit ID ${payload.fitId}. Length=${payload.l ?: "—"} Width=${payload.w ?: "—"}"
+        }
+    }
+
+    fun issueFitRecoveryCode() {
+        viewModelScope.launch {
+            val profile = when (val user = userRepository.ensureSignedIn()) {
+                is DataResult.Success -> user.value
+                is DataResult.Failure -> {
+                    _statusMessage.value = user.error.message
+                    return@launch
+                }
+            }
+            val json = syncClient.encodeFitProfile(
+                userId = profile.userId,
+                cachedLengthMm = profile.cachedFootLengthMm,
+                cachedWidthMm = profile.cachedFootWidthMm,
+                favouriteBrands = profile.preferences.preferredBrands,
+            )
+            val obj = kotlinx.serialization.json.Json.parseToJsonElement(json)
+                as? kotlinx.serialization.json.JsonObject
+            if (obj == null) {
+                _statusMessage.value = "Could not build fit profile payload."
+                return@launch
+            }
+            val issued = fitIdentityClient.issueRecoveryCode(obj)
+            if (issued == null) {
+                _statusMessage.value =
+                    "Could not issue recovery code. Configure API and ensure device auth."
+                return@launch
+            }
+            _recoveryCode.value = issued.recoveryCode
+            _statusMessage.value = "Recovery code issued (one-time). Store it offline."
+        }
+    }
+
+    fun redeemFitRecoveryCode(code: String) {
+        viewModelScope.launch {
+            val recovered = fitIdentityClient.recover(code.trim())
+            if (recovered == null) {
+                _statusMessage.value = "Recovery failed — invalid or already used."
+                return@launch
+            }
+            fun num(key: String): Double? {
+                val el = recovered.fitProfile[key] ?: return null
+                return (el as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull()
+            }
+            val length = num("cachedFootLengthMm") ?: num("lengthMm")
+            val width = num("cachedFootWidthMm") ?: num("widthMm")
+            if (length != null && width != null) {
+                userRepository.cacheLatestFootMetrics(length, width)
+            }
+            _statusMessage.value =
+                "Recovered Fit ID ${recovered.fitId}. Length=${length ?: "—"} Width=${width ?: "—"}"
+        }
+    }
+
+    fun createMerchantShareGrant(orgId: String) {
+        viewModelScope.launch {
+            val trimmed = orgId.trim()
+            if (trimmed.length < 4) {
+                _statusMessage.value = "Enter a merchant org id."
+                return@launch
+            }
+            val profile = when (val user = userRepository.ensureSignedIn()) {
+                is DataResult.Success -> user.value
+                is DataResult.Failure -> {
+                    _statusMessage.value = user.error.message
+                    return@launch
+                }
+            }
+            val json = syncClient.encodeFitProfile(
+                userId = profile.userId,
+                cachedLengthMm = profile.cachedFootLengthMm,
+                cachedWidthMm = profile.cachedFootWidthMm,
+                favouriteBrands = profile.preferences.preferredBrands,
+            )
+            val obj = kotlinx.serialization.json.Json.parseToJsonElement(json)
+                as? kotlinx.serialization.json.JsonObject
+            if (obj == null) {
+                _statusMessage.value = "Could not build fit profile payload."
+                return@launch
+            }
+            val issued = fitIdentityClient.createShareGrant(trimmed, obj)
+            if (issued == null) {
+                _statusMessage.value =
+                    "Share grant failed. Check org id exists and API auth works."
+                return@launch
+            }
+            _shareToken.value = issued.shareToken
+            _statusMessage.value =
+                "Merchant share token ready for ${issued.orgId} (${issued.purpose})."
         }
     }
 

@@ -47,6 +47,16 @@ export function errorHandler(
     res.status(413).json({ error: "payload_too_large", requestId });
     return;
   }
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    res.status(status).json({
+      error:
+        err instanceof Error && err.message
+          ? err.message.replace(/\s+/g, "_").toLowerCase()
+          : "client_error",
+      requestId,
+    });
+    return;
+  }
 
   console.error("[fitsense-api]", requestId ?? "-", err);
   res.status(500).json({
