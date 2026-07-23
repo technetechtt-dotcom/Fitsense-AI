@@ -42,7 +42,9 @@ export async function createShareGrant(input: {
     [input.orgId],
   );
   if (!org.rows[0]) {
-    return Promise.reject(Object.assign(new Error("merchant_org_not_found"), { status: 404 }));
+    return Promise.reject(
+      Object.assign(new Error("merchant_org_not_found"), { status: 404 }),
+    );
   }
 
   const grantId = newGrantId();

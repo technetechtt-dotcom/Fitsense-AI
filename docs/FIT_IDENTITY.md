@@ -2,11 +2,11 @@
 
 FitSense separates **portable measurement identity** from **durable account login**.
 
-| Mechanism | Prefix | Trust | Use |
-| --------- | ------ | ----- | --- |
-| Local share token | `FSP1.` | Unsigned snapshot | Paste / QR between own devices |
-| Recovery code | `FSIR1.` | Server one-time | Device loss; multi-device restore |
-| Merchant share | `FSMS1.` | User consent + org API key | In-store / partner sizing |
+| Mechanism         | Prefix   | Trust                      | Use                               |
+| ----------------- | -------- | -------------------------- | --------------------------------- |
+| Local share token | `FSP1.`  | Unsigned snapshot          | Paste / QR between own devices    |
+| Recovery code     | `FSIR1.` | Server one-time            | Device loss; multi-device restore |
+| Merchant share    | `FSMS1.` | User consent + org API key | In-store / partner sizing         |
 
 ## Multi-device today
 
