@@ -103,6 +103,23 @@ export function recommend(
     preferredBrands = options.profile?.favouriteBrands ?? [],
     profile,
   } = options;
+
+  // Protocol: never publish a retail size from an unreliable scan.
+  const CONFIDENCE_FLOOR = 0.55;
+  if (measurement.confidence < CONFIDENCE_FLOOR) {
+    return {
+      uk: "",
+      us: "",
+      eu: "",
+      mondopointMm: 0,
+      recommendationConfidence: 0,
+      matches: [],
+      sizeWithheld: true,
+      withholdReason:
+        "Measurement confidence is too low to publish a retail size. Retake with sharper lighting and clearer landmarks.",
+    };
+  }
+
   const insights = profile?.insights;
 
   // ── Step 1: target length with profile-derived adjustments ─────────
@@ -161,6 +178,7 @@ export function recommend(
     mondopointMm: sizes.mondopointMm,
     recommendationConfidence,
     matches,
+    sizeWithheld: false,
   };
 }
 

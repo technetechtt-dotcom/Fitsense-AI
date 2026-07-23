@@ -31,6 +31,20 @@ class RecommendationEngine @Inject constructor(
         products: List<Product> = catalog.builtIn(),
         maxResults: Int = 8,
     ): SizeRecommendation {
+        if (measurement.confidence < Constants.RECOMMENDATION_CONFIDENCE_FLOOR) {
+            return SizeRecommendation(
+                uk = "",
+                us = "",
+                eu = "",
+                mondopointMm = 0,
+                matches = emptyList(),
+                recommendationConfidence = 0f,
+                sizeWithheld = true,
+                withholdReason =
+                    "Measurement confidence is too low to publish a retail size. Retake with sharper lighting and clearer landmarks.",
+            )
+        }
+
         // Add heel-space margin so toes don't jam the toebox.
         val effectiveLengthMm = measurement.lengthMm + Constants.SIZE_HEEL_MARGIN_MM
         val sizes = SizeMappingTable.forLengthMm(effectiveLengthMm)
@@ -44,12 +58,22 @@ class RecommendationEngine @Inject constructor(
             .take(maxResults)
             .toList()
 
+        // Built-in catalog has limited evidence; cap recommendation confidence
+        // by measurement quality and a modest catalogue floor.
+        val catalogueEvidence = 0.75f
+        val recommendationConfidence =
+            if (matches.isEmpty()) 0f
+            else minOf(measurement.confidence, catalogueEvidence)
+
         return SizeRecommendation(
             uk = sizes.uk,
             us = sizes.us,
             eu = sizes.eu,
             mondopointMm = sizes.mondopointMm,
             matches = matches,
+            recommendationConfidence = recommendationConfidence,
+            sizeWithheld = false,
+            withholdReason = null,
         )
     }
 

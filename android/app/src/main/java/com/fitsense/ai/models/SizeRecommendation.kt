@@ -13,6 +13,14 @@ data class SizeRecommendation(
     val eu: String,
     val mondopointMm: Int,
     val matches: List<ShoeMatch> = emptyList(),
+    /** 0..1 — overall trust in publishing a retail size. */
+    val recommendationConfidence: Float = 0f,
+    /**
+     * When true, UK/US/EU strings are empty and matches are empty —
+     * measurement quality was too low to publish a retail size.
+     */
+    val sizeWithheld: Boolean = false,
+    val withholdReason: String? = null,
 )
 
 @Serializable

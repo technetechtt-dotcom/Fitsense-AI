@@ -54,6 +54,9 @@ export interface SizeRecommendation {
   /** 0..1 — measurement quality capped by product/catalogue evidence. */
   recommendationConfidence: number;
   matches: ShoeMatch[];
+  /** When true, retail sizes are withheld — do not treat empty UK/US/EU as a fit. */
+  sizeWithheld?: boolean;
+  withholdReason?: string;
 }
 
 export interface ScanResult {

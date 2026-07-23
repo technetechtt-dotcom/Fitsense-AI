@@ -49,6 +49,7 @@ export async function autoDetectReference(
   const contours = new cv.MatVector();
   const hierarchy = new cv.Mat();
   let best: AutoDetectResult | null = null;
+  let secondScore = 0;
 
   try {
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
@@ -73,14 +74,19 @@ export async function autoDetectReference(
         const area = Math.abs(cv.contourArea(approx));
         const areaFraction = area / frameArea;
         if (areaFraction >= MIN_AREA_FRACTION && areaFraction <= MAX_AREA_FRACTION) {
-          const corners = matRowsToPoints(approx);
-          const score = scoreQuad(corners, expectedAspect, areaFraction);
-          if (!best || score > best.confidence) {
-            best = {
-              corners: sortCornersTL(corners),
-              confidence: score,
-              areaPx: area,
-            };
+          const corners = sortCornersTL(matRowsToPoints(approx));
+          if (hasRectangleLikeAngles(corners)) {
+            const score = scoreQuad(corners, expectedAspect, areaFraction);
+            if (!best || score > best.confidence) {
+              secondScore = best?.confidence ?? 0;
+              best = {
+                corners,
+                confidence: score,
+                areaPx: area,
+              };
+            } else if (score > secondScore) {
+              secondScore = score;
+            }
           }
         }
       }
@@ -99,7 +105,29 @@ export async function autoDetectReference(
   // Require at least a modest confidence — better to fall back to taps
   // than confidently show wrong corners.
   if (!best || best.confidence < 0.65) return null;
+  // Ambiguous multi-rectangle scenes are unsafe to auto-accept.
+  if (secondScore > 0 && best.confidence - secondScore < 0.08) return null;
   return best;
+}
+
+function hasRectangleLikeAngles(corners: Point[]): boolean {
+  if (corners.length !== 4) return false;
+  for (let i = 0; i < 4; i++) {
+    const prev = corners[(i + 3) % 4];
+    const curr = corners[i];
+    const next = corners[(i + 1) % 4];
+    const ax = prev.x - curr.x;
+    const ay = prev.y - curr.y;
+    const bx = next.x - curr.x;
+    const by = next.y - curr.y;
+    const magA = Math.hypot(ax, ay);
+    const magB = Math.hypot(bx, by);
+    if (magA < 1e-3 || magB < 1e-3) return false;
+    const cos = Math.max(-1, Math.min(1, (ax * bx + ay * by) / (magA * magB)));
+    const degrees = (Math.acos(cos) * 180) / Math.PI;
+    if (degrees < 55 || degrees > 125) return false;
+  }
+  return true;
 }
 
 function matRowsToPoints(mat: { rows: number; data32S: Int32Array }): Point[] {

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.fitsense.ai.accuracy.AccuracyDatasetStore
 import com.fitsense.ai.camera.CameraXController
+import com.fitsense.ai.measurement.LandmarkDisagreement
 import com.fitsense.ai.measurement.MeasurementValidator
 import com.fitsense.ai.measurement.CalibrationEngine
 import com.fitsense.ai.measurement.MeasurementEngine
@@ -24,6 +25,7 @@ import com.fitsense.ai.utils.DataResult
 import com.fitsense.ai.vision.ImageOrientation
 import com.fitsense.ai.vision.ImageQualityProbe
 import com.fitsense.ai.vision.LandmarkBootstrap
+import com.fitsense.ai.vision.LandmarkSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,12 +72,15 @@ class ScanViewModel @Inject constructor(
         val previewLengthMm: Double? = null,
         val previewWidthMm: Double? = null,
         val previewConfidence: Float? = null,
+        val confidenceNotes: List<String> = emptyList(),
         val refSource: com.fitsense.ai.vision.LandmarkSource =
             com.fitsense.ai.vision.LandmarkSource.DETECTED,
         val footSource: com.fitsense.ai.vision.LandmarkSource =
             com.fitsense.ai.vision.LandmarkSource.DETECTED,
         val requiresFallbackConfirmation: Boolean = false,
         val fallbackConfirmed: Boolean = false,
+        /** Contour seed used for disagreement checks; null when foot was fallback. */
+        val contourSeed: LandmarkDisagreement.ContourSeed? = null,
     )
 
     data class UiState(
@@ -97,6 +102,8 @@ class ScanViewModel @Inject constructor(
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
     private var capturedBitmap: Bitmap? = null
+    private var markupBaseline: MarkupState? = null
+    private val markupUndoStack = ArrayDeque<MarkupState>()
 
     val camera: CameraXController get() = cameraController
 
@@ -144,30 +151,44 @@ class ScanViewModel @Inject constructor(
                 )
                 capturedBitmap?.recycle()
                 capturedBitmap = bitmap
+                val contourSeed = if (boot.footSource == LandmarkSource.DETECTED) {
+                    LandmarkDisagreement.ContourSeed(
+                        heel = boot.heel,
+                        toe = boot.toe,
+                        widthMedial = boot.widthMedial,
+                        widthLateral = boot.widthLateral,
+                    )
+                } else {
+                    null
+                }
                 val status = if (boot.requiresFallbackConfirmation) {
                     "Auto-detect used fallback landmarks — confirm they look correct before accepting."
                 } else {
                     "Drag each marker to the correct corner and foot point."
                 }
+                val markup = MarkupState(
+                    imageWidth = bitmap.width,
+                    imageHeight = bitmap.height,
+                    refCorners = boot.refCorners,
+                    heel = boot.heel,
+                    toe = boot.toe,
+                    widthMedial = boot.widthMedial,
+                    widthLateral = boot.widthLateral,
+                    activeFoot = _uiState.value.activeFoot,
+                    refSource = boot.refSource,
+                    footSource = boot.footSource,
+                    requiresFallbackConfirmation = boot.requiresFallbackConfirmation,
+                    fallbackConfirmed = false,
+                    contourSeed = contourSeed,
+                )
+                markupBaseline = markup
+                markupUndoStack.clear()
                 _uiState.update {
                     it.copy(
                         capturing = false,
                         captureProgress = 1f,
                         phase = ScanPhase.Markup,
-                        markup = MarkupState(
-                            imageWidth = bitmap.width,
-                            imageHeight = bitmap.height,
-                            refCorners = boot.refCorners,
-                            heel = boot.heel,
-                            toe = boot.toe,
-                            widthMedial = boot.widthMedial,
-                            widthLateral = boot.widthLateral,
-                            activeFoot = _uiState.value.activeFoot,
-                            refSource = boot.refSource,
-                            footSource = boot.footSource,
-                            requiresFallbackConfirmation = boot.requiresFallbackConfirmation,
-                            fallbackConfirmed = false,
-                        ),
+                        markup = markup,
                         statusMessage = status,
                     )
                 }
@@ -209,6 +230,42 @@ class ScanViewModel @Inject constructor(
         refreshPreview()
     }
 
+    /** Snapshot current markup once per drag gesture so Undo undoes one move. */
+    fun beginLandmarkEdit() {
+        val markup = _uiState.value.markup ?: return
+        pushUndo(markup)
+    }
+
+    fun undoLandmarkEdit() {
+        val previous = markupUndoStack.removeLastOrNull() ?: return
+        _uiState.update { it.copy(markup = previous, errorMessage = null) }
+        refreshPreview()
+    }
+
+    fun resetLandmarks() {
+        val baseline = markupBaseline ?: return
+        val current = _uiState.value.markup
+        if (current != null) pushUndo(current)
+        _uiState.update {
+            it.copy(
+                markup = baseline.copy(
+                    selectedLandmark = current?.selectedLandmark ?: LandmarkKind.RefCorner0,
+                    fallbackConfirmed = false,
+                ),
+                errorMessage = null,
+                statusMessage = "Landmarks reset to auto-detect seeds.",
+            )
+        }
+        refreshPreview()
+    }
+
+    private fun pushUndo(markup: MarkupState) {
+        markupUndoStack.addLast(markup)
+        while (markupUndoStack.size > 40) {
+            markupUndoStack.removeFirst()
+        }
+    }
+
     fun refreshPreview() {
         val markup = _uiState.value.markup ?: return
         val result = runCatching {
@@ -232,6 +289,7 @@ class ScanViewModel @Inject constructor(
                     previewLengthMm = result.measurement.lengthMm,
                     previewWidthMm = result.measurement.widthMm,
                     previewConfidence = result.measurement.confidence,
+                    confidenceNotes = result.confidenceNotes,
                 ),
             )
         }
@@ -271,10 +329,24 @@ class ScanViewModel @Inject constructor(
             _uiState.update { s -> s.copy(errorMessage = it.message ?: "Measurement failed.") }
             return
         }
+        val disagreement = markup.contourSeed?.let { seed ->
+            LandmarkDisagreement.compare(
+                seed = seed,
+                heel = markup.heel,
+                toe = markup.toe,
+                widthMedial = markup.widthMedial,
+                widthLateral = markup.widthLateral,
+                pixelsPerMm = result.pixelsPerMm,
+            )
+        }
         val validation = measurementValidator.validate(
-            result.measurement,
-            result.sanity,
-            result.widthMeasured,
+            measurement = result.measurement,
+            sanity = result.sanity,
+            widthMeasured = result.widthMeasured,
+            footLandmarks = listOf(markup.heel, markup.toe, markup.widthMedial, markup.widthLateral),
+            imageWidthPx = markup.imageWidth,
+            imageHeightPx = markup.imageHeight,
+            disagreement = disagreement,
         )
         if (!validation.accepted) {
             _uiState.update { it.copy(errorMessage = validation.issue) }
@@ -328,6 +400,8 @@ class ScanViewModel @Inject constructor(
     fun scanOtherFoot() {
         capturedBitmap?.recycle()
         capturedBitmap = null
+        markupBaseline = null
+        markupUndoStack.clear()
         val nextFoot = if (_uiState.value.activeFoot == Foot.RIGHT) Foot.LEFT else Foot.RIGHT
         _uiState.update {
             it.copy(
@@ -401,6 +475,8 @@ class ScanViewModel @Inject constructor(
     fun retake() {
         capturedBitmap?.recycle()
         capturedBitmap = null
+        markupBaseline = null
+        markupUndoStack.clear()
         _uiState.update {
             it.copy(
                 phase = ScanPhase.Camera,

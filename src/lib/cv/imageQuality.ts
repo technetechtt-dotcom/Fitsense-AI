@@ -19,6 +19,8 @@ export interface ImageQuality {
   shadowFraction: number;
   /** Fraction of pixels near white; high values indicate glare/clipping. */
   highlightFraction: number;
+  /** Fraction of high-contrast pixels in the border band (clipping proxy). */
+  borderEdgeFraction: number;
   /** Composite OK flag. */
   ok: boolean;
   /** Human-readable reason if not OK. */
@@ -30,6 +32,7 @@ const SHARPNESS_FLOOR = 55;
 const LUMINANCE_MIN = 35;
 const LUMINANCE_MAX = 235;
 const CLIPPED_FRACTION_MAX = 0.3;
+const BORDER_EDGE_MAX = 0.45;
 
 /**
  * Compute sharpness + brightness for a captured frame.
@@ -93,6 +96,7 @@ export function probeImageQuality(canvas: HTMLCanvasElement): ImageQuality {
   }
   const mean = sum / n;
   const sharpness = sumSq / n - mean * mean;
+  const borderEdgeFraction = borderHighContrastFraction(gray, w, h);
 
   let issue: string | null = null;
   if (sharpness < SHARPNESS_FLOOR) {
@@ -105,15 +109,46 @@ export function probeImageQuality(canvas: HTMLCanvasElement): ImageQuality {
     issue = "Severe shadows hide the foot or reference — use bright, even light.";
   } else if (highlightFraction > CLIPPED_FRACTION_MAX) {
     issue = "Glare hides the foot or reference — avoid flash and reflective light.";
+  } else if (borderEdgeFraction > BORDER_EDGE_MAX) {
+    issue =
+      "Subject looks clipped by the frame — step back so the full foot and reference are visible.";
   }
   return {
     sharpness,
     meanLuminance,
     shadowFraction,
     highlightFraction,
+    borderEdgeFraction,
     ok: issue === null,
     issue,
   };
+}
+
+function borderHighContrastFraction(
+  gray: Uint8ClampedArray,
+  w: number,
+  h: number,
+): number {
+  if (w < 16 || h < 16) return 0;
+  const band = Math.max(2, Math.floor(Math.min(w, h) / 20));
+  let edgeHits = 0;
+  let samples = 0;
+  const sample = (x: number, y: number) => {
+    const i = y * w + x;
+    const grad =
+      Math.abs(gray[i - 1] - gray[i + 1]) + Math.abs(gray[i - w] - gray[i + w]);
+    if (grad > 80) edgeHits++;
+    samples++;
+  };
+  for (let y = band; y < h - band; y++) {
+    for (let x = 1; x < band; x++) sample(x, y);
+    for (let x = w - band; x < w - 1; x++) sample(x, y);
+  }
+  for (let x = band; x < w - band; x++) {
+    for (let y = 1; y < band; y++) sample(x, y);
+    for (let y = h - band; y < h - 1; y++) sample(x, y);
+  }
+  return samples === 0 ? 0 : edgeHits / samples;
 }
 
 function emptyResult(issue: string): ImageQuality {
@@ -122,6 +157,7 @@ function emptyResult(issue: string): ImageQuality {
     meanLuminance: 0,
     shadowFraction: 1,
     highlightFraction: 0,
+    borderEdgeFraction: 0,
     ok: false,
     issue,
   };

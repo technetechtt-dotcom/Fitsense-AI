@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -28,8 +32,10 @@ fun ScanMarkupOverlay(
     markup: ScanViewModel.MarkupState,
     onMoveLandmark: (ScanViewModel.LandmarkKind, Point2D) -> Unit,
     onSelectLandmark: (ScanViewModel.LandmarkKind) -> Unit,
+    onBeginEdit: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var draggingKind by remember { mutableStateOf<ScanViewModel.LandmarkKind?>(null) }
     Column(modifier = modifier) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             AsyncImage(
@@ -41,14 +47,16 @@ fun ScanMarkupOverlay(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(markup) {
+                    .pointerInput(markup.imageWidth, markup.imageHeight) {
                         detectDragGestures(
                             onDragStart = { offset ->
                                 val kind = nearestLandmark(markup, offset.x, offset.y, size.width, size.height)
+                                draggingKind = kind
                                 onSelectLandmark(kind)
+                                onBeginEdit()
                             },
                             onDrag = { change, _ ->
-                                val kind = markup.selectedLandmark ?: return@detectDragGestures
+                                val kind = draggingKind ?: return@detectDragGestures
                                 val point = screenToImage(
                                     change.position.x,
                                     change.position.y,
@@ -59,6 +67,8 @@ fun ScanMarkupOverlay(
                                 )
                                 onMoveLandmark(kind, point)
                             },
+                            onDragEnd = { draggingKind = null },
+                            onDragCancel = { draggingKind = null },
                         )
                     },
             ) {
@@ -98,6 +108,10 @@ fun ScanMarkupOverlay(
                 markup.previewLengthMm?.let { append("Length ${"%.1f".format(it)} mm. ") }
                 markup.previewWidthMm?.let { append("Width ${"%.1f".format(it)} mm. ") }
                 markup.previewConfidence?.let { append("Confidence ${(it * 100).toInt()}%.") }
+                if (markup.confidenceNotes.isNotEmpty()) {
+                    append("\n")
+                    append(markup.confidenceNotes.take(3).joinToString(" · "))
+                }
             },
             style = MaterialTheme.typography.bodySmall,
             color = FitSenseColors.OnSurface,

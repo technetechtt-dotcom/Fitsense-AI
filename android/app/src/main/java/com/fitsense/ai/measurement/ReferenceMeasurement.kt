@@ -34,6 +34,7 @@ class ReferenceMeasurement @Inject constructor() {
         val sanity: ReferenceSanity,
         val pixelsPerMm: Double,
         val widthMeasured: Boolean,
+        val confidenceNotes: List<String> = emptyList(),
     )
 
     fun measure(taps: TapPoints, reference: CalibrationReference): Result {
@@ -100,17 +101,23 @@ class ReferenceMeasurement @Inject constructor() {
             imageHeightPx = taps.imageHeightPx,
             widthMeasured = widthMeasured,
             sanity = finalSanity,
-        ).toFloat()
+        )
 
         val measurement = FootMeasurement(
             lengthMm = lengthMm,
             widthMm = widthMm,
-            confidence = confidence,
+            confidence = confidence.score.toFloat(),
             foot = taps.foot,
             calibration = reference,
             pixelsPerMm = pixelsPerMm,
         )
-        return Result(measurement, finalSanity, pixelsPerMm, widthMeasured)
+        return Result(
+            measurement = measurement,
+            sanity = finalSanity,
+            pixelsPerMm = pixelsPerMm,
+            widthMeasured = widthMeasured,
+            confidenceNotes = confidence.notes,
+        )
     }
 
     private fun computeSanity(
@@ -177,6 +184,8 @@ class ReferenceMeasurement @Inject constructor() {
         return null
     }
 
+    private data class ConfidenceBreakdown(val score: Double, val notes: List<String>)
+
     private fun computeConfidence(
         pixelsPerMm: Double,
         ordered: List<Point2D>,
@@ -184,17 +193,48 @@ class ReferenceMeasurement @Inject constructor() {
         imageHeightPx: Int,
         widthMeasured: Boolean,
         sanity: ReferenceSanity,
-    ): Double {
+    ): ConfidenceBreakdown {
         var score = 0.4
-        if (pixelsPerMm >= 3.0) score += 0.15 else if (pixelsPerMm >= 1.5) score += 0.07
+        val notes = mutableListOf<String>()
+        when {
+            pixelsPerMm >= 3.0 -> {
+                score += 0.15
+                notes += "Sharp scale (≥3 px/mm)"
+            }
+            pixelsPerMm >= 1.5 -> {
+                score += 0.07
+                notes += "Adequate scale (≥1.5 px/mm)"
+            }
+            else -> notes += "Low px/mm — move closer to the foot"
+        }
         if (imageWidthPx > 0 && imageHeightPx > 0) {
             val ratio = quadArea(ordered) / (imageWidthPx.toDouble() * imageHeightPx)
-            if (ratio in 0.05..0.6) score += 0.1
+            if (ratio in 0.05..0.6) {
+                score += 0.1
+                notes += "Reference fills a healthy share of the frame"
+            } else {
+                notes += "Reference size in frame is suboptimal"
+            }
         }
-        if (widthMeasured) score += 0.1
+        if (widthMeasured) {
+            score += 0.1
+            notes += "Ball width measured from both landmarks"
+        } else {
+            notes += "Width not measured"
+        }
         score += 0.15 * sanity.aspectScore
+        notes += if (sanity.aspectScore >= 0.85) {
+            "Reference aspect looks correct"
+        } else {
+            "Reference aspect is weak — check corners"
+        }
         score += 0.1 * sanity.scaleConsistencyScore
-        return score.coerceIn(0.0, 1.0)
+        notes += if (sanity.scaleConsistencyScore >= 0.85) {
+            "Camera angle looks level"
+        } else {
+            "Scale inconsistency — shoot more from above"
+        }
+        return ConfidenceBreakdown(score.coerceIn(0.0, 1.0), notes)
     }
 
     private fun referenceHasFrameMargin(corners: List<Point2D>, widthPx: Int, heightPx: Int): Boolean {

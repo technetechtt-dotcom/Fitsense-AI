@@ -62,6 +62,21 @@ export function Recommendations() {
     );
   }
 
+  if (rec.sizeWithheld) {
+    return (
+      <PageLayout withTopBar gap="gap-4">
+        <TopBar title="Recommended for you" />
+        <ErrorState
+          message={
+            rec.withholdReason ??
+            "Measurement confidence is too low to publish a retail size. Retake the scan."
+          }
+          onRetry={() => nav("/scan")}
+        />
+      </PageLayout>
+    );
+  }
+
   const learnedFromCount = Object.keys(
     fitProfile?.insights?.brandConfidence ?? {},
   ).length;

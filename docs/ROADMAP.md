@@ -35,6 +35,12 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 - Recoverable Fit Identity via `/v1/fit-identity/recovery-codes` (one-time codes)
 - Explicit fallback landmark confirmation (web + Android)
 - Reference aspect scoring + photographic fixture metadata
+- Contour↔manual landmark disagreement gate (retake when delta too large)
+- Explainable confidence factor notes on Android markup
+- Withhold retail size when measurement confidence is below floor (web + Android)
+- Reference detector: OpenCV Mat release, convexity, corner-angle, multi-quad ambiguity reject
+- Image quality: blur/exposure/glare + border-clipping proxy (web + Android)
+- Android markup undo / reset to auto-detect seeds
 - Accuracy study JSONL + `scripts/analyze-accuracy-dataset.mjs`
 - Telemetry endpoint + Timber/web monitoring hooks
 - Backup/restore drill test + POPIA retention job + Privacy copy
@@ -43,6 +49,8 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 - Regional locales (en-ZA / af / xh / zu) + UK sizing; offline sync outbox; low-data mode
 - Kimberley / Northern Cape pilot runbook (`docs/ops/PILOT_KIMBERLEY.md`)
 - CI Postgres handoff/sync/schema tests; staging Blueprint; smoke record path
+
+**P4 still open:** live quality HUD before shutter, socks/footwear detector, true coplanarity / fold detection, magnified landmark loupe, floor suitability ML.
 
 ---
 

@@ -89,13 +89,15 @@ fun ScanScreen(
                     markup = uiState.markup!!,
                     onMoveLandmark = viewModel::moveLandmark,
                     onSelectLandmark = viewModel::selectLandmark,
+                    onBeginEdit = viewModel::beginLandmarkEdit,
                     modifier = Modifier.fillMaxSize(),
                 )
                 MarkupControls(
                     state = uiState,
-                    onCancel = onCancel,
                     onAccept = viewModel::acceptMeasurement,
                     onRetake = viewModel::retake,
+                    onUndo = viewModel::undoLandmarkEdit,
+                    onReset = viewModel::resetLandmarks,
                     onConfirmFallback = viewModel::confirmFallbackLandmarks,
                 )
             }
@@ -234,9 +236,10 @@ private fun ScanControls(
 @Composable
 private fun MarkupControls(
     state: ScanViewModel.UiState,
-    onCancel: () -> Unit,
     onAccept: () -> Unit,
     onRetake: () -> Unit,
+    onUndo: () -> Unit,
+    onReset: () -> Unit,
     onConfirmFallback: (Boolean) -> Unit,
 ) {
     val markup = state.markup
@@ -275,6 +278,21 @@ private fun MarkupControls(
             }
         }
         state.errorMessage?.let { ErrorCard(it) }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(bottom = 8.dp),
+        ) {
+            PrimaryButton(
+                text = stringResource(R.string.scan_undo_landmark),
+                onClick = onUndo,
+                modifier = Modifier.weight(1f),
+            )
+            PrimaryButton(
+                text = stringResource(R.string.scan_reset_landmarks),
+                onClick = onReset,
+                modifier = Modifier.weight(1f),
+            )
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             PrimaryButton(
                 text = stringResource(R.string.scan_retake),

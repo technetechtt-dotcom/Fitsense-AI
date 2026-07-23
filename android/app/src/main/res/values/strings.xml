@@ -44,6 +44,8 @@
     <string name="scan_foot_label">Scanning %1$s foot</string>
     <string name="scan_accept_measurement">Accept measurement</string>
     <string name="scan_retake">Retake</string>
+    <string name="scan_undo_landmark">Undo</string>
+    <string name="scan_reset_landmarks">Reset markers</string>
     <string name="scan_other_foot">Scan other foot</string>
     <string name="scan_save_measurement">Save accepted scan</string>
     <string name="scan_review_title">Review accepted measurements</string>

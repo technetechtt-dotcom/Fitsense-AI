@@ -18,6 +18,12 @@ object Constants {
     /** Confidence floor below which a measurement is marked low-quality in the UI. */
     const val LOW_CONFIDENCE_THRESHOLD = 0.55f
 
+    /**
+     * Below this confidence we withhold retail size recommendations entirely —
+     * millimetres may still be shown with a quality warning, but no UK/US/EU size.
+     */
+    const val RECOMMENDATION_CONFIDENCE_FLOOR = 0.55f
+
     // ---- ARCore -------------------------------------------------------------
     const val MIN_PLANE_AREA_M2 = 0.06f // ~ A4 sized plane
     const val PLANE_DETECTION_TIMEOUT_MS = 15_000L

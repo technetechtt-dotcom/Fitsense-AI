@@ -77,14 +77,24 @@ fun RecommendationsScreen(
                     }
 
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            StatTile(modifier = Modifier.weight(1f), label = "UK", value = s.data.uk)
-                            StatTile(modifier = Modifier.weight(1f), label = "US", value = s.data.us)
-                            StatTile(modifier = Modifier.weight(1f), label = "EU", value = s.data.eu)
+                        if (s.data.sizeWithheld) {
+                            Text(
+                                text = s.data.withholdReason
+                                    ?: "Measurement confidence is too low to publish a retail size. Retake the scan.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = FitSenseColors.OnSurfaceMuted,
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+                        } else {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                StatTile(modifier = Modifier.weight(1f), label = "UK", value = s.data.uk)
+                                StatTile(modifier = Modifier.weight(1f), label = "US", value = s.data.us)
+                                StatTile(modifier = Modifier.weight(1f), label = "EU", value = s.data.eu)
+                            }
                         }
                     }
 
-                    if (s.data.matches.isEmpty()) {
+                    if (!s.data.sizeWithheld && s.data.matches.isEmpty()) {
                         item {
                             Text(
                                 text = stringResource(R.string.recommendations_empty),
@@ -95,8 +105,10 @@ fun RecommendationsScreen(
                         }
                     }
 
-                    items(s.data.matches, key = { it.productId }) { match ->
-                        ShoeCard(match = match)
+                    if (!s.data.sizeWithheld) {
+                        items(s.data.matches, key = { it.productId }) { match ->
+                            ShoeCard(match = match)
+                        }
                     }
                 }
             }
