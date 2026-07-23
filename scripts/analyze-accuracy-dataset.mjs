@@ -113,12 +113,10 @@ function analyze(subset) {
   const length = stats(lengthErr);
   const width = widthErr.length ? stats(widthErr) : null;
   const passLength =
-    length.median <= THRESHOLDS.lengthMedianMm &&
-    length.p95 <= THRESHOLDS.lengthP95Mm;
+    length.median <= THRESHOLDS.lengthMedianMm && length.p95 <= THRESHOLDS.lengthP95Mm;
   const passWidth =
     !width ||
-    (width.median <= THRESHOLDS.widthMedianMm &&
-      width.p95 <= THRESHOLDS.widthP95Mm);
+    (width.median <= THRESHOLDS.widthMedianMm && width.p95 <= THRESHOLDS.widthP95Mm);
   return { length, width, pass: passLength && passWidth };
 }
 

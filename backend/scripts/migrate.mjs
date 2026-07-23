@@ -8,9 +8,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const migrateUrl = pathToFileURL(
-  path.join(root, "../dist/services/migrate.js"),
-).href;
+const migrateUrl = pathToFileURL(path.join(root, "../dist/services/migrate.js")).href;
 
 async function main() {
   // Prefer compiled dist; fall back to tsx-loaded source in dev.

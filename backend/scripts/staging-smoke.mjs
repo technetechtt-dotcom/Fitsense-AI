@@ -169,7 +169,9 @@ async function main() {
     });
     if (!(putScan.status === 200 || putScan.status === 201 || putScan.status === 204)) {
       const putBody = await json(putScan);
-      throw new Error(`sync put scan failed: ${putScan.status} ${JSON.stringify(putBody)}`);
+      throw new Error(
+        `sync put scan failed: ${putScan.status} ${JSON.stringify(putBody)}`,
+      );
     }
 
     const pull = await fetch(`${base}/v1/sync`, {

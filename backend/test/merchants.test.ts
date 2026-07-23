@@ -215,8 +215,11 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
   );
   assert.equal(revoke.status, 204);
 
-  const afterRevoke = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/catalogue`, {
-    headers: { "X-Api-Key": keyBody.apiKey },
-  });
+  const afterRevoke = await fetch(
+    `${baseUrl}/v1/merchants/orgs/${org.orgId}/catalogue`,
+    {
+      headers: { "X-Api-Key": keyBody.apiKey },
+    },
+  );
   assert.equal(afterRevoke.status, 401);
 });

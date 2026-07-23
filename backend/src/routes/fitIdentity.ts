@@ -36,7 +36,12 @@ const shareCreateSchema = z.object({
   orgId: documentIdSchema,
   fitProfile: fitProfileSchema,
   purpose: z.string().trim().min(1).max(64).optional(),
-  ttlMs: z.number().int().positive().max(30 * 24 * 60 * 60 * 1000).optional(),
+  ttlMs: z
+    .number()
+    .int()
+    .positive()
+    .max(30 * 24 * 60 * 60 * 1000)
+    .optional(),
 });
 
 const shareRedeemSchema = z.object({

@@ -1,7 +1,7 @@
 {
   "baseUrl": "https://fitsense-api-1rne.onrender.com",
-  "startedAt": "2026-07-22T17:52:39.017Z",
-  "finishedAt": "2026-07-22T17:53:07.881Z",
+  "startedAt": "2026-07-23T18:10:01.588Z",
+  "finishedAt": "2026-07-23T18:10:30.953Z",
   "ok": true,
   "steps": [
     {
@@ -26,6 +26,16 @@
     },
     {
       "name": "sync",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "sync_put_scan",
+      "ok": true,
+      "status": 204
+    },
+    {
+      "name": "sync_pull_roundtrip",
       "ok": true,
       "status": 200
     },
