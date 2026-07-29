@@ -3,7 +3,9 @@ import type { FitType, Product, ShoeCategory } from "../types";
 import {
   getMerchantOrgId,
   listCatalogue,
+  listInventory,
   type CatalogueProduct,
+  type InventoryItem,
 } from "./api/merchantApi";
 import { getApiBaseUrl } from "./api/config";
 
@@ -25,11 +27,16 @@ const CATEGORIES = new Set<ShoeCategory>([
 ]);
 
 let merchantProducts: Product[] | null = null;
+let merchantInventory: InventoryItem[] = [];
 let sourceLabel: "builtin" | "merchant" = "builtin";
 
 export function getActiveCatalogue(): Product[] {
   if (merchantProducts && merchantProducts.length > 0) return merchantProducts;
   return SHOE_CATALOG;
+}
+
+export function getActiveInventory(): InventoryItem[] {
+  return merchantInventory;
 }
 
 export function getCatalogueSource(): "builtin" | "merchant" {
@@ -38,12 +45,36 @@ export function getCatalogueSource(): "builtin" | "merchant" {
 
 export function clearMerchantCatalogue(): void {
   merchantProducts = null;
+  merchantInventory = [];
   sourceLabel = "builtin";
 }
 
 export function setMerchantCatalogue(products: Product[]): void {
   merchantProducts = products.length > 0 ? products : null;
   sourceLabel = products.length > 0 ? "merchant" : "builtin";
+}
+
+export function setMerchantInventory(items: InventoryItem[]): void {
+  merchantInventory = items;
+}
+
+/** UK size labels in stock for a product (quantity > 0). */
+export function inStockUkLabels(productId: string): string[] {
+  const labels = new Set<string>();
+  for (const row of merchantInventory) {
+    if (row.productId !== productId) continue;
+    if (row.sizeSystem !== "uk") continue;
+    if (row.quantity <= 0) continue;
+    labels.add(row.sizeLabel);
+  }
+  return Array.from(labels).sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+}
+
+export function productHasAnyStock(productId: string): boolean | null {
+  if (merchantInventory.length === 0) return null;
+  const rows = merchantInventory.filter((r) => r.productId === productId);
+  if (rows.length === 0) return false;
+  return rows.some((r) => r.quantity > 0);
 }
 
 export function catalogueProductToProduct(raw: CatalogueProduct): Product | null {
@@ -89,7 +120,7 @@ export function catalogueProductToProduct(raw: CatalogueProduct): Product | null
   };
 }
 
-/** Load merchant catalogue into the recommendation layer when an org is selected. */
+/** Load merchant catalogue + inventory into the recommendation layer. */
 export async function loadMerchantCatalogue(
   orgId = getMerchantOrgId(),
 ): Promise<number> {
@@ -97,10 +128,14 @@ export async function loadMerchantCatalogue(
     clearMerchantCatalogue();
     return 0;
   }
-  const raw = await listCatalogue(orgId);
+  const [raw, inv] = await Promise.all([
+    listCatalogue(orgId),
+    listInventory(orgId).catch(() => [] as InventoryItem[]),
+  ]);
   const products = raw
     .map(catalogueProductToProduct)
     .filter((p): p is Product => p !== null);
   setMerchantCatalogue(products);
+  setMerchantInventory(inv);
   return products.length;
 }

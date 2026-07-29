@@ -32,7 +32,7 @@ export function ShoeCard({ match, index = 0, onClick }: Props) {
           {match.brand}
         </div>
         <div className="text-base font-semibold truncate">{match.model}</div>
-        <div className="text-xs text-ink-muted mt-0.5 flex items-center gap-2">
+        <div className="text-xs text-ink-muted mt-0.5 flex items-center gap-2 flex-wrap">
           <span>EU {match.recommendedEuSize}</span>
           <span className="w-1 h-1 rounded-full bg-ink-dim" />
           <span className="text-neon flex items-center gap-1">
@@ -41,6 +41,23 @@ export function ShoeCard({ match, index = 0, onClick }: Props) {
           </span>
           <span className="w-1 h-1 rounded-full bg-ink-dim" />
           <span className="text-lime">Comfort {match.comfortScore}%</span>
+          {match.inStock === true ? (
+            <>
+              <span className="w-1 h-1 rounded-full bg-ink-dim" />
+              <span className="text-lime">
+                In stock
+                {match.stockUkLabels?.length
+                  ? ` · UK ${match.stockUkLabels.slice(0, 4).join(", ")}`
+                  : ""}
+              </span>
+            </>
+          ) : null}
+          {match.inStock === false ? (
+            <>
+              <span className="w-1 h-1 rounded-full bg-ink-dim" />
+              <span className="text-amber-400">Out of stock</span>
+            </>
+          ) : null}
         </div>
       </div>
 

@@ -21,8 +21,8 @@ Operational work that cannot be completed in code alone. Track progress here.
 | ----------------------------------- | ------- | ------------------------------------------------------------------- |
 | Merchant portal UI                  | Done    | `/merchant` — orgs, catalogue, inventory, brand-fit, outcomes, keys |
 | Real footwear retailer catalogue    | Open    | Sample feed: `docs/samples/kimberley-catalogue-feed.json`           |
-| Variants, sizes, widths, inventory  | Partial | Portal inventory + brand-fit tabs; `GET .../inventory`              |
-| Outcomes ↔ real orders              | Partial | Optional `orderId` on outcomes → `data.orderId`                     |
+| Variants, sizes, widths, inventory  | Partial | `widthLabel` on inventory; portal + sample feed; stock-aware recs   |
+| Outcomes ↔ real orders              | Partial | `orderId` + list/CSV export for weekly pilot reconcile              |
 | Passkey customer accounts           | Open    | Explicitly deferred — no stubs                                      |
 | Complete POPIA implementation       | Partial | Privacy copy + retention incl. `merchant_outcomes`; legal DPA open  |
 | Controlled Kimberley pilot          | Open    | Runbook ready                                                       |

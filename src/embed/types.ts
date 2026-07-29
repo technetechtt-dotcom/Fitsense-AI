@@ -46,8 +46,10 @@ export interface EmbedProductContext {
 }
 
 export interface EmbedConfig extends EmbedProductContext {
-  /** Optional API key for analytics / per-partner config. */
+  /** Optional API key for analytics / per-partner config / merchant catalogue. */
   apiKey?: string;
+  /** Merchant org id — loads partner catalogue into recommendations. */
+  merchantOrgId?: string;
   /** Visible brand of the host store, shown in the embed header. */
   storeName?: string;
   /** Theme tokens. */
@@ -143,6 +145,7 @@ export function buildEmbedUrl(base: string, cfg: EmbedConfig): string {
   if (cfg.storeName) url.searchParams.set("storeName", cfg.storeName);
   if (cfg.locale) url.searchParams.set("locale", cfg.locale);
   if (cfg.apiKey) url.searchParams.set("apiKey", cfg.apiKey);
+  if (cfg.merchantOrgId) url.searchParams.set("merchantOrgId", cfg.merchantOrgId);
   if (cfg.theme) {
     url.searchParams.set("theme", encodeTheme(cfg.theme));
   }
@@ -200,6 +203,7 @@ export function readEmbedConfigFromUrl(href: string): EmbedConfig {
     storeName: url.searchParams.get("storeName") ?? undefined,
     locale: url.searchParams.get("locale") ?? undefined,
     apiKey: url.searchParams.get("apiKey") ?? undefined,
+    merchantOrgId: url.searchParams.get("merchantOrgId") ?? undefined,
     theme: themeRaw ? decodeTheme(themeRaw) : undefined,
     handoff,
   };

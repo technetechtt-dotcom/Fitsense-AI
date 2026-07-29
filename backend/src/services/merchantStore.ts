@@ -286,6 +286,7 @@ export type InventoryRow = {
   productId: string;
   sizeSystem: string;
   sizeLabel: string;
+  widthLabel: string;
   quantity: number;
   updatedAtEpochMs?: number;
 };
@@ -296,14 +297,17 @@ export async function listInventory(orgId: string): Promise<InventoryRow[]> {
     product_id: string;
     size_system: string;
     size_label: string;
+    width_label: string;
     quantity: number;
     updated_at: Date;
   }>(
     `
-      SELECT product_id, size_system, size_label, quantity, updated_at
+      SELECT product_id, size_system, size_label,
+             COALESCE(width_label, 'standard') AS width_label,
+             quantity, updated_at
       FROM catalogue_inventory
       WHERE org_id = $1
-      ORDER BY product_id, size_system, size_label
+      ORDER BY product_id, size_system, size_label, width_label
     `,
     [orgId],
   );
@@ -311,6 +315,7 @@ export async function listInventory(orgId: string): Promise<InventoryRow[]> {
     productId: r.product_id,
     sizeSystem: r.size_system,
     sizeLabel: r.size_label,
+    widthLabel: r.width_label || "standard",
     quantity: r.quantity,
     updatedAtEpochMs: r.updated_at?.getTime?.() ?? undefined,
   }));
@@ -322,6 +327,7 @@ export async function upsertInventory(
     productId: string;
     sizeSystem: string;
     sizeLabel: string;
+    widthLabel?: string;
     quantity: number;
   }>,
 ): Promise<{ upserted: number }> {
@@ -332,16 +338,17 @@ export async function upsertInventory(
   try {
     await client.query("BEGIN");
     for (const row of rows) {
+      const widthLabel = (row.widthLabel ?? "standard").trim() || "standard";
       await client.query(
         `
           INSERT INTO catalogue_inventory (
-            org_id, product_id, size_system, size_label, quantity, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, now())
-          ON CONFLICT (org_id, product_id, size_system, size_label) DO UPDATE SET
+            org_id, product_id, size_system, size_label, width_label, quantity, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, now())
+          ON CONFLICT (org_id, product_id, size_system, size_label, width_label) DO UPDATE SET
             quantity = EXCLUDED.quantity,
             updated_at = now()
         `,
-        [orgId, row.productId, row.sizeSystem, row.sizeLabel, row.quantity],
+        [orgId, row.productId, row.sizeSystem, row.sizeLabel, widthLabel, row.quantity],
       );
       upserted += 1;
     }
@@ -353,6 +360,74 @@ export async function upsertInventory(
     client.release();
   }
   return { upserted };
+}
+
+export type OutcomeRow = {
+  outcomeId: string;
+  kind: string;
+  productId: string | null;
+  brand: string | null;
+  sizeLabel: string | null;
+  sizeSystem: string | null;
+  fitId: string | null;
+  reason: string | null;
+  orderId: string | null;
+  data: Record<string, unknown>;
+  createdAtEpochMs: number;
+};
+
+export async function listOutcomes(
+  orgId: string,
+  opts: { sinceEpochMs?: number; limit?: number } = {},
+): Promise<OutcomeRow[]> {
+  await ensureMerchantSchema();
+  const limit = Math.min(Math.max(opts.limit ?? 200, 1), 1000);
+  const since =
+    opts.sinceEpochMs === undefined || opts.sinceEpochMs === null
+      ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      : new Date(opts.sinceEpochMs);
+  const result = await getPostgresPool().query<{
+    outcome_id: string;
+    kind: string;
+    product_id: string | null;
+    brand: string | null;
+    size_label: string | null;
+    size_system: string | null;
+    fit_id: string | null;
+    reason: string | null;
+    data: Record<string, unknown> | null;
+    created_at: Date;
+  }>(
+    `
+      SELECT outcome_id, kind, product_id, brand, size_label, size_system,
+             fit_id, reason, data, created_at
+      FROM merchant_outcomes
+      WHERE org_id = $1 AND created_at >= $2
+      ORDER BY created_at DESC
+      LIMIT $3
+    `,
+    [orgId, since, limit],
+  );
+  return result.rows.map((r) => {
+    const data =
+      r.data && typeof r.data === "object" && !Array.isArray(r.data)
+        ? (r.data as Record<string, unknown>)
+        : {};
+    const orderId = typeof data.orderId === "string" ? data.orderId : null;
+    return {
+      outcomeId: r.outcome_id,
+      kind: r.kind,
+      productId: r.product_id,
+      brand: r.brand,
+      sizeLabel: r.size_label,
+      sizeSystem: r.size_system,
+      fitId: r.fit_id,
+      reason: r.reason,
+      orderId,
+      data,
+      createdAtEpochMs: r.created_at.getTime(),
+    };
+  });
 }
 
 export async function upsertBrandFitProfile(input: {

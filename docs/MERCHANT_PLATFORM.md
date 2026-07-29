@@ -27,13 +27,18 @@ Partner **API keys** (`X-Api-Key: fs_live_…`) act as **operator**.
 | GET     | `/v1/merchants/orgs/:orgId/inventory`              | viewer+                                                     |
 | PUT/GET | `/v1/merchants/orgs/:orgId/brand-fit`              | operator+ / viewer+                                         |
 | POST    | `/v1/merchants/orgs/:orgId/outcomes`               | operator+ or API key (`purchase` \| `return` \| `exchange`) |
+| GET     | `/v1/merchants/orgs/:orgId/outcomes`               | viewer+ (`?format=csv`, `sinceEpochMs`, `limit`)            |
 | GET     | `/v1/merchants/orgs/:orgId/pilot-metrics`          | viewer+                                                     |
 
 Catalogue ingest accepts ≤ 200 products per request. Inventory ≤ 500 rows.
 
+Inventory rows support optional `widthLabel` (default `standard`) so UK 5 / wide stock can sit beside UK 5 / standard.
+
 ### Outcomes + orders
 
 Optional `orderId` on POST outcomes is stored in `data.orderId` for retail attribution. Return rate = `returns ÷ purchases` (not diluted by mixing kinds).
+
+`GET .../outcomes` lists recent rows (default last 90 days). `?format=csv` downloads a CSV for weekly pilot reconciliation.
 
 ## Web portal
 
@@ -46,6 +51,8 @@ In-app route: **`/merchant`** (also linked from Home + Settings).
 - Create / list / revoke API keys
 - View pilot metrics
 - Loaded merchant catalogue replaces the built-in demo shelf for recommendations (`src/lib/catalogueRuntime.ts`)
+- Embed: pass `merchantOrgId` + `apiKey` (query / SDK / `data-merchant-org-id`) to load the same catalogue inside `?embed=1`
+- Recommendations soft-prefer in-stock SKUs when inventory is loaded (OOS still shown, labeled)
 
 Requires `VITE_API_BASE_URL` and device cloud auth. Optional `VITE_MERCHANT_ORG_ID` / `VITE_MERCHANT_API_KEY` for kiosk brand-fit bootstrap.
 

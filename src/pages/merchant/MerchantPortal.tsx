@@ -24,6 +24,8 @@ import {
   listCatalogue,
   listInventory,
   listMerchantOrgs,
+  listMerchantOutcomes,
+  downloadMerchantOutcomesCsv,
   listOrgApiKeys,
   listOrgBrandFits,
   recordMerchantOutcome,
@@ -36,6 +38,7 @@ import {
   type CatalogueProduct,
   type InventoryItem,
   type MerchantOrg,
+  type MerchantOutcomeRow,
   type PilotMetrics,
 } from "../../lib/api/merchantApi";
 
@@ -71,6 +74,7 @@ export function MerchantPortal() {
   const [outcomeReason, setOutcomeReason] = useState("");
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [outcomes, setOutcomes] = useState<MerchantOutcomeRow[]>([]);
   const [brandFits, setBrandFits] = useState<
     Array<BrandFitProfileInput & Record<string, unknown>>
   >([]);
@@ -96,16 +100,20 @@ export function MerchantPortal() {
 
   async function refreshCatalogueAndMetrics() {
     if (!apiReady || !orgId) return;
-    const [cat, met, inv, fits] = await Promise.all([
+    const [cat, met, inv, fits, outs] = await Promise.all([
       listCatalogue(orgId),
       fetchPilotMetrics(orgId),
       listInventory(orgId),
       listOrgBrandFits(orgId),
+      listMerchantOutcomes(orgId, { limit: 50 }).catch(
+        () => [] as MerchantOutcomeRow[],
+      ),
     ]);
     setProducts(cat);
     setMetrics(met);
     setInventory(inv);
     setBrandFits(fits);
+    setOutcomes(outs);
     if (!outcomeProductId && cat[0]) setOutcomeProductId(cat[0].productId);
     await loadMerchantCatalogue(orgId).catch(() => 0);
   }
@@ -392,11 +400,14 @@ export function MerchantPortal() {
               <ul className="space-y-2 max-h-80 overflow-y-auto">
                 {inventory.map((row) => (
                   <li
-                    key={`${row.productId}-${row.sizeSystem}-${row.sizeLabel}`}
+                    key={`${row.productId}-${row.sizeSystem}-${row.sizeLabel}-${row.widthLabel ?? "standard"}`}
                     className="rounded-xl bg-surface-2 border border-white/5 px-3 py-2 text-xs flex justify-between gap-2"
                   >
                     <span>
                       {row.productId} · {row.sizeSystem.toUpperCase()} {row.sizeLabel}
+                      {row.widthLabel && row.widthLabel !== "standard"
+                        ? ` · ${row.widthLabel}`
+                        : ""}
                     </span>
                     <span className="font-semibold text-neon">qty {row.quantity}</span>
                   </li>
@@ -573,11 +584,62 @@ export function MerchantPortal() {
                   });
                   setStatus(`Recorded ${outcomeKind} (${result.outcomeId})`);
                   setMetrics(await fetchPilotMetrics(orgId));
+                  setOutcomes(await listMerchantOutcomes(orgId, { limit: 50 }));
                 })
               }
             >
               Record {outcomeKind}
             </PrimaryButton>
+          </div>
+
+          <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Recent outcomes</h2>
+              <button
+                type="button"
+                className="text-xs text-neon"
+                disabled={busy || !orgId || !apiReady}
+                onClick={() =>
+                  void withBusy(async () => {
+                    if (!orgId) return;
+                    const blob = await downloadMerchantOutcomesCsv(orgId);
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `outcomes-${orgId}.csv`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    setStatus("CSV downloaded");
+                  })
+                }
+              >
+                Download CSV
+              </button>
+            </div>
+            {outcomes.length === 0 ? (
+              <p className="text-xs text-ink-muted">No outcomes in the last 90 days.</p>
+            ) : (
+              <ul className="space-y-2 max-h-72 overflow-y-auto">
+                {outcomes.map((o) => (
+                  <li
+                    key={o.outcomeId}
+                    className="rounded-xl bg-surface-2 border border-white/5 px-3 py-2 text-xs"
+                  >
+                    <div className="font-semibold">
+                      {o.kind}
+                      {o.orderId ? ` · order ${o.orderId}` : ""}
+                    </div>
+                    <div className="text-ink-muted">
+                      {o.productId ?? "—"}
+                      {o.sizeLabel ? ` · ${o.sizeSystem ?? ""} ${o.sizeLabel}` : ""}
+                      {o.reason ? ` · ${o.reason}` : ""}
+                      {" · "}
+                      {new Date(o.createdAtEpochMs).toLocaleString()}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </section>
       ) : null}
@@ -696,36 +758,42 @@ const SAMPLE_INVENTORY: Array<{
   productId: string;
   sizeSystem: "uk" | "us" | "eu" | "mondopoint";
   sizeLabel: string;
+  widthLabel?: string;
   quantity: number;
 }> = [
   {
     productId: "bata-power-school-01",
     sizeSystem: "uk",
     sizeLabel: "4",
+    widthLabel: "standard",
     quantity: 8,
   },
   {
     productId: "bata-power-school-01",
     sizeSystem: "uk",
     sizeLabel: "5",
+    widthLabel: "standard",
     quantity: 12,
   },
   {
     productId: "bata-power-school-01",
     sizeSystem: "uk",
     sizeLabel: "6",
+    widthLabel: "standard",
     quantity: 10,
   },
   {
     productId: "bata-power-school-02",
     sizeSystem: "uk",
     sizeLabel: "5",
+    widthLabel: "wide",
     quantity: 6,
   },
   {
     productId: "bata-power-school-02",
     sizeSystem: "uk",
     sizeLabel: "6",
+    widthLabel: "wide",
     quantity: 9,
   },
 ];

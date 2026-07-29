@@ -44,6 +44,13 @@ export interface ShoeMatch {
   /** 0..100 — broader comfort estimate. */
   comfortScore: number;
   imageUrl?: string;
+  /**
+   * When merchant inventory is loaded: true if any size is in stock,
+   * false if tracked but OOS, undefined if no inventory data.
+   */
+  inStock?: boolean;
+  /** UK size labels with quantity &gt; 0 (merchant inventory). */
+  stockUkLabels?: string[];
 }
 
 export interface SizeRecommendation {

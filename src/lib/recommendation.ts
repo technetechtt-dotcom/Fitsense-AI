@@ -15,6 +15,11 @@ import {
 import { euAsNumber, sizeForEu, sizeForLengthMm } from "./sizing";
 import { brandFitFor } from "../data/brandFit";
 import { hasAiPersonalizationConsent } from "./consent";
+import {
+  getActiveInventory,
+  inStockUkLabels,
+  productHasAnyStock,
+} from "./catalogueRuntime";
 import { loadRanker, scoreProduct } from "./ml/learnedRanker";
 
 /**
@@ -196,7 +201,9 @@ export function recommend(
 }
 
 function sortScore(m: ShoeMatch): number {
-  return m.fitScore + m.comfortScore;
+  // Soft-prefer in-stock SKUs when merchant inventory is present; never drop OOS.
+  const stockBoost = m.inStock === true ? 8 : m.inStock === false ? -12 : 0;
+  return m.fitScore * 0.55 + m.comfortScore * 0.45 + stockBoost;
 }
 
 function buildMatch(
@@ -273,6 +280,12 @@ function buildMatch(
     fitScore: fit,
     comfortScore: comfort,
     imageUrl: product.imageUrl,
+    inStock:
+      getActiveInventory().length > 0
+        ? (productHasAnyStock(product.productId) ?? false)
+        : undefined,
+    stockUkLabels:
+      getActiveInventory().length > 0 ? inStockUkLabels(product.productId) : undefined,
   };
 }
 

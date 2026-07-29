@@ -48,36 +48,42 @@
       "productId": "bata-power-school-01",
       "sizeSystem": "uk",
       "sizeLabel": "4",
+      "widthLabel": "standard",
       "quantity": 8
     },
     {
       "productId": "bata-power-school-01",
       "sizeSystem": "uk",
       "sizeLabel": "5",
+      "widthLabel": "standard",
       "quantity": 12
     },
     {
       "productId": "bata-power-school-01",
       "sizeSystem": "uk",
       "sizeLabel": "6",
+      "widthLabel": "standard",
       "quantity": 10
     },
     {
       "productId": "bata-power-school-02",
       "sizeSystem": "uk",
       "sizeLabel": "5",
+      "widthLabel": "wide",
       "quantity": 6
     },
     {
       "productId": "bata-power-school-02",
       "sizeSystem": "uk",
       "sizeLabel": "6",
+      "widthLabel": "wide",
       "quantity": 9
     },
     {
       "productId": "bata-power-school-03",
       "sizeSystem": "uk",
       "sizeLabel": "7",
+      "widthLabel": "standard",
       "quantity": 4
     }
   ]

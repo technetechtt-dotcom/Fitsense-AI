@@ -12,7 +12,14 @@ import {
 } from "lucide-react";
 import { buildScanResult } from "../lib/measurement";
 import { recommend } from "../lib/recommendation";
-import { getActiveCatalogue } from "../lib/catalogueRuntime";
+import { getActiveCatalogue, loadMerchantCatalogue } from "../lib/catalogueRuntime";
+import {
+  getMerchantOrgId,
+  loadMerchantBrandFits,
+  setMerchantOrgId,
+  setSessionMerchantApiKey,
+} from "../lib/api/merchantApi";
+import { isApiConfigured } from "../lib/api/config";
 import { CALIBRATION_META, primaryFoot, widthToLengthRatio } from "../types";
 import type { CalibrationReference, FootMeasurement, ScanResult } from "../types";
 import { ArScanner } from "../components/ArScanner";
@@ -94,6 +101,21 @@ export function EmbedApp() {
 
   const isPhoneReceiver = !!config.handoff?.sessionId && !!config.handoff?.publishToken;
   const demoScanEnabled = isDemoScanEnabled();
+
+  // Load partner catalogue / brand-fit when org + API are configured (embed
+  // skips App bootstrap, so this is the only load path for iframe mode).
+  useEffect(() => {
+    const orgId = config.merchantOrgId?.trim() || getMerchantOrgId();
+    if (config.apiKey) setSessionMerchantApiKey(config.apiKey);
+    if (orgId) setMerchantOrgId(orgId);
+    if (!orgId || !isApiConfigured()) return;
+    void loadMerchantCatalogue(orgId).catch((err) =>
+      console.warn("[fitsense embed] catalogue load failed", err),
+    );
+    void loadMerchantBrandFits(orgId).catch((err) =>
+      console.warn("[fitsense embed] brand-fit load failed", err),
+    );
+  }, [config.merchantOrgId, config.apiKey]);
 
   // Announce readiness + accept reconfiguration from the host page.
   useEffect(() => {

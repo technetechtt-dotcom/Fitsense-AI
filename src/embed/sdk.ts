@@ -360,6 +360,7 @@ interface TriggerDataset {
   storeName?: string;
   locale?: string;
   apiKey?: string;
+  merchantOrgId?: string;
   themePrimary?: string;
   themeBg?: string;
   themeText?: string;
@@ -399,6 +400,7 @@ function readTriggerOptions(el: HTMLElement): OpenOptions {
     storeName: d.storeName,
     locale: d.locale,
     apiKey: d.apiKey,
+    merchantOrgId: d.merchantOrgId,
     theme,
     handoff,
     onSize:

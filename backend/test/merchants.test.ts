@@ -151,7 +151,15 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
           productId: "bata-power-school-01",
           sizeSystem: "uk",
           sizeLabel: "5",
+          widthLabel: "standard",
           quantity: 12,
+        },
+        {
+          productId: "bata-power-school-02",
+          sizeSystem: "uk",
+          sizeLabel: "5",
+          widthLabel: "wide",
+          quantity: 4,
         },
       ],
     }),
@@ -163,9 +171,14 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
   });
   assert.equal(invList.status, 200);
   const invBody = (await invList.json()) as {
-    items: Array<{ productId: string; quantity: number }>;
+    items: Array<{ productId: string; quantity: number; widthLabel?: string }>;
   };
   assert.ok(invBody.items.some((i) => i.productId === "bata-power-school-01"));
+  assert.ok(
+    invBody.items.some(
+      (i) => i.productId === "bata-power-school-02" && i.widthLabel === "wide",
+    ),
+  );
 
   for (const kind of ["purchase", "purchase", "return", "exchange"] as const) {
     const outcome = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes`, {
@@ -206,6 +219,26 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
   assert.equal(body.returnRate, 0.5);
   assert.equal(body.exchangeRate, 0.5);
   assert.equal(body.sizeRelatedRate, 1.0);
+
+  const outcomesList = await fetch(
+    `${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes?limit=10`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  assert.equal(outcomesList.status, 200);
+  const outcomesBody = (await outcomesList.json()) as {
+    outcomes: Array<{ kind: string; orderId: string | null }>;
+  };
+  assert.ok(outcomesBody.outcomes.length >= 4);
+  assert.ok(outcomesBody.outcomes.some((o) => o.orderId === "KIM-ORD-1001"));
+
+  const outcomesCsv = await fetch(
+    `${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes?format=csv`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  assert.equal(outcomesCsv.status, 200);
+  const csvText = await outcomesCsv.text();
+  assert.ok(csvText.includes("outcomeId,kind"));
+  assert.ok(csvText.includes("KIM-ORD-1001"));
 
   const listKeys = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/api-keys`, {
     headers: { Authorization: `Bearer ${accessToken}` },

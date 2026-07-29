@@ -14,6 +14,7 @@ import {
   listInventory,
   listMembers,
   listOrgsForDevice,
+  listOutcomes,
   listProducts,
   pilotMetrics,
   recordOutcome,
@@ -79,6 +80,8 @@ const inventorySchema = z.object({
         productId: documentIdSchema,
         sizeSystem: z.enum(["uk", "us", "eu", "mondopoint"]),
         sizeLabel: z.string().trim().min(1).max(32),
+        /** Fitting width (e.g. standard, wide, D, EE). Defaults to standard. */
+        widthLabel: z.string().trim().min(1).max(32).optional(),
         quantity: z.number().int().nonnegative(),
       }),
     )
@@ -321,6 +324,50 @@ merchantRouter.post(
         data: Object.keys(data).length ? data : undefined,
       });
       res.status(201).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.get(
+  "/merchants/orgs/:orgId/outcomes",
+  requireOrgRole("viewer"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      const since = req.query.sinceEpochMs ? Number(req.query.sinceEpochMs) : undefined;
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const rows = await listOutcomes(req.orgId!, { sinceEpochMs: since, limit });
+      const format = String(req.query.format ?? "json").toLowerCase();
+      if (format === "csv") {
+        const header =
+          "outcomeId,kind,productId,brand,sizeSystem,sizeLabel,orderId,reason,createdAtEpochMs";
+        const escape = (v: string | null | undefined) => {
+          const s = v ?? "";
+          return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+        const lines = rows.map((r) =>
+          [
+            r.outcomeId,
+            r.kind,
+            escape(r.productId),
+            escape(r.brand),
+            escape(r.sizeSystem),
+            escape(r.sizeLabel),
+            escape(r.orderId),
+            escape(r.reason),
+            String(r.createdAtEpochMs),
+          ].join(","),
+        );
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="outcomes-${req.orgId}.csv"`,
+        );
+        res.send([header, ...lines].join("\n"));
+        return;
+      }
+      res.json({ outcomes: rows });
     } catch (err) {
       next(err);
     }

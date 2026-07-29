@@ -161,9 +161,10 @@ CREATE TABLE IF NOT EXISTS catalogue_inventory (
   product_id text NOT NULL,
   size_system text NOT NULL,
   size_label text NOT NULL,
+  width_label text NOT NULL DEFAULT 'standard',
   quantity integer NOT NULL DEFAULT 0,
   updated_at timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (org_id, product_id, size_system, size_label)
+  PRIMARY KEY (org_id, product_id, size_system, size_label, width_label)
 );
 
 CREATE TABLE IF NOT EXISTS brand_fit_profiles (

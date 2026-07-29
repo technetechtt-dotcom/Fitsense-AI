@@ -10,6 +10,13 @@ import type { BrandFitDelta } from "../../types";
 
 const ORG_STORAGE_KEY = "fitsense:merchantOrgId";
 
+/** Session override for embed/kiosk X-Api-Key (URL/SDK), else env. */
+let sessionMerchantApiKey: string | null = null;
+
+export function setSessionMerchantApiKey(apiKey: string | null): void {
+  sessionMerchantApiKey = apiKey?.trim() || null;
+}
+
 export function getMerchantOrgId(): string | null {
   if (typeof window !== "undefined") {
     const stored = localStorage.getItem(ORG_STORAGE_KEY)?.trim();
@@ -25,7 +32,7 @@ export function setMerchantOrgId(orgId: string | null): void {
 }
 
 export function getMerchantApiKey(): string | null {
-  return import.meta.env.VITE_MERCHANT_API_KEY?.trim() || null;
+  return sessionMerchantApiKey || import.meta.env.VITE_MERCHANT_API_KEY?.trim() || null;
 }
 
 async function merchantFetch(
@@ -159,6 +166,7 @@ export async function upsertInventory(
     productId: string;
     sizeSystem: "uk" | "us" | "eu" | "mondopoint";
     sizeLabel: string;
+    widthLabel?: string;
     quantity: number;
   }>,
 ): Promise<{ upserted: number }> {
@@ -174,6 +182,7 @@ export type InventoryItem = {
   productId: string;
   sizeSystem: string;
   sizeLabel: string;
+  widthLabel?: string;
   quantity: number;
   updatedAtEpochMs?: number;
 };
@@ -240,6 +249,46 @@ export async function recordMerchantOutcome(
   );
   if (!res.ok) throw new Error(`outcome failed: ${res.status}`);
   return (await res.json()) as { outcomeId: string };
+}
+
+export type MerchantOutcomeRow = {
+  outcomeId: string;
+  kind: string;
+  productId: string | null;
+  brand: string | null;
+  sizeLabel: string | null;
+  sizeSystem: string | null;
+  fitId: string | null;
+  reason: string | null;
+  orderId: string | null;
+  data: Record<string, unknown>;
+  createdAtEpochMs: number;
+};
+
+export async function listMerchantOutcomes(
+  orgId: string,
+  opts?: { sinceEpochMs?: number; limit?: number },
+): Promise<MerchantOutcomeRow[]> {
+  const params = new URLSearchParams();
+  if (opts?.sinceEpochMs !== undefined) {
+    params.set("sinceEpochMs", String(opts.sinceEpochMs));
+  }
+  if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
+  const q = params.toString() ? `?${params}` : "";
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/outcomes${q}`,
+  );
+  if (!res.ok) throw new Error(`outcomes list failed: ${res.status}`);
+  const body = (await res.json()) as { outcomes?: MerchantOutcomeRow[] };
+  return body.outcomes ?? [];
+}
+
+export async function downloadMerchantOutcomesCsv(orgId: string): Promise<Blob> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/outcomes?format=csv`,
+  );
+  if (!res.ok) throw new Error(`outcomes csv failed: ${res.status}`);
+  return res.blob();
 }
 
 export async function fetchPilotMetrics(
