@@ -20,7 +20,7 @@ Operational work that cannot be completed in code alone. Track progress here.
 | Item                                | Status  | Notes                                                               |
 | ----------------------------------- | ------- | ------------------------------------------------------------------- |
 | Merchant portal UI                  | Done    | `/merchant` — orgs, catalogue, inventory, brand-fit, outcomes, keys |
-| Real footwear retailer catalogue    | Open    | Sample feed: `docs/samples/kimberley-catalogue-feed.json`           |
+| Real footwear retailer catalogue    | Partial | Sample feed + Android/web merchant catalogue load                   |
 | Variants, sizes, widths, inventory  | Partial | `widthLabel` on inventory; portal + sample feed; stock-aware recs   |
 | Outcomes ↔ real orders              | Partial | `orderId` + list/CSV export for weekly pilot reconcile              |
 | Passkey customer accounts           | Open    | Explicitly deferred — no stubs                                      |

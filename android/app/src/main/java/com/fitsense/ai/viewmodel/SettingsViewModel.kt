@@ -27,6 +27,8 @@ class SettingsViewModel @Inject constructor(
     private val accuracyDatasetStore: com.fitsense.ai.accuracy.AccuracyDatasetStore,
     private val fitIdentityClient: com.fitsense.ai.identity.FitIdentityClient,
     private val syncClient: com.fitsense.ai.sync.SyncClient,
+    private val merchantPrefs: com.fitsense.ai.api.MerchantPrefs,
+    private val catalogueRuntime: com.fitsense.ai.recommendation.CatalogueRuntime,
 ) : ViewModel() {
 
     val profile: StateFlow<UserProfile?> = userRepository.profile
@@ -61,11 +63,27 @@ class SettingsViewModel @Inject constructor(
     private val _shareToken = MutableStateFlow<String?>(null)
     val shareToken: StateFlow<String?> = _shareToken.asStateFlow()
 
+    private val _merchantOrgId = MutableStateFlow("")
+    val merchantOrgId: StateFlow<String> = _merchantOrgId.asStateFlow()
+
+    private val _merchantApiKey = MutableStateFlow("")
+    val merchantApiKey: StateFlow<String> = _merchantApiKey.asStateFlow()
+
+    private val _catalogueSource = MutableStateFlow("builtin")
+    val catalogueSource: StateFlow<String> = _catalogueSource.asStateFlow()
+
+    private val _catalogueCount = MutableStateFlow(0)
+    val catalogueCount: StateFlow<Int> = _catalogueCount.asStateFlow()
+
     init {
         viewModelScope.launch {
             userRepository.ensureSignedIn()
             refreshSyncStatus()
             refreshAccuracyCount()
+            _merchantOrgId.value = merchantPrefs.orgId().orEmpty()
+            _merchantApiKey.value = merchantPrefs.apiKey().orEmpty()
+            _catalogueSource.value = catalogueRuntime.source()
+            _catalogueCount.value = catalogueRuntime.getActiveCatalogue().size
             val enabled = profile.value?.preferences?.cloudSyncOptIn == true
             if (enabled) {
                 cloudSyncCoordinator.flushOutbox()
@@ -237,6 +255,31 @@ class SettingsViewModel @Inject constructor(
             }
             _statusMessage.value =
                 "Recovered Fit ID ${recovered.fitId}. Length=${length ?: "—"} Width=${width ?: "—"}"
+        }
+    }
+
+    fun saveMerchantCatalogueConfig(orgId: String, apiKey: String) {
+        viewModelScope.launch {
+            merchantPrefs.save(orgId.trim().ifEmpty { null }, apiKey.trim().ifEmpty { null })
+            _merchantOrgId.value = orgId.trim()
+            _merchantApiKey.value = apiKey.trim()
+            val n = runCatching { catalogueRuntime.loadFromConfig() }.getOrDefault(0)
+            _catalogueSource.value = catalogueRuntime.source()
+            _catalogueCount.value = catalogueRuntime.getActiveCatalogue().size
+            _statusMessage.value =
+                if (n > 0) "Loaded $n merchant products (${catalogueRuntime.source()})."
+                else "No merchant catalogue — using built-in demo shelf."
+        }
+    }
+
+    fun reloadMerchantCatalogue() {
+        viewModelScope.launch {
+            val n = runCatching { catalogueRuntime.loadFromConfig() }.getOrDefault(0)
+            _catalogueSource.value = catalogueRuntime.source()
+            _catalogueCount.value = catalogueRuntime.getActiveCatalogue().size
+            _statusMessage.value =
+                if (n > 0) "Reloaded $n merchant products."
+                else "Catalogue reload empty — check API URL, org id, and API key."
         }
     }
 

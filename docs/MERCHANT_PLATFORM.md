@@ -53,6 +53,19 @@ In-app route: **`/merchant`** (also linked from Home + Settings).
 - Loaded merchant catalogue replaces the built-in demo shelf for recommendations (`src/lib/catalogueRuntime.ts`)
 - Embed: pass `merchantOrgId` + `apiKey` (query / SDK / `data-merchant-org-id`) to load the same catalogue inside `?embed=1`
 - Recommendations soft-prefer in-stock SKUs when inventory is loaded (OOS still shown, labeled)
+- Android: Settings → Merchant catalogue (org id + API key); splash loads catalogue into `CatalogueRuntime` for scan + recommendations
+
+## Android
+
+Set in `android/local.properties` (see `local.properties.example`):
+
+```
+fitsense.api.baseUrl=https://…
+fitsense.merchant.orgId=org_…
+fitsense.merchant.apiKey=fs_live_…
+```
+
+Or configure at runtime in Settings. Without org/API, the app keeps the built-in demo shelf.
 
 Requires `VITE_API_BASE_URL` and device cloud auth. Optional `VITE_MERCHANT_ORG_ID` / `VITE_MERCHANT_API_KEY` for kiosk brand-fit bootstrap.
 

@@ -49,6 +49,17 @@ android {
             "API_BASE_URL",
             "\"${localProps.getProperty("fitsense.api.baseUrl", "")}\"",
         )
+        // Optional Kimberley / partner catalogue defaults (override in Settings).
+        buildConfigField(
+            "String",
+            "MERCHANT_ORG_ID",
+            "\"${localProps.getProperty("fitsense.merchant.orgId", "")}\"",
+        )
+        buildConfigField(
+            "String",
+            "MERCHANT_API_KEY",
+            "\"${localProps.getProperty("fitsense.merchant.apiKey", "")}\"",
+        )
     }
 
     buildTypes {

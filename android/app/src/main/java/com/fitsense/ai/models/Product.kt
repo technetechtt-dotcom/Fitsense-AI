@@ -27,7 +27,7 @@ data class SizeRange(val min: Double, val max: Double, val step: Double = 1.0) {
     fun contains(size: Double): Boolean = size in min..max
 }
 
-enum class ShoeCategory { SNEAKER, RUNNING, CASUAL, FORMAL, BOOT, SANDAL }
+enum class ShoeCategory { SNEAKER, RUNNING, CASUAL, FORMAL, BOOT, SANDAL, SCHOOL, SAFETY }
 
 /**
  * Width / volume profile of a last (shoe shape).

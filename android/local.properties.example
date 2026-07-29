@@ -6,3 +6,10 @@ sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
 
 # Optional: override Gradle JDK (must be 17+). If unset, see gradle.properties.
 # jdk.dir=C\:\\Program Files\\Android\\Android Studio\\jbr
+
+# Optional FitSense API (cloud auth / sync / merchant catalogue).
+# fitsense.api.baseUrl=https://fitsense-api-1rne.onrender.com
+
+# Optional merchant catalogue defaults (also configurable in Settings).
+# fitsense.merchant.orgId=org_...
+# fitsense.merchant.apiKey=fs_live_...

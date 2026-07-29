@@ -148,6 +148,8 @@ class RecommendationEngine @Inject constructor(
         val categoryBoost = when (product.category) {
             com.fitsense.ai.models.ShoeCategory.RUNNING,
             com.fitsense.ai.models.ShoeCategory.SNEAKER -> 0.08
+            com.fitsense.ai.models.ShoeCategory.SCHOOL,
+            com.fitsense.ai.models.ShoeCategory.SAFETY,
             com.fitsense.ai.models.ShoeCategory.CASUAL -> 0.04
             else -> 0.0
         }

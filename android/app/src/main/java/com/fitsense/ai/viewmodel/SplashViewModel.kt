@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.fitsense.ai.recommendation.CatalogueRuntime
 import com.fitsense.ai.repository.UserRepository
 import com.fitsense.ai.ui.navigation.Destinations
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,6 +26,7 @@ import javax.inject.Inject
 class SplashViewModel @Inject constructor(
     private val userRepository: UserRepository,
     private val dataStore: DataStore<Preferences>,
+    private val catalogueRuntime: CatalogueRuntime,
 ) : ViewModel() {
 
     private val _startDestination = MutableStateFlow<Destinations?>(null)
@@ -38,6 +40,10 @@ class SplashViewModel @Inject constructor(
 
             // Anonymous sign-in fires concurrently — we don't block landing on it.
             launch { userRepository.ensureSignedIn() }
+            // Merchant catalogue when org/API configured (falls back to builtin).
+            launch {
+                runCatching { catalogueRuntime.loadFromConfig() }
+            }
 
             _startDestination.value =
                 if (onboarded) Destinations.Home else Destinations.Onboarding

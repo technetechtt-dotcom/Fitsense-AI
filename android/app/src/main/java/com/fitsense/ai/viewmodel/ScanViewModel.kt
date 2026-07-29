@@ -19,6 +19,7 @@ import com.fitsense.ai.models.Foot
 import com.fitsense.ai.models.FootMeasurement
 import com.fitsense.ai.models.ScanResult
 import com.fitsense.ai.recommendation.RecommendationEngine
+import com.fitsense.ai.repository.ProductRepository
 import com.fitsense.ai.repository.ScanRepository
 import com.fitsense.ai.repository.UserRepository
 import com.fitsense.ai.utils.DataResult
@@ -48,6 +49,7 @@ class ScanViewModel @Inject constructor(
     private val scanRepository: ScanRepository,
     private val userRepository: UserRepository,
     private val recommendationEngine: RecommendationEngine,
+    private val productRepository: ProductRepository,
     private val accuracyDatasetStore: AccuracyDatasetStore,
     private val cloudSyncCoordinator: com.fitsense.ai.sync.CloudSyncCoordinator,
 ) : ViewModel() {
@@ -438,7 +440,11 @@ class ScanViewModel @Inject constructor(
                     val scanId = UUID.randomUUID().toString()
                     val sizingFoot = listOfNotNull(state.leftFoot, state.rightFoot)
                         .maxByOrNull { it.lengthMm } ?: primary
-                    val recommendation = recommendationEngine.recommend(sizingFoot)
+                    val products = when (val p = productRepository.getAllProducts()) {
+                        is DataResult.Success -> p.value
+                        is DataResult.Failure -> emptyList()
+                    }
+                    val recommendation = recommendationEngine.recommend(sizingFoot, products)
                     val scan = ScanResult(
                         scanId = scanId,
                         userId = userId,
