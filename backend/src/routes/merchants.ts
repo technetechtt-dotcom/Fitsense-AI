@@ -11,6 +11,7 @@ import {
   ingestProducts,
   listApiKeys,
   listBrandFitProfiles,
+  listInventory,
   listMembers,
   listOrgsForDevice,
   listProducts,
@@ -261,6 +262,18 @@ merchantRouter.put(
       const body = inventorySchema.parse(req.body);
       const result = await upsertInventory(req.orgId!, body.items);
       res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.get(
+  "/merchants/orgs/:orgId/inventory",
+  requireOrgRole("viewer"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      res.json({ items: await listInventory(req.orgId!) });
     } catch (err) {
       next(err);
     }

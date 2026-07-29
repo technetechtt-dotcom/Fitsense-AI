@@ -8,7 +8,7 @@ import { ShoeCard } from "../components/ShoeCard";
 import { Loading } from "../components/Loading";
 import { ErrorState } from "../components/ErrorState";
 import { FitFeedback } from "../components/FitFeedback";
-import { SHOE_CATALOG } from "../data/catalog";
+import { getActiveCatalogue } from "../lib/catalogueRuntime";
 import {
   buildBrandSizeSheet,
   recommend,
@@ -39,7 +39,7 @@ export function Recommendations() {
     if (!scan || !fitProfile) return null;
     const foot = primaryFoot(scan);
     if (!foot) return null;
-    return recommend(foot, SHOE_CATALOG, {
+    return recommend(foot, getActiveCatalogue(), {
       preferredBrands: profile?.preferences.preferredBrands,
       profile: fitProfile,
     });

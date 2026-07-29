@@ -170,6 +170,56 @@ export async function upsertInventory(
   return (await res.json()) as { upserted: number };
 }
 
+export type InventoryItem = {
+  productId: string;
+  sizeSystem: string;
+  sizeLabel: string;
+  quantity: number;
+  updatedAtEpochMs?: number;
+};
+
+export async function listInventory(orgId: string): Promise<InventoryItem[]> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/inventory`,
+  );
+  if (!res.ok) throw new Error(`inventory list failed: ${res.status}`);
+  const body = (await res.json()) as { items?: InventoryItem[] };
+  return body.items ?? [];
+}
+
+export type BrandFitProfileInput = {
+  brand: string;
+  model?: string;
+  euSizeDelta: number;
+  toeBoxWidth: "narrow" | "regular" | "wide" | "extra_wide";
+  midsoleFeel: "firm" | "balanced" | "soft" | "unknown";
+  note?: string;
+};
+
+export async function upsertOrgBrandFit(
+  orgId: string,
+  profile: BrandFitProfileInput,
+): Promise<void> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/brand-fit`,
+    { method: "PUT", body: JSON.stringify(profile) },
+  );
+  if (res.status !== 204) throw new Error(`brand-fit upsert failed: ${res.status}`);
+}
+
+export async function listOrgBrandFits(
+  orgId: string,
+): Promise<Array<BrandFitProfileInput & Record<string, unknown>>> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/brand-fit`,
+  );
+  if (!res.ok) throw new Error(`brand-fit list failed: ${res.status}`);
+  const body = (await res.json()) as {
+    profiles?: Array<BrandFitProfileInput & Record<string, unknown>>;
+  };
+  return body.profiles ?? [];
+}
+
 export async function recordMerchantOutcome(
   orgId: string,
   input: {

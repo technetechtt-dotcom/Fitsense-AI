@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import {
   Building2,
   KeyRound,
+  Layers,
   Package,
+  Ruler,
   RefreshCw,
   ShoppingBag,
   Upload,
@@ -12,6 +14,7 @@ import { PageLayout, StickyPageHeader } from "../../components/PageLayout";
 import { TopBar } from "../../components/TopBar";
 import { PrimaryButton } from "../../components/PrimaryButton";
 import { isApiConfigured } from "../../lib/api/config";
+import { loadMerchantCatalogue } from "../../lib/catalogueRuntime";
 import {
   createMerchantOrg,
   createOrgApiKey,
@@ -19,18 +22,24 @@ import {
   getMerchantOrgId,
   ingestCatalogue,
   listCatalogue,
+  listInventory,
   listMerchantOrgs,
   listOrgApiKeys,
+  listOrgBrandFits,
   recordMerchantOutcome,
   revokeOrgApiKey,
   setMerchantOrgId,
+  upsertInventory,
+  upsertOrgBrandFit,
   type ApiKeyRow,
+  type BrandFitProfileInput,
   type CatalogueProduct,
+  type InventoryItem,
   type MerchantOrg,
   type PilotMetrics,
 } from "../../lib/api/merchantApi";
 
-type Tab = "org" | "catalogue" | "outcomes" | "keys";
+type Tab = "org" | "catalogue" | "inventory" | "brandfit" | "outcomes" | "keys";
 
 function pct(rate: number | null): string {
   if (rate === null || Number.isNaN(rate)) return "—";
@@ -61,6 +70,18 @@ export function MerchantPortal() {
   const [outcomeSize, setOutcomeSize] = useState("");
   const [outcomeReason, setOutcomeReason] = useState("");
 
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [brandFits, setBrandFits] = useState<
+    Array<BrandFitProfileInput & Record<string, unknown>>
+  >([]);
+  const [bfBrand, setBfBrand] = useState("Bata Power");
+  const [bfModel, setBfModel] = useState("School Runner");
+  const [bfDelta, setBfDelta] = useState("0");
+  const [bfToe, setBfToe] = useState<BrandFitProfileInput["toeBoxWidth"]>("regular");
+  const [bfMidsole, setBfMidsole] =
+    useState<BrandFitProfileInput["midsoleFeel"]>("firm");
+  const [bfNote, setBfNote] = useState("Pilot model — true to size");
+
   const apiReady = isApiConfigured();
 
   async function refreshOrgs() {
@@ -75,13 +96,18 @@ export function MerchantPortal() {
 
   async function refreshCatalogueAndMetrics() {
     if (!apiReady || !orgId) return;
-    const [cat, met] = await Promise.all([
+    const [cat, met, inv, fits] = await Promise.all([
       listCatalogue(orgId),
       fetchPilotMetrics(orgId),
+      listInventory(orgId),
+      listOrgBrandFits(orgId),
     ]);
     setProducts(cat);
     setMetrics(met);
+    setInventory(inv);
+    setBrandFits(fits);
     if (!outcomeProductId && cat[0]) setOutcomeProductId(cat[0].productId);
+    await loadMerchantCatalogue(orgId).catch(() => 0);
   }
 
   async function refreshKeys() {
@@ -141,6 +167,8 @@ export function MerchantPortal() {
           [
             ["org", "Organisation", Building2],
             ["catalogue", "Catalogue", Package],
+            ["inventory", "Inventory", Layers],
+            ["brandfit", "Brand fit", Ruler],
             ["outcomes", "Outcomes", ShoppingBag],
             ["keys", "API keys", KeyRound],
           ] as const
@@ -267,24 +295,31 @@ export function MerchantPortal() {
                 void withBusy(async () => {
                   if (!orgId) return;
                   let productsPayload = SAMPLE_PRODUCTS;
+                  let inventoryPayload = SAMPLE_INVENTORY;
                   try {
                     const res = await fetch("/samples/kimberley-catalogue-feed.json");
                     if (res.ok) {
                       const body = (await res.json()) as {
                         products?: CatalogueProduct[];
+                        inventory?: typeof SAMPLE_INVENTORY;
                       };
                       if (body.products?.length) productsPayload = body.products;
+                      if (body.inventory?.length) inventoryPayload = body.inventory;
                     }
                   } catch {
                     /* use inline sample */
                   }
                   const result = await ingestCatalogue(orgId, productsPayload);
-                  setStatus(`Upserted ${result.upserted} products`);
+                  const inv = await upsertInventory(orgId, inventoryPayload);
+                  await loadMerchantCatalogue(orgId);
+                  setStatus(
+                    `Upserted ${result.upserted} products, ${inv.upserted} inventory rows`,
+                  );
                   await refreshCatalogueAndMetrics();
                 })
               }
             >
-              Ingest sample catalogue
+              Ingest sample catalogue + inventory
             </PrimaryButton>
           </div>
 
@@ -326,6 +361,144 @@ export function MerchantPortal() {
                 ))}
               </ul>
             )}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === "inventory" ? (
+        <section className="space-y-4">
+          <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
+            <h2 className="text-sm font-semibold">Stock by size</h2>
+            <p className="text-xs text-ink-muted">
+              UK sizes for Kimberley pilot SKUs. Ingest sample feed to seed rows, or
+              push via <code className="text-neon">PUT .../inventory</code>.
+            </p>
+            <PrimaryButton
+              disabled={busy || !orgId || !apiReady}
+              onClick={() =>
+                void withBusy(async () => {
+                  if (!orgId) return;
+                  const result = await upsertInventory(orgId, SAMPLE_INVENTORY);
+                  setStatus(`Upserted ${result.upserted} inventory rows`);
+                  setInventory(await listInventory(orgId));
+                })
+              }
+            >
+              Seed sample inventory
+            </PrimaryButton>
+            {inventory.length === 0 ? (
+              <p className="text-xs text-ink-muted">No inventory rows yet.</p>
+            ) : (
+              <ul className="space-y-2 max-h-80 overflow-y-auto">
+                {inventory.map((row) => (
+                  <li
+                    key={`${row.productId}-${row.sizeSystem}-${row.sizeLabel}`}
+                    className="rounded-xl bg-surface-2 border border-white/5 px-3 py-2 text-xs flex justify-between gap-2"
+                  >
+                    <span>
+                      {row.productId} · {row.sizeSystem.toUpperCase()} {row.sizeLabel}
+                    </span>
+                    <span className="font-semibold text-neon">qty {row.quantity}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      ) : null}
+
+      {tab === "brandfit" ? (
+        <section className="space-y-4">
+          <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
+            <h2 className="text-sm font-semibold">Brand / model fit profile</h2>
+            <p className="text-xs text-ink-muted">
+              EU size delta and last notes used by the recommendation layer.
+            </p>
+            <input
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              placeholder="Brand"
+              value={bfBrand}
+              onChange={(e) => setBfBrand(e.target.value)}
+            />
+            <input
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              placeholder="Model"
+              value={bfModel}
+              onChange={(e) => setBfModel(e.target.value)}
+            />
+            <input
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              placeholder="EU size delta (−2…2)"
+              value={bfDelta}
+              onChange={(e) => setBfDelta(e.target.value)}
+            />
+            <select
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              value={bfToe}
+              onChange={(e) =>
+                setBfToe(e.target.value as BrandFitProfileInput["toeBoxWidth"])
+              }
+            >
+              <option value="narrow">Toe box: narrow</option>
+              <option value="regular">Toe box: regular</option>
+              <option value="wide">Toe box: wide</option>
+              <option value="extra_wide">Toe box: extra wide</option>
+            </select>
+            <select
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              value={bfMidsole}
+              onChange={(e) =>
+                setBfMidsole(e.target.value as BrandFitProfileInput["midsoleFeel"])
+              }
+            >
+              <option value="firm">Midsole: firm</option>
+              <option value="balanced">Midsole: balanced</option>
+              <option value="soft">Midsole: soft</option>
+              <option value="unknown">Midsole: unknown</option>
+            </select>
+            <input
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              placeholder="Note"
+              value={bfNote}
+              onChange={(e) => setBfNote(e.target.value)}
+            />
+            <PrimaryButton
+              disabled={busy || !orgId || !apiReady || !bfBrand.trim()}
+              onClick={() =>
+                void withBusy(async () => {
+                  if (!orgId) return;
+                  const delta = Number(bfDelta);
+                  await upsertOrgBrandFit(orgId, {
+                    brand: bfBrand.trim(),
+                    model: bfModel.trim() || undefined,
+                    euSizeDelta: Number.isFinite(delta) ? delta : 0,
+                    toeBoxWidth: bfToe,
+                    midsoleFeel: bfMidsole,
+                    note: bfNote.trim() || undefined,
+                  });
+                  setBrandFits(await listOrgBrandFits(orgId));
+                  setStatus("Brand-fit profile saved");
+                })
+              }
+            >
+              Save brand-fit
+            </PrimaryButton>
+            <ul className="space-y-2 max-h-60 overflow-y-auto">
+              {brandFits.map((p, i) => (
+                <li
+                  key={`${p.brand}-${p.model ?? ""}-${i}`}
+                  className="rounded-xl bg-surface-2 border border-white/5 px-3 py-2 text-xs"
+                >
+                  <div className="font-semibold">
+                    {p.brand}
+                    {p.model ? ` · ${p.model}` : ""}
+                  </div>
+                  <div className="text-ink-muted">
+                    ΔEU {p.euSizeDelta} · {p.toeBoxWidth} · {p.midsoleFeel}
+                  </div>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
       ) : null}
@@ -516,5 +689,43 @@ const SAMPLE_PRODUCTS: CatalogueProduct[] = [
     description: "Wide-fit Kimberley pilot SKU",
     colorways: ["White", "Navy"],
     dataQuality: "verified",
+  },
+];
+
+const SAMPLE_INVENTORY: Array<{
+  productId: string;
+  sizeSystem: "uk" | "us" | "eu" | "mondopoint";
+  sizeLabel: string;
+  quantity: number;
+}> = [
+  {
+    productId: "bata-power-school-01",
+    sizeSystem: "uk",
+    sizeLabel: "4",
+    quantity: 8,
+  },
+  {
+    productId: "bata-power-school-01",
+    sizeSystem: "uk",
+    sizeLabel: "5",
+    quantity: 12,
+  },
+  {
+    productId: "bata-power-school-01",
+    sizeSystem: "uk",
+    sizeLabel: "6",
+    quantity: 10,
+  },
+  {
+    productId: "bata-power-school-02",
+    sizeSystem: "uk",
+    sizeLabel: "5",
+    quantity: 6,
+  },
+  {
+    productId: "bata-power-school-02",
+    sizeSystem: "uk",
+    sizeLabel: "6",
+    quantity: 9,
   },
 ];

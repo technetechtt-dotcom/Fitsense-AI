@@ -158,6 +158,15 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
   });
   assert.equal(inventory.status, 200);
 
+  const invList = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/inventory`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  assert.equal(invList.status, 200);
+  const invBody = (await invList.json()) as {
+    items: Array<{ productId: string; quantity: number }>;
+  };
+  assert.ok(invBody.items.some((i) => i.productId === "bata-power-school-01"));
+
   for (const kind of ["purchase", "purchase", "return", "exchange"] as const) {
     const outcome = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes`, {
       method: "POST",

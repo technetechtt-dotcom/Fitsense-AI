@@ -1,4 +1,4 @@
-import { SHOE_CATALOG } from "../../data/catalog";
+import { getActiveCatalogue } from "../catalogueRuntime";
 import { hasAiPersonalizationConsent } from "../consent";
 import type { FitEvent, FitProfile, FootMeasurement, Product } from "../../types";
 import {
@@ -158,7 +158,7 @@ export interface TrainingTuple {
 
 export function eventToTuple(
   event: FitEvent,
-  catalog: Product[] = SHOE_CATALOG,
+  catalog: Product[] = getActiveCatalogue(),
 ): TrainingTuple | null {
   let product: Product | undefined;
   if ("productId" in event && event.productId) {

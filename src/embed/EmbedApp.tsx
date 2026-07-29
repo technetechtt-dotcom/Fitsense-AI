@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { buildScanResult } from "../lib/measurement";
 import { recommend } from "../lib/recommendation";
-import { SHOE_CATALOG } from "../data/catalog";
+import { getActiveCatalogue } from "../lib/catalogueRuntime";
 import { CALIBRATION_META, primaryFoot, widthToLengthRatio } from "../types";
 import type { CalibrationReference, FootMeasurement, ScanResult } from "../types";
 import { ArScanner } from "../components/ArScanner";
@@ -140,7 +140,7 @@ export function EmbedApp() {
       }
       const { simulatedMeasurement } = await import("../lib/demo/simulatedMeasurement");
       const measurement = simulatedMeasurement(calibration);
-      const recommendation = recommend(measurement, SHOE_CATALOG);
+      const recommendation = recommend(measurement, getActiveCatalogue());
       return buildScanResult(
         config.productId ?? "embed-anonymous",
         measurement,
@@ -271,7 +271,7 @@ export function EmbedApp() {
       const rightFoot = pendingRightFoot;
       const leftFoot = measuredFoot;
       const sizingFoot = leftFoot.lengthMm >= rightFoot.lengthMm ? leftFoot : rightFoot;
-      const recommendation = recommend(sizingFoot, SHOE_CATALOG);
+      const recommendation = recommend(sizingFoot, getActiveCatalogue());
       const result: ScanResult = {
         scanId: crypto.randomUUID(),
         userId: config.productId ?? "embed-anonymous",

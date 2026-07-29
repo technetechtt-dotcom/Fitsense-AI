@@ -282,6 +282,40 @@ export async function listProducts(orgId: string): Promise<unknown[]> {
   return result.rows.map((r) => r.data);
 }
 
+export type InventoryRow = {
+  productId: string;
+  sizeSystem: string;
+  sizeLabel: string;
+  quantity: number;
+  updatedAtEpochMs?: number;
+};
+
+export async function listInventory(orgId: string): Promise<InventoryRow[]> {
+  await ensureMerchantSchema();
+  const result = await getPostgresPool().query<{
+    product_id: string;
+    size_system: string;
+    size_label: string;
+    quantity: number;
+    updated_at: Date;
+  }>(
+    `
+      SELECT product_id, size_system, size_label, quantity, updated_at
+      FROM catalogue_inventory
+      WHERE org_id = $1
+      ORDER BY product_id, size_system, size_label
+    `,
+    [orgId],
+  );
+  return result.rows.map((r) => ({
+    productId: r.product_id,
+    sizeSystem: r.size_system,
+    sizeLabel: r.size_label,
+    quantity: r.quantity,
+    updatedAtEpochMs: r.updated_at?.getTime?.() ?? undefined,
+  }));
+}
+
 export async function upsertInventory(
   orgId: string,
   rows: Array<{

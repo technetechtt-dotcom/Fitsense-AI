@@ -1,7 +1,7 @@
 {
   "feedId": "kimberley-bata-power-pilot-v1",
   "region": "ZA-NC",
-  "notes": "Sample catalogue for Kimberley / Northern Cape school footwear pilot. Replace with retailer contract feed before production.",
+  "notes": "Sample catalogue + inventory for Kimberley / Northern Cape school footwear pilot. Replace with retailer contract feed before production.",
   "products": [
     {
       "productId": "bata-power-school-01",
@@ -41,6 +41,44 @@
       "colorways": ["Grey"],
       "dataQuality": "unverified",
       "sku": "BP-TL-03"
+    }
+  ],
+  "inventory": [
+    {
+      "productId": "bata-power-school-01",
+      "sizeSystem": "uk",
+      "sizeLabel": "4",
+      "quantity": 8
+    },
+    {
+      "productId": "bata-power-school-01",
+      "sizeSystem": "uk",
+      "sizeLabel": "5",
+      "quantity": 12
+    },
+    {
+      "productId": "bata-power-school-01",
+      "sizeSystem": "uk",
+      "sizeLabel": "6",
+      "quantity": 10
+    },
+    {
+      "productId": "bata-power-school-02",
+      "sizeSystem": "uk",
+      "sizeLabel": "5",
+      "quantity": 6
+    },
+    {
+      "productId": "bata-power-school-02",
+      "sizeSystem": "uk",
+      "sizeLabel": "6",
+      "quantity": 9
+    },
+    {
+      "productId": "bata-power-school-03",
+      "sizeSystem": "uk",
+      "sizeLabel": "7",
+      "quantity": 4
     }
   ]
 }

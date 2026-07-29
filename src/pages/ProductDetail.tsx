@@ -17,7 +17,7 @@ import { ErrorState } from "../components/ErrorState";
 import { PrimaryButton } from "../components/PrimaryButton";
 import { FitScoreRing } from "../components/FitScoreRing";
 import { FitFeedback } from "../components/FitFeedback";
-import { SHOE_CATALOG } from "../data/catalog";
+import { getActiveCatalogue } from "../lib/catalogueRuntime";
 import { productStoreUrl } from "../lib/productLinks";
 import { recommend } from "../lib/recommendation";
 import { getOrCreateProfile, listScans, updatePreferences } from "../lib/storage";
@@ -33,6 +33,8 @@ const CATEGORY_LABEL: Record<ShoeCategory, string> = {
   formal: "Formal",
   boot: "Boot",
   sandal: "Sandal",
+  school: "School",
+  safety: "Safety",
 };
 
 const FIT_TYPE_DESCRIPTION = {
@@ -62,7 +64,7 @@ export function ProductDetail() {
   }, []);
 
   const product = useMemo<Product | undefined>(
-    () => SHOE_CATALOG.find((p) => p.productId === productId),
+    () => getActiveCatalogue().find((p) => p.productId === productId),
     [productId],
   );
 

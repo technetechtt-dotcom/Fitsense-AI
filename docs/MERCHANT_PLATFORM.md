@@ -24,6 +24,7 @@ Partner **API keys** (`X-Api-Key: fs_live_…`) act as **operator**.
 | POST    | `/v1/merchants/orgs/:orgId/catalogue/ingest`       | operator+ or API key                                        |
 | GET     | `/v1/merchants/orgs/:orgId/catalogue`              | viewer+                                                     |
 | PUT     | `/v1/merchants/orgs/:orgId/inventory`              | operator+                                                   |
+| GET     | `/v1/merchants/orgs/:orgId/inventory`              | viewer+                                                     |
 | PUT/GET | `/v1/merchants/orgs/:orgId/brand-fit`              | operator+ / viewer+                                         |
 | POST    | `/v1/merchants/orgs/:orgId/outcomes`               | operator+ or API key (`purchase` \| `return` \| `exchange`) |
 | GET     | `/v1/merchants/orgs/:orgId/pilot-metrics`          | viewer+                                                     |
@@ -39,10 +40,12 @@ Optional `orderId` on POST outcomes is stored in `data.orderId` for retail attri
 In-app route: **`/merchant`** (also linked from Home + Settings).
 
 - Create / select org (persisted in `localStorage` as `fitsense:merchantOrgId`)
-- Ingest sample Kimberley feed (`public/samples/kimberley-catalogue-feed.json`, mirrored under `docs/samples/`)
+- Ingest sample Kimberley feed (`public/samples/kimberley-catalogue-feed.json`, mirrored under `docs/samples/`) including inventory rows
+- Upsert brand-fit profiles; seed / list inventory by size
 - Record outcomes with optional order id
 - Create / list / revoke API keys
 - View pilot metrics
+- Loaded merchant catalogue replaces the built-in demo shelf for recommendations (`src/lib/catalogueRuntime.ts`)
 
 Requires `VITE_API_BASE_URL` and device cloud auth. Optional `VITE_MERCHANT_ORG_ID` / `VITE_MERCHANT_API_KEY` for kiosk brand-fit bootstrap.
 

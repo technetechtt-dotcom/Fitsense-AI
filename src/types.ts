@@ -88,7 +88,7 @@ export const FIT_TYPE_RATIO: Record<FitType, number> = {
 };
 
 export type ShoeCategory =
-  "sneaker" | "running" | "casual" | "formal" | "boot" | "sandal";
+  "sneaker" | "running" | "casual" | "formal" | "boot" | "sandal" | "school" | "safety";
 
 export interface SizeRange {
   min: number;

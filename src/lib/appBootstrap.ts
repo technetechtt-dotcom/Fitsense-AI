@@ -8,6 +8,7 @@ import { acknowledgePolicy, hasCloudSyncConsent, loadConsent } from "./consent";
 import { installWebMonitoring } from "./monitoring";
 import { installSyncOutboxListeners, flushSyncOutbox } from "./cloud/syncOutbox";
 import { getMerchantOrgId, loadMerchantBrandFits } from "./api/merchantApi";
+import { loadMerchantCatalogue } from "./catalogueRuntime";
 
 let booted = false;
 
@@ -65,6 +66,11 @@ export async function bootstrapApp(): Promise<void> {
         await loadMerchantBrandFits();
       } catch (err) {
         console.warn("[fitsense] merchant brand-fit load failed", err);
+      }
+      try {
+        await loadMerchantCatalogue();
+      } catch (err) {
+        console.warn("[fitsense] merchant catalogue load failed", err);
       }
     }
   }

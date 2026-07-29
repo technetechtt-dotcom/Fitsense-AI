@@ -9,7 +9,7 @@ import { ApiConnectionStatus } from "../components/ApiConnectionStatus";
 import { canUseCloudSync, isApiConfigured } from "../lib/api/config";
 import { getOrCreateProfile, signOut, updatePreferences } from "../lib/storage";
 import { signOutCloudAccount } from "../lib/cloud/auth";
-import { SHOE_CATALOG } from "../data/catalog";
+import { getActiveCatalogue } from "../lib/catalogueRuntime";
 import type { CalibrationReference, MeasurementUnit, UserProfile } from "../types";
 import { CALIBRATION_META } from "../types";
 
@@ -25,7 +25,7 @@ export function Settings() {
 
   // Distinct brand list from the catalog — used for the brand-preference chips.
   const brands = useMemo(
-    () => Array.from(new Set(SHOE_CATALOG.map((p) => p.brand))).sort(),
+    () => Array.from(new Set(getActiveCatalogue().map((p) => p.brand))).sort(),
     [],
   );
 

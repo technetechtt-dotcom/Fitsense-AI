@@ -35,6 +35,24 @@ Track merchant KPIs via `GET /v1/merchants/orgs/:orgId/pilot-metrics`.
 4. Apply size in till / embed; log purchase / exchange / return via outcomes API.
 5. Weekly pull of `pilot-metrics` + accuracy JSONL sample.
 
+## Repeated-scan operator protocol
+
+Use this when collecting accuracy-study or pilot validation data (not for
+everyday till sizing unless the first scan is rejected by quality gates).
+
+1. **Same session, same foot.** Keep socks, stance (standing), floor, and
+   lighting unchanged between repeats.
+2. **Three captures minimum.** Scan L then R once (baseline), then repeat
+   L and R twice more → 3 length samples per foot when dual-foot is used.
+3. **Reset between captures.** Clear the on-device footprint overlay / start a
+   new capture so landmarks are not reused from the previous frame.
+4. **Record ground truth once per participant.** Brannock / calibrated tool
+   after the last capture; never invent millimetres.
+5. **Export.** Use Settings → accuracy export (JSONL) and tag device model +
+   lighting cohort in [DEVICE_MATRIX.md](../DEVICE_MATRIX.md).
+6. **Reject rules.** Discard a repeat if blur / coplanarity / landmark
+   disagreement gates fire; do not average rejected frames into mm truth.
+
 ## Expansion path (broader SA retailers)
 
 1. Replicate org + catalogue feed contract per retailer chain.

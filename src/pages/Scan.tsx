@@ -18,7 +18,7 @@ import { TapMeasurement, AutoDetectChip } from "../components/TapMeasurement";
 import { CameraPermissionHelp } from "../components/CameraPermissionHelp";
 import { ArScanner } from "../components/ArScanner";
 import { recommend } from "../lib/recommendation";
-import { SHOE_CATALOG } from "../data/catalog";
+import { getActiveCatalogue } from "../lib/catalogueRuntime";
 import { getOrCreateProfile, listScans, saveScan } from "../lib/storage";
 import {
   appendFitEvent,
@@ -270,7 +270,7 @@ export function Scan() {
           : measuredFoot;
       const recommendation =
         leftFoot && rightFoot
-          ? recommend(sizingFoot, SHOE_CATALOG, {
+          ? recommend(sizingFoot, getActiveCatalogue(), {
               preferredBrands: userProfile.preferences.preferredBrands,
               profile: fitProfile,
             })

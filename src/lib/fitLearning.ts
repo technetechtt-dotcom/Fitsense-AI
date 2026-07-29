@@ -250,6 +250,8 @@ function computeReplacementHints(
     formal: 1000 * 60 * 60 * 24 * 730,
     boot: 1000 * 60 * 60 * 24 * 730,
     sandal: 1000 * 60 * 60 * 24 * 540,
+    school: 1000 * 60 * 60 * 24 * 365,
+    safety: 1000 * 60 * 60 * 24 * 540,
   };
   const lastByCategory: Map<ShoeCategory, number> = new Map();
   // We don't have category info on the event itself — caller can add this
