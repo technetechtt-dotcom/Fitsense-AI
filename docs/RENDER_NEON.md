@@ -40,7 +40,7 @@ CORS_ORIGIN=https://fitsense-web.onrender.com
 ```
 
 `HANDOFF_SECRET` is **required** in production and **must differ** from `AUTH_SECRET`.
-Render Blueprint keeps `autoDeployTrigger: off` until branch protection is enabled
+Render Blueprint keeps `autoDeployTrigger: off` until CI gates are green
 (see [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md)).
 
 `CORS_ORIGIN` must be the **exact** public URL of `fitsense-web` (no trailing slash).

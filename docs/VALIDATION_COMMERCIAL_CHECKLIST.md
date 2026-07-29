@@ -36,4 +36,4 @@ Operational work that cannot be completed in code alone. Track progress here.
 - Scan revision / conflict merge
 - Merchant return-rate + API-key list/revoke
 - Staging smoke PUT→GET round-trip
-- Protected PR policy documented
+- Direct-to-main policy documented (branch protection off)
