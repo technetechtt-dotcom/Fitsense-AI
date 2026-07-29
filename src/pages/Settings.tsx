@@ -184,6 +184,21 @@ export function Settings() {
         </Section>
       ) : null}
 
+      <Section label="Partners">
+        <button
+          onClick={() => nav("/merchant")}
+          className="w-full rounded-2xl bg-surface-2 border border-white/5 px-4 py-3 text-left flex items-center justify-between hover:bg-surface-3"
+        >
+          <div>
+            <div className="text-sm font-semibold">Merchant portal</div>
+            <div className="text-xs text-ink-muted">
+              Orgs, catalogue, outcomes, API keys
+            </div>
+          </div>
+          <span className="text-neon text-xs">Open →</span>
+        </button>
+      </Section>
+
       <Section label="Data rights">
         <button
           onClick={() => nav("/privacy")}

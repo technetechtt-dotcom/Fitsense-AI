@@ -112,6 +112,8 @@ export const config = {
     scanDays: parseNumber(process.env.RETENTION_SCAN_DAYS, 730),
     eventDays: parseNumber(process.env.RETENTION_EVENT_DAYS, 730),
     profileDays: parseNumber(process.env.RETENTION_PROFILE_DAYS, 730),
+    /** Merchant purchase/return/exchange rows (POPIA purpose limitation). */
+    outcomeDays: parseNumber(process.env.RETENTION_OUTCOME_DAYS, 730),
   },
 } as const;
 

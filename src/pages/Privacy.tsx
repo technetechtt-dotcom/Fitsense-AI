@@ -158,8 +158,11 @@ export function Privacy() {
             <p>
               <strong className="text-ink">Retention.</strong> Local data remains until
               you delete it or sign out. Cloud copies are removed when you erase cloud
-              data, and server retention jobs purge inactive sync rows after configured
-              periods (default 730 days). Handoff sessions expire within minutes.
+              data, and server retention jobs purge inactive sync rows and merchant
+              purchase/return outcome rows after configured periods (default 730 days;
+              override with <code className="text-neon">RETENTION_*_DAYS</code>).
+              Handoff sessions expire within minutes. Fit Identity share grants expire
+              by design (default 7 days).
             </p>
             <p>
               <strong className="text-ink">Your rights (POPIA / GDPR).</strong> Access

@@ -1,0 +1,46 @@
+{
+  "feedId": "kimberley-bata-power-pilot-v1",
+  "region": "ZA-NC",
+  "notes": "Sample catalogue for Kimberley / Northern Cape school footwear pilot. Replace with retailer contract feed before production.",
+  "products": [
+    {
+      "productId": "bata-power-school-01",
+      "brand": "Bata Power",
+      "model": "School Runner",
+      "category": "school",
+      "fitType": "standard",
+      "sizeRangeEu": { "min": 30, "max": 42, "step": 1 },
+      "priceUsd": 35,
+      "description": "NC school footwear pilot SKU",
+      "colorways": ["Black"],
+      "dataQuality": "verified",
+      "sku": "BP-SR-01"
+    },
+    {
+      "productId": "bata-power-school-02",
+      "brand": "Bata Power",
+      "model": "Court Classic",
+      "category": "school",
+      "fitType": "wide",
+      "sizeRangeEu": { "min": 32, "max": 44, "step": 1 },
+      "priceUsd": 42,
+      "description": "Wide-fit Kimberley pilot SKU",
+      "colorways": ["White", "Navy"],
+      "dataQuality": "verified",
+      "sku": "BP-CC-02"
+    },
+    {
+      "productId": "bata-power-school-03",
+      "brand": "Bata Power",
+      "model": "Trail Lite",
+      "category": "casual",
+      "fitType": "standard",
+      "sizeRangeEu": { "min": 35, "max": 46, "step": 1 },
+      "priceUsd": 48,
+      "description": "Casual pilot SKU for after-school wear",
+      "colorways": ["Grey"],
+      "dataQuality": "unverified",
+      "sku": "BP-TL-03"
+    }
+  ]
+}

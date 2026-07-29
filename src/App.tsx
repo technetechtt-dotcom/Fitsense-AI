@@ -13,6 +13,7 @@ import { Integrations } from "./pages/Integrations";
 import { ProductDetail } from "./pages/ProductDetail";
 import { FitProfile } from "./pages/FitProfile";
 import { Privacy } from "./pages/Privacy";
+import { MerchantPortal } from "./pages/merchant/MerchantPortal";
 import { Loading } from "./components/Loading";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { EmbedApp } from "./embed/EmbedApp";
@@ -160,6 +161,14 @@ function AnimatedRoutes() {
           element={
             <RouteShell>
               <Privacy />
+            </RouteShell>
+          }
+        />
+        <Route
+          path="/merchant"
+          element={
+            <RouteShell>
+              <MerchantPortal />
             </RouteShell>
           }
         />

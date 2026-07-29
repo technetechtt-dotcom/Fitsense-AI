@@ -172,6 +172,7 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
         sizeLabel: "5",
         sizeSystem: "uk",
         reason: kind === "return" ? "too_small" : undefined,
+        orderId: kind === "purchase" ? "KIM-ORD-1001" : "KIM-ORD-1001",
       }),
     });
     assert.equal(outcome.status, 201);

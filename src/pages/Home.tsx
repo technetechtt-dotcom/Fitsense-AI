@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Brain,
+  Building2,
   Footprints,
   History,
   ScanLine,
@@ -102,10 +103,14 @@ export function Home() {
           onClick={() => nav("/integrations")}
         />
         <QuickAction
+          icon={Building2}
+          label="Merchant portal"
+          onClick={() => nav("/merchant")}
+        />
+        <QuickAction
           icon={SettingsIcon}
           label="Settings"
           onClick={() => nav("/settings")}
-          className="col-span-2 md:col-span-1"
         />
       </section>
 

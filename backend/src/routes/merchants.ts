@@ -102,6 +102,8 @@ const outcomeSchema = z.object({
   sizeSystem: z.enum(["uk", "us", "eu", "mondopoint"]).optional(),
   fitId: documentIdSchema.optional(),
   reason: z.string().trim().max(80).optional(),
+  /** Retail / POS order id — stored in outcome `data.orderId` for attribution. */
+  orderId: z.string().trim().min(1).max(120).optional(),
   data: z.record(z.unknown()).optional(),
 });
 
@@ -297,7 +299,14 @@ merchantRouter.post(
   async (req: MerchantRequest, res, next) => {
     try {
       const body = outcomeSchema.parse(req.body);
-      const result = await recordOutcome({ orgId: req.orgId!, ...body });
+      const { orderId, data: rawData, ...rest } = body;
+      const data: Record<string, unknown> = { ...(rawData ?? {}) };
+      if (orderId) data.orderId = orderId;
+      const result = await recordOutcome({
+        orgId: req.orgId!,
+        ...rest,
+        data: Object.keys(data).length ? data : undefined,
+      });
       res.status(201).json(result);
     } catch (err) {
       next(err);

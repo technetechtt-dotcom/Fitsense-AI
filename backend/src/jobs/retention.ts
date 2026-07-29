@@ -2,8 +2,8 @@ import { getPostgresPool, isPostgresConfigured } from "../services/postgres.js";
 import { config } from "../config.js";
 
 /**
- * POPIA-aligned retention: delete sync + handoff rows older than configured days.
- * Run via `npm run retention:run` or a scheduled job.
+ * POPIA-aligned retention: delete sync, merchant outcomes, + handoff rows
+ * older than configured days. Run via `npm run retention:run` or a scheduled job.
  */
 export async function runRetentionSweep(now = new Date()): Promise<{
   scansDeleted: number;
@@ -11,6 +11,7 @@ export async function runRetentionSweep(now = new Date()): Promise<{
   profilesDeleted: number;
   handoffDeleted: number;
   recoveryDeleted: number;
+  outcomesDeleted: number;
 }> {
   if (!isPostgresConfigured()) {
     throw new Error("DATABASE_URL required for retention sweep");
@@ -24,6 +25,9 @@ export async function runRetentionSweep(now = new Date()): Promise<{
   );
   const profileCutoff = new Date(
     now.getTime() - config.retention.profileDays * 24 * 60 * 60 * 1000,
+  );
+  const outcomeCutoff = new Date(
+    now.getTime() - config.retention.outcomeDays * 24 * 60 * 60 * 1000,
   );
 
   const scans = await pool.query("DELETE FROM scans WHERE updated_at < $1", [
@@ -42,6 +46,16 @@ export async function runRetentionSweep(now = new Date()): Promise<{
   const recovery = await pool.query(
     "DELETE FROM fit_recovery_codes WHERE expires_at < now() OR consumed_at IS NOT NULL",
   );
+  let outcomesDeleted = 0;
+  try {
+    const outcomes = await pool.query(
+      "DELETE FROM merchant_outcomes WHERE created_at < $1",
+      [outcomeCutoff],
+    );
+    outcomesDeleted = outcomes.rowCount ?? 0;
+  } catch {
+    // Table may not exist on older DBs before merchant migrations.
+  }
 
   return {
     scansDeleted: scans.rowCount ?? 0,
@@ -49,5 +63,6 @@ export async function runRetentionSweep(now = new Date()): Promise<{
     profilesDeleted: profiles.rowCount ?? 0,
     handoffDeleted: handoff.rowCount ?? 0,
     recoveryDeleted: recovery.rowCount ?? 0,
+    outcomesDeleted,
   };
 }

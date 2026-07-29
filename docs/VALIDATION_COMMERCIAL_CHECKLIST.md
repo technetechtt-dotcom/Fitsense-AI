@@ -17,16 +17,16 @@ Operational work that cannot be completed in code alone. Track progress here.
 
 ## Commercial development
 
-| Item                                | Status  | Notes                                  |
-| ----------------------------------- | ------- | -------------------------------------- |
-| Merchant portal UI                  | Open    | APIs exist under `/v1/merchants/*`     |
-| Real footwear retailer catalogue    | Open    | Ingest endpoints ready                 |
-| Variants, sizes, widths, inventory  | Partial | Catalogue + inventory APIs             |
-| Outcomes ↔ real orders              | Open    | Outcomes API exists; order linkage TBD |
-| Passkey customer accounts           | Open    | Explicitly deferred — no stubs         |
-| Complete POPIA implementation       | Partial | Privacy copy + retention job; expand   |
-| Controlled Kimberley pilot          | Open    | Runbook ready                          |
-| Prove reduced returns / conversions | Open    | Fixed return-rate = returns÷purchases  |
+| Item                                | Status  | Notes                                                              |
+| ----------------------------------- | ------- | ------------------------------------------------------------------ |
+| Merchant portal UI                  | Done    | `/merchant` — orgs, catalogue, outcomes, API keys                  |
+| Real footwear retailer catalogue    | Open    | Sample feed: `docs/samples/kimberley-catalogue-feed.json`          |
+| Variants, sizes, widths, inventory  | Partial | Catalogue + inventory APIs; portal ingest for catalogue            |
+| Outcomes ↔ real orders              | Partial | Optional `orderId` on outcomes → `data.orderId`                    |
+| Passkey customer accounts           | Open    | Explicitly deferred — no stubs                                     |
+| Complete POPIA implementation       | Partial | Privacy copy + retention incl. `merchant_outcomes`; legal DPA open |
+| Controlled Kimberley pilot          | Open    | Runbook ready                                                      |
+| Prove reduced returns / conversions | Open    | Fixed return-rate = returns÷purchases                              |
 
 ## Engineering fixes landed (this batch)
 
