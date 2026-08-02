@@ -378,7 +378,12 @@ export type OutcomeRow = {
 
 export async function listOutcomes(
   orgId: string,
-  opts: { sinceEpochMs?: number; limit?: number } = {},
+  opts: {
+    sinceEpochMs?: number;
+    limit?: number;
+    orderId?: string;
+    deviceId?: string;
+  } = {},
 ): Promise<OutcomeRow[]> {
   await ensureMerchantSchema();
   const limit = Math.min(Math.max(opts.limit ?? 200, 1), 1000);
@@ -386,6 +391,16 @@ export async function listOutcomes(
     opts.sinceEpochMs === undefined || opts.sinceEpochMs === null
       ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
       : new Date(opts.sinceEpochMs);
+  const params: unknown[] = [orgId, since, limit];
+  let filter = "";
+  if (opts.orderId?.trim()) {
+    params.push(opts.orderId.trim());
+    filter += ` AND data->>'orderId' = $${params.length}`;
+  }
+  if (opts.deviceId?.trim()) {
+    params.push(opts.deviceId.trim());
+    filter += ` AND data->>'deviceId' = $${params.length}`;
+  }
   const result = await getPostgresPool().query<{
     outcome_id: string;
     kind: string;
@@ -402,11 +417,11 @@ export async function listOutcomes(
       SELECT outcome_id, kind, product_id, brand, size_label, size_system,
              fit_id, reason, data, created_at
       FROM merchant_outcomes
-      WHERE org_id = $1 AND created_at >= $2
+      WHERE org_id = $1 AND created_at >= $2${filter}
       ORDER BY created_at DESC
       LIMIT $3
     `,
-    [orgId, since, limit],
+    params,
   );
   return result.rows.map((r) => {
     const data =
@@ -428,6 +443,22 @@ export async function listOutcomes(
       createdAtEpochMs: r.created_at.getTime(),
     };
   });
+}
+
+/** POPIA erase: delete outcomes attributed to a device id in `data.deviceId`. */
+export async function eraseOutcomesByDevice(
+  orgId: string,
+  deviceId: string,
+): Promise<{ deleted: number }> {
+  await ensureMerchantSchema();
+  const result = await getPostgresPool().query(
+    `
+      DELETE FROM merchant_outcomes
+      WHERE org_id = $1 AND data->>'deviceId' = $2
+    `,
+    [orgId, deviceId],
+  );
+  return { deleted: result.rowCount ?? 0 };
 }
 
 export async function upsertBrandFitProfile(input: {

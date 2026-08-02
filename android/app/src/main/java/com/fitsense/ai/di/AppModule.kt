@@ -7,6 +7,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import com.fitsense.ai.measurement.CalibrationEngine
 import com.fitsense.ai.measurement.MeasurementEngine
 import com.fitsense.ai.measurement.UnitConverter
+import com.fitsense.ai.recommendation.CatalogueRuntime
 import com.fitsense.ai.recommendation.RecommendationEngine
 import com.fitsense.ai.recommendation.ShoeCatalog
 import com.fitsense.ai.vision.FootContourDetector
@@ -105,7 +106,9 @@ object AppModule {
     @Singleton
     fun provideRecommendationEngine(
         catalog: ShoeCatalog,
-    ): RecommendationEngine = RecommendationEngine(catalog)
+        catalogueRuntime: CatalogueRuntime,
+    ): RecommendationEngine =
+        RecommendationEngine(catalog) { catalogueRuntime.stockIndex() }
 }
 
 @Qualifier @Retention(AnnotationRetention.BINARY) annotation class IoDispatcher

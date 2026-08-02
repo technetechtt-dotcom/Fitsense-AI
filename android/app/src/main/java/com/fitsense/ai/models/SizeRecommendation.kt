@@ -34,4 +34,11 @@ data class ShoeMatch(
     /** 0..100 — broader comfort estimate (cushioning, drop, last shape). */
     val comfortScore: Int,
     val imageUrl: String? = null,
+    /**
+     * When merchant inventory is loaded: true if any size is in stock,
+     * false if tracked but OOS, null if no inventory data.
+     */
+    val inStock: Boolean? = null,
+    /** UK size labels with quantity > 0 (merchant inventory). */
+    val stockUkLabels: List<String> = emptyList(),
 )

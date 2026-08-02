@@ -80,9 +80,24 @@ fun ShoeCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "EU ${match.recommendedEuSize}  •  Fit ${match.fitScore}%  •  Comfort ${match.comfortScore}%",
+                    text = buildString {
+                        append("EU ${match.recommendedEuSize}  •  Fit ${match.fitScore}%  •  Comfort ${match.comfortScore}%")
+                        when (match.inStock) {
+                            true -> {
+                                append("  •  In stock")
+                                if (match.stockUkLabels.isNotEmpty()) {
+                                    append(" · UK ${match.stockUkLabels.take(4).joinToString(", ")}")
+                                }
+                            }
+                            false -> append("  •  Out of stock")
+                            null -> Unit
+                        }
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = FitSenseColors.OnSurfaceMuted,
+                    color = when (match.inStock) {
+                        false -> FitSenseColors.OnSurfaceMuted
+                        else -> FitSenseColors.OnSurfaceMuted
+                    },
                 )
             }
         }

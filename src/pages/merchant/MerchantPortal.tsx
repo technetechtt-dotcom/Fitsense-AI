@@ -26,6 +26,7 @@ import {
   listMerchantOrgs,
   listMerchantOutcomes,
   downloadMerchantOutcomesCsv,
+  eraseMerchantOutcomesByDevice,
   listOrgApiKeys,
   listOrgBrandFits,
   recordMerchantOutcome,
@@ -72,6 +73,9 @@ export function MerchantPortal() {
   const [outcomeOrderId, setOutcomeOrderId] = useState("");
   const [outcomeSize, setOutcomeSize] = useState("");
   const [outcomeReason, setOutcomeReason] = useState("");
+  const [outcomeFilterOrderId, setOutcomeFilterOrderId] = useState("");
+  const [eraseDeviceId, setEraseDeviceId] = useState("");
+  const [metricsDays, setMetricsDays] = useState<7 | 30 | 90>(90);
 
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [outcomes, setOutcomes] = useState<MerchantOutcomeRow[]>([]);
@@ -100,14 +104,16 @@ export function MerchantPortal() {
 
   async function refreshCatalogueAndMetrics() {
     if (!apiReady || !orgId) return;
+    const since = Date.now() - metricsDays * 24 * 60 * 60 * 1000;
     const [cat, met, inv, fits, outs] = await Promise.all([
       listCatalogue(orgId),
-      fetchPilotMetrics(orgId),
+      fetchPilotMetrics(orgId, since),
       listInventory(orgId),
       listOrgBrandFits(orgId),
-      listMerchantOutcomes(orgId, { limit: 50 }).catch(
-        () => [] as MerchantOutcomeRow[],
-      ),
+      listMerchantOutcomes(orgId, {
+        limit: 50,
+        orderId: outcomeFilterOrderId.trim() || undefined,
+      }).catch(() => [] as MerchantOutcomeRow[]),
     ]);
     setProducts(cat);
     setMetrics(met);
@@ -135,7 +141,7 @@ export function MerchantPortal() {
     void Promise.all([refreshCatalogueAndMetrics(), refreshKeys()]).catch((e) =>
       setError(e instanceof Error ? e.message : "Failed to load org data"),
     );
-  }, [orgId, apiReady]);
+  }, [orgId, apiReady, metricsDays]);
 
   async function withBusy(fn: () => Promise<void>) {
     setBusy(true);
@@ -271,7 +277,25 @@ export function MerchantPortal() {
 
           {metrics ? (
             <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-2">
-              <h2 className="text-sm font-semibold">Pilot metrics (90d)</h2>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <h2 className="text-sm font-semibold">Pilot metrics</h2>
+                <div className="flex gap-1">
+                  {([7, 30, 90] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setMetricsDays(d)}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold border ${
+                        metricsDays === d
+                          ? "bg-neon/15 border-neon/40 text-neon"
+                          : "border-white/10 text-ink-muted"
+                      }`}
+                    >
+                      {d}d
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <Metric label="Purchases" value={String(metrics.purchases)} />
                 <Metric label="Returns" value={String(metrics.returns)} />
@@ -583,8 +607,18 @@ export function MerchantPortal() {
                     orderId: outcomeOrderId.trim() || undefined,
                   });
                   setStatus(`Recorded ${outcomeKind} (${result.outcomeId})`);
-                  setMetrics(await fetchPilotMetrics(orgId));
-                  setOutcomes(await listMerchantOutcomes(orgId, { limit: 50 }));
+                  setMetrics(
+                    await fetchPilotMetrics(
+                      orgId,
+                      Date.now() - metricsDays * 24 * 60 * 60 * 1000,
+                    ),
+                  );
+                  setOutcomes(
+                    await listMerchantOutcomes(orgId, {
+                      limit: 50,
+                      orderId: outcomeFilterOrderId.trim() || undefined,
+                    }),
+                  );
                 })
               }
             >
@@ -593,7 +627,7 @@ export function MerchantPortal() {
           </div>
 
           <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <h2 className="text-sm font-semibold">Recent outcomes</h2>
               <button
                 type="button"
@@ -602,7 +636,9 @@ export function MerchantPortal() {
                 onClick={() =>
                   void withBusy(async () => {
                     if (!orgId) return;
-                    const blob = await downloadMerchantOutcomesCsv(orgId);
+                    const blob = await downloadMerchantOutcomesCsv(orgId, {
+                      orderId: outcomeFilterOrderId.trim() || undefined,
+                    });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement("a");
                     a.href = url;
@@ -614,6 +650,27 @@ export function MerchantPortal() {
                 }
               >
                 Download CSV
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+                placeholder="Filter by order ID"
+                value={outcomeFilterOrderId}
+                onChange={(e) => setOutcomeFilterOrderId(e.target.value)}
+              />
+              <button
+                type="button"
+                className="text-xs text-neon px-2 shrink-0"
+                disabled={busy || !orgId}
+                onClick={() =>
+                  void withBusy(async () => {
+                    await refreshCatalogueAndMetrics();
+                    setStatus("Outcomes refreshed");
+                  })
+                }
+              >
+                Apply
               </button>
             </div>
             {outcomes.length === 0 ? (
@@ -640,6 +697,36 @@ export function MerchantPortal() {
                 ))}
               </ul>
             )}
+          </div>
+
+          <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
+            <h2 className="text-sm font-semibold">POPIA erase by device</h2>
+            <p className="text-xs text-ink-muted">
+              Deletes outcomes whose <code className="text-neon">data.deviceId</code>{" "}
+              matches (admin+). See docs/legal/POPIA_DPA_TEMPLATE.md.
+            </p>
+            <input
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              placeholder="Device id"
+              value={eraseDeviceId}
+              onChange={(e) => setEraseDeviceId(e.target.value)}
+            />
+            <PrimaryButton
+              disabled={busy || !orgId || !apiReady || eraseDeviceId.trim().length < 4}
+              onClick={() =>
+                void withBusy(async () => {
+                  if (!orgId) return;
+                  const result = await eraseMerchantOutcomesByDevice(
+                    orgId,
+                    eraseDeviceId.trim(),
+                  );
+                  setStatus(`Erased ${result.deleted} outcomes for device`);
+                  await refreshCatalogueAndMetrics();
+                })
+              }
+            >
+              Erase device outcomes
+            </PrimaryButton>
           </div>
         </section>
       ) : null}

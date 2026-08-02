@@ -15,6 +15,7 @@ import {
   listMembers,
   listOrgsForDevice,
   listOutcomes,
+  eraseOutcomesByDevice,
   listProducts,
   pilotMetrics,
   recordOutcome,
@@ -108,6 +109,8 @@ const outcomeSchema = z.object({
   reason: z.string().trim().max(80).optional(),
   /** Retail / POS order id — stored in outcome `data.orderId` for attribution. */
   orderId: z.string().trim().min(1).max(120).optional(),
+  /** Device that recorded the outcome — stored in `data.deviceId` for POPIA erase. */
+  deviceId: documentIdSchema.optional(),
   data: z.record(z.unknown()).optional(),
 });
 
@@ -315,9 +318,11 @@ merchantRouter.post(
   async (req: MerchantRequest, res, next) => {
     try {
       const body = outcomeSchema.parse(req.body);
-      const { orderId, data: rawData, ...rest } = body;
+      const { orderId, deviceId, data: rawData, ...rest } = body;
       const data: Record<string, unknown> = { ...(rawData ?? {}) };
       if (orderId) data.orderId = orderId;
+      const actorDeviceId = deviceId ?? req.uid;
+      if (actorDeviceId) data.deviceId = actorDeviceId;
       const result = await recordOutcome({
         orgId: req.orgId!,
         ...rest,
@@ -337,7 +342,16 @@ merchantRouter.get(
     try {
       const since = req.query.sinceEpochMs ? Number(req.query.sinceEpochMs) : undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
-      const rows = await listOutcomes(req.orgId!, { sinceEpochMs: since, limit });
+      const orderId =
+        typeof req.query.orderId === "string" ? req.query.orderId : undefined;
+      const deviceId =
+        typeof req.query.deviceId === "string" ? req.query.deviceId : undefined;
+      const rows = await listOutcomes(req.orgId!, {
+        sinceEpochMs: since,
+        limit,
+        orderId,
+        deviceId,
+      });
       const format = String(req.query.format ?? "json").toLowerCase();
       if (format === "csv") {
         const header =
@@ -368,6 +382,25 @@ merchantRouter.get(
         return;
       }
       res.json({ outcomes: rows });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.delete(
+  "/merchants/orgs/:orgId/outcomes",
+  requireOrgRole("admin"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      const deviceId =
+        typeof req.query.deviceId === "string" ? req.query.deviceId.trim() : "";
+      if (!deviceId) {
+        res.status(400).json({ error: "deviceId query required" });
+        return;
+      }
+      const result = await eraseOutcomesByDevice(req.orgId!, deviceId);
+      res.json(result);
     } catch (err) {
       next(err);
     }

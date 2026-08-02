@@ -38,7 +38,11 @@ Inventory rows support optional `widthLabel` (default `standard`) so UK 5 / wide
 
 Optional `orderId` on POST outcomes is stored in `data.orderId` for retail attribution. Return rate = `returns ÷ purchases` (not diluted by mixing kinds).
 
-`GET .../outcomes` lists recent rows (default last 90 days). `?format=csv` downloads a CSV for weekly pilot reconciliation.
+`GET .../outcomes` lists recent rows (default last 90 days). Filters: `?orderId=`, `?deviceId=`. `?format=csv` downloads CSV. `DELETE .../outcomes?deviceId=` (admin+) erases device-attributed rows for POPIA.
+
+Retailer feed contract: [docs/schemas/retailer-catalogue-feed.schema.json](schemas/retailer-catalogue-feed.schema.json). Validate with `npm run validate:catalogue-feed`.
+
+POPIA DPA template: [docs/legal/POPIA_DPA_TEMPLATE.md](legal/POPIA_DPA_TEMPLATE.md).
 
 ## Web portal
 

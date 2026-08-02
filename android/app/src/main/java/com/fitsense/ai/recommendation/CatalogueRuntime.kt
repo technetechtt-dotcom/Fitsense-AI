@@ -20,19 +20,21 @@ class CatalogueRuntime @Inject constructor(
     private var merchantProducts: List<Product>? = null
 
     @Volatile
-    private var inventoryLoaded: Boolean = false
+    private var stockIndex: InventoryStockIndex = InventoryStockIndex()
 
     fun getActiveCatalogue(): List<Product> {
         val merchant = merchantProducts
         return if (!merchant.isNullOrEmpty()) merchant else shoeCatalog.builtIn()
     }
 
+    fun stockIndex(): InventoryStockIndex = stockIndex
+
     fun source(): String =
         if (!merchantProducts.isNullOrEmpty()) "merchant" else "builtin"
 
     fun clear() {
         merchantProducts = null
-        inventoryLoaded = false
+        stockIndex = InventoryStockIndex()
     }
 
     /**
@@ -50,9 +52,7 @@ class CatalogueRuntime @Inject constructor(
             return 0
         }
         merchantProducts = products
-        // Inventory fetch is best-effort (stock hints can be added later).
-        runCatching { merchantApi.listInventory(orgId) }
-        inventoryLoaded = true
+        stockIndex = InventoryStockIndex(merchantApi.listInventory(orgId).orEmpty())
         return products.size
     }
 }

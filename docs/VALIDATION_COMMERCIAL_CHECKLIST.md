@@ -20,11 +20,11 @@ Operational work that cannot be completed in code alone. Track progress here.
 | Item                                | Status  | Notes                                                               |
 | ----------------------------------- | ------- | ------------------------------------------------------------------- |
 | Merchant portal UI                  | Done    | `/merchant` — orgs, catalogue, inventory, brand-fit, outcomes, keys |
-| Real footwear retailer catalogue    | Partial | Sample feed + Android/web merchant catalogue load                   |
+| Real footwear retailer catalogue    | Partial | Sample feed + schema + `npm run validate:catalogue-feed`            |
 | Variants, sizes, widths, inventory  | Partial | `widthLabel` on inventory; portal + sample feed; stock-aware recs   |
-| Outcomes ↔ real orders              | Partial | `orderId` + list/CSV export for weekly pilot reconcile              |
+| Outcomes ↔ real orders              | Partial | `orderId` filter + list/CSV; deviceId erase for POPIA               |
 | Passkey customer accounts           | Open    | Explicitly deferred — no stubs                                      |
-| Complete POPIA implementation       | Partial | Privacy copy + retention incl. `merchant_outcomes`; legal DPA open  |
+| Complete POPIA implementation       | Partial | DPA template + retention + outcomes erase by deviceId               |
 | Controlled Kimberley pilot          | Open    | Runbook ready                                                       |
 | Prove reduced returns / conversions | Open    | Fixed return-rate = returns÷purchases                               |
 

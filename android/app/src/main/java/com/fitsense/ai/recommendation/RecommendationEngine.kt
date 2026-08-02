@@ -7,7 +7,6 @@ import com.fitsense.ai.models.Product
 import com.fitsense.ai.models.ShoeMatch
 import com.fitsense.ai.models.SizeRecommendation
 import com.fitsense.ai.utils.Constants
-import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -22,10 +21,10 @@ import kotlin.math.roundToInt
  *  • Multi-locale size triplet (UK / US / EU) + Mondopoint
  *  • Sorted [ShoeMatch] list with fit + comfort scores 0..100
  */
-class RecommendationEngine @Inject constructor(
+class RecommendationEngine(
     private val catalog: ShoeCatalog,
+    private val stockProvider: () -> InventoryStockIndex = { InventoryStockIndex() },
 ) {
-
     fun recommend(
         measurement: FootMeasurement,
         products: List<Product> = catalog.builtIn(),
@@ -49,12 +48,13 @@ class RecommendationEngine @Inject constructor(
         val effectiveLengthMm = measurement.lengthMm + Constants.SIZE_HEEL_MARGIN_MM
         val sizes = SizeMappingTable.forLengthMm(effectiveLengthMm)
         val euSize = SizeMappingTable.euAsDouble(sizes.eu)
+        val stock = stockProvider()
 
         val matches = products
             .asSequence()
             .filter { it.sizeRangeEu.contains(euSize) }
-            .map { product -> buildMatch(product, measurement, euSize) }
-            .sortedByDescending { it.fitScore + it.comfortScore }
+            .map { product -> buildMatch(product, measurement, euSize, stock) }
+            .sortedByDescending { sortScore(it) }
             .take(maxResults)
             .toList()
 
@@ -77,10 +77,20 @@ class RecommendationEngine @Inject constructor(
         )
     }
 
+    private fun sortScore(match: ShoeMatch): Double {
+        val stockBoost = when (match.inStock) {
+            true -> 8.0
+            false -> -12.0
+            null -> 0.0
+        }
+        return match.fitScore * 0.55 + match.comfortScore * 0.45 + stockBoost
+    }
+
     private fun buildMatch(
         product: Product,
         measurement: FootMeasurement,
         euSize: Double,
+        stock: InventoryStockIndex,
     ): ShoeMatch {
         // Snap user's EU size to the nearest step the product supports.
         val step = product.sizeRangeEu.step.coerceAtLeast(0.5)
@@ -90,6 +100,16 @@ class RecommendationEngine @Inject constructor(
 
         val fitScore = fitScore(product, measurement)
         val comfortScore = comfortScore(product, measurement, recommendedSize, euSize)
+        val inStock = if (stock.hasInventory()) {
+            stock.productHasAnyStock(product.productId) ?: false
+        } else {
+            null
+        }
+        val stockUk = if (stock.hasInventory()) {
+            stock.inStockUkLabels(product.productId)
+        } else {
+            emptyList()
+        }
 
         return ShoeMatch(
             productId = product.productId,
@@ -99,6 +119,8 @@ class RecommendationEngine @Inject constructor(
             fitScore = fitScore,
             comfortScore = comfortScore,
             imageUrl = product.imageUrl,
+            inStock = inStock,
+            stockUkLabels = stockUk,
         )
     }
 

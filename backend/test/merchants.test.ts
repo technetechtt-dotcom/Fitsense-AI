@@ -231,6 +231,17 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
   assert.ok(outcomesBody.outcomes.length >= 4);
   assert.ok(outcomesBody.outcomes.some((o) => o.orderId === "KIM-ORD-1001"));
 
+  const byOrder = await fetch(
+    `${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes?orderId=KIM-ORD-1001`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  assert.equal(byOrder.status, 200);
+  const byOrderBody = (await byOrder.json()) as {
+    outcomes: Array<{ orderId: string | null }>;
+  };
+  assert.ok(byOrderBody.outcomes.length >= 1);
+  assert.ok(byOrderBody.outcomes.every((o) => o.orderId === "KIM-ORD-1001"));
+
   const outcomesCsv = await fetch(
     `${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes?format=csv`,
     { headers: { Authorization: `Bearer ${accessToken}` } },

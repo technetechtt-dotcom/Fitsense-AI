@@ -267,13 +267,14 @@ export type MerchantOutcomeRow = {
 
 export async function listMerchantOutcomes(
   orgId: string,
-  opts?: { sinceEpochMs?: number; limit?: number },
+  opts?: { sinceEpochMs?: number; limit?: number; orderId?: string },
 ): Promise<MerchantOutcomeRow[]> {
   const params = new URLSearchParams();
   if (opts?.sinceEpochMs !== undefined) {
     params.set("sinceEpochMs", String(opts.sinceEpochMs));
   }
   if (opts?.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts?.orderId?.trim()) params.set("orderId", opts.orderId.trim());
   const q = params.toString() ? `?${params}` : "";
   const res = await merchantFetch(
     `/v1/merchants/orgs/${encodeURIComponent(orgId)}/outcomes${q}`,
@@ -283,12 +284,32 @@ export async function listMerchantOutcomes(
   return body.outcomes ?? [];
 }
 
-export async function downloadMerchantOutcomesCsv(orgId: string): Promise<Blob> {
+export async function downloadMerchantOutcomesCsv(
+  orgId: string,
+  opts?: { orderId?: string; sinceEpochMs?: number },
+): Promise<Blob> {
+  const params = new URLSearchParams({ format: "csv" });
+  if (opts?.orderId?.trim()) params.set("orderId", opts.orderId.trim());
+  if (opts?.sinceEpochMs !== undefined) {
+    params.set("sinceEpochMs", String(opts.sinceEpochMs));
+  }
   const res = await merchantFetch(
-    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/outcomes?format=csv`,
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/outcomes?${params}`,
   );
   if (!res.ok) throw new Error(`outcomes csv failed: ${res.status}`);
   return res.blob();
+}
+
+export async function eraseMerchantOutcomesByDevice(
+  orgId: string,
+  deviceId: string,
+): Promise<{ deleted: number }> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/outcomes?deviceId=${encodeURIComponent(deviceId)}`,
+    { method: "DELETE" },
+  );
+  if (!res.ok) throw new Error(`outcomes erase failed: ${res.status}`);
+  return (await res.json()) as { deleted: number };
 }
 
 export async function fetchPilotMetrics(
