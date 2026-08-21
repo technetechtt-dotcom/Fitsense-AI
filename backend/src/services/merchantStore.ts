@@ -552,14 +552,15 @@ export async function recordOutcome(input: {
       return { outcomeId: existing.rows[0].outcome_id, reused: true };
     }
   }
+  // One event per (commercial line, kind) — purchase and return share order_line_id.
   if (orderLineId) {
     const existing = await getPostgresPool().query<{ outcome_id: string }>(
       `
         SELECT outcome_id FROM merchant_outcomes
-        WHERE org_id = $1 AND order_line_id = $2
+        WHERE org_id = $1 AND order_line_id = $2 AND kind = $3
         LIMIT 1
       `,
-      [input.orgId, orderLineId],
+      [input.orgId, orderLineId, input.kind],
     );
     if (existing.rows[0]) {
       return { outcomeId: existing.rows[0].outcome_id, reused: true };
@@ -614,10 +615,10 @@ export async function recordOutcome(input: {
         const again = await getPostgresPool().query<{ outcome_id: string }>(
           `
             SELECT outcome_id FROM merchant_outcomes
-            WHERE org_id = $1 AND order_line_id = $2
+            WHERE org_id = $1 AND order_line_id = $2 AND kind = $3
             LIMIT 1
           `,
-          [input.orgId, orderLineId],
+          [input.orgId, orderLineId, input.kind],
         );
         if (again.rows[0]) {
           return { outcomeId: again.rows[0].outcome_id, reused: true };
@@ -683,20 +684,20 @@ export async function pilotMetrics(
     [orgId, since],
   );
 
-  const buckets: Record<string, { purchases: number; returns: number; exchanges: number }> =
-    {
-      assisted: { purchases: 0, returns: 0, exchanges: 0 },
-      control: { purchases: 0, returns: 0, exchanges: 0 },
-      unassigned: { purchases: 0, returns: 0, exchanges: 0 },
-      all: { purchases: 0, returns: 0, exchanges: 0 },
-    };
+  const buckets: Record<
+    string,
+    { purchases: number; returns: number; exchanges: number }
+  > = {
+    assisted: { purchases: 0, returns: 0, exchanges: 0 },
+    control: { purchases: 0, returns: 0, exchanges: 0 },
+    unassigned: { purchases: 0, returns: 0, exchanges: 0 },
+    all: { purchases: 0, returns: 0, exchanges: 0 },
+  };
 
   for (const row of result.rows) {
     const n = Number(row.n);
     const arm =
-      row.cohort === "assisted" || row.cohort === "control"
-        ? row.cohort
-        : "unassigned";
+      row.cohort === "assisted" || row.cohort === "control" ? row.cohort : "unassigned";
     const kindKey =
       row.kind === "purchase"
         ? "purchases"
@@ -753,8 +754,7 @@ export async function pilotRoi(
     assistedPurchases > 0
   ) {
     relativeSizeRelatedReduction = (controlRate - assistedRate) / controlRate;
-    const avoided =
-      Math.max(0, controlRate - assistedRate) * assistedPurchases;
+    const avoided = Math.max(0, controlRate - assistedRate) * assistedPurchases;
     estimatedReturnCostSavedZar = avoided * avgReturnCostZar;
     estimatedExtraMarginZar = avoided * avgMarginZar * 0.25;
   }
@@ -766,8 +766,7 @@ export async function pilotRoi(
     estimatedReturnCostSavedZar,
     estimatedExtraMarginZar,
     relativeSizeRelatedReduction,
-    note:
-      "Estimates only — requires assisted vs control cohorts with real POS outcomes. Does not invent sizing millimetres.",
+    note: "Estimates only — requires assisted vs control cohorts with real POS outcomes. Does not invent sizing millimetres.",
   };
 }
 
@@ -832,7 +831,11 @@ export async function outcomeFitInsights(
     const reason = (row.reason ?? "unspecified").toLowerCase();
     acc.sampleSize += n;
     acc.reasons[reason] = (acc.reasons[reason] ?? 0) + n;
-    if (reason.includes("small") || reason.includes("tight") || reason.includes("short")) {
+    if (
+      reason.includes("small") ||
+      reason.includes("tight") ||
+      reason.includes("short")
+    ) {
       acc.deltaVotes += n; // need larger size → positive EU delta
     } else if (
       reason.includes("large") ||
@@ -996,8 +999,7 @@ export async function listIntegrations(orgId: string): Promise<
     provider: r.provider,
     status: r.status,
     externalRef: r.external_ref,
-    data:
-      r.data && typeof r.data === "object" && !Array.isArray(r.data) ? r.data : {},
+    data: r.data && typeof r.data === "object" && !Array.isArray(r.data) ? r.data : {},
     updatedAtEpochMs: r.updated_at.getTime(),
   }));
 }

@@ -5,11 +5,11 @@ Protocol companion to [MEASUREMENT_PROTOCOL.md](./MEASUREMENT_PROTOCOL.md) and
 
 ## Recruitment (Phase 2)
 
-| Stage | Target | Notes |
-| ----- | ------ | ----- |
-| Internal validation | ≥ 30 participants | Staff / friends / family; both feet; Brannock GT |
-| Expansion | 100–300 participants | Kimberley + NC catchment; age/sex mix |
-| Publish | Accuracy, repeatability, failure rates | `npm run publish:accuracy -- path/to.jsonl` → `docs/records/` |
+| Stage               | Target                                 | Notes                                                         |
+| ------------------- | -------------------------------------- | ------------------------------------------------------------- |
+| Internal validation | ≥ 30 participants                      | Staff / friends / family; both feet; Brannock GT              |
+| Expansion           | 100–300 participants                   | Kimberley + NC catchment; age/sex mix                         |
+| Publish             | Accuracy, repeatability, failure rates | `npm run publish:accuracy -- path/to.jsonl` → `docs/records/` |
 
 ### Brannock / calibrated tool
 

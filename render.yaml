@@ -9,7 +9,7 @@ services:
     plan: free
     # Match CI: lockfile install including build-time TypeScript types.
     buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
-    startCommand: npm start
+    startCommand: npm run migrate && npm start
     healthCheckPath: /health
     # Keep off until branch protection + required CI checks are enforced on main.
     autoDeployTrigger: off
@@ -67,7 +67,7 @@ services:
     rootDir: backend
     plan: free
     buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
-    startCommand: npm start
+    startCommand: npm run migrate && npm start
     healthCheckPath: /health
     # Manual / blueprint sync until a staging branch auto-deploy policy is chosen.
     autoDeployTrigger: off
@@ -115,3 +115,51 @@ services:
       - type: rewrite
         source: /*
         destination: /index.html
+
+  # POPIA retention (staging) — monitor logs after each run. See docs/ops/RETENTION.md.
+  - type: cron
+    name: fitsense-retention-staging
+    runtime: node
+    rootDir: backend
+    plan: starter
+    schedule: "0 3 * * *"
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run retention:run
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: DATABASE_URL
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+
+  # POPIA retention (production).
+  - type: cron
+    name: fitsense-retention
+    runtime: node
+    rootDir: backend
+    plan: starter
+    schedule: "30 3 * * *"
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run retention:run
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          name: fitsense-api
+          type: web
+          envVarKey: DATABASE_URL
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: "true"

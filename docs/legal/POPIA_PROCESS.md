@@ -12,12 +12,12 @@ Companion to the contract template [POPIA_DPA_TEMPLATE.md](./POPIA_DPA_TEMPLATE.
 
 ## Ongoing
 
-| Cadence  | Action                                                          |
-| -------- | --------------------------------------------------------------- |
-| Weekly   | Spot-check consent banners + erase drill on staging             |
-| Monthly  | Retention job dry-run; review outcome retention days            |
-| Quarterly| Access review of merchant API keys; revoke unused               |
-| On exit  | Erase device-attributed outcomes; revoke keys; close org access |
+| Cadence   | Action                                                          |
+| --------- | --------------------------------------------------------------- |
+| Weekly    | Spot-check consent banners + erase drill on staging             |
+| Monthly   | Retention job dry-run; review outcome retention days            |
+| Quarterly | Access review of merchant API keys; revoke unused               |
+| On exit   | Erase device-attributed outcomes; revoke keys; close org access |
 
 ## Data subject requests
 
