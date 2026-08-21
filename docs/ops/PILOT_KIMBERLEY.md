@@ -20,10 +20,10 @@ and ROI via `GET .../pilot-roi`. Outcome fit suggestions: `GET .../outcome-fit-i
 
 ## Assisted vs control
 
-| Cohort | Definition |
-| ------ | ---------- |
+| Cohort     | Definition                                     |
+| ---------- | ---------------------------------------------- |
 | `assisted` | Size recommendation from FitSense used at till |
-| `control` | Traditional sizing / no FitSense size applied |
+| `control`  | Traditional sizing / no FitSense size applied  |
 
 Record `cohort` on every outcome (`POST .../outcomes`). Portal outcomes tab has a cohort selector.
 

@@ -98,10 +98,7 @@ export const config = {
   handoffKid: process.env.HANDOFF_KID?.trim() || "handoff-v1",
   accessTokenTtlMs: parseNumber(process.env.ACCESS_TOKEN_TTL_MS, 15 * 60 * 1000),
   /** Short-lived merchant catalogue/inventory read tokens (not operator keys). */
-  catalogueTokenTtlMs: parseNumber(
-    process.env.CATALOGUE_TOKEN_TTL_MS,
-    30 * 60 * 1000,
-  ),
+  catalogueTokenTtlMs: parseNumber(process.env.CATALOGUE_TOKEN_TTL_MS, 30 * 60 * 1000),
   refreshTokenTtlMs: parseNumber(
     process.env.REFRESH_TOKEN_TTL_MS,
     30 * 24 * 60 * 60 * 1000,

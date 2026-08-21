@@ -48,9 +48,7 @@ export function evaluateDeviceCertification(
       entry.manufacturer.toLowerCase() === mfr ||
       mfr.includes(entry.manufacturer.toLowerCase());
     if (!mfrOk) continue;
-    const hit = entry.modelContains.some((token) =>
-      mdl.includes(token.toLowerCase()),
-    );
+    const hit = entry.modelContains.some((token) => mdl.includes(token.toLowerCase()));
     if (!hit && mdl) continue;
     if (entry.status === "blocked") {
       return {

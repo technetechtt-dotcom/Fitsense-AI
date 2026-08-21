@@ -104,10 +104,7 @@ class PostgresSyncStore implements SyncStore {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("DELETE FROM scan_tombstones WHERE uid = $1 AND scan_id = $2", [
-        uid,
-        scanId,
-      ]);
+      // Lock order: scans → tombstones (must match deleteScan to avoid deadlocks).
       await client.query(
         `
           INSERT INTO scans (uid, scan_id, data, created_at_epoch_ms, updated_at)
@@ -118,6 +115,10 @@ class PostgresSyncStore implements SyncStore {
             updated_at = now()
         `,
         [uid, scanId, JSON.stringify(scan), body.createdAtEpochMs ?? null],
+      );
+      await client.query(
+        "DELETE FROM scan_tombstones WHERE uid = $1 AND scan_id = $2",
+        [uid, scanId],
       );
       await client.query("COMMIT");
     } catch (err) {

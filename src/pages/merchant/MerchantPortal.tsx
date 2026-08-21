@@ -356,8 +356,9 @@ export function MerchantPortal() {
               {billing ? (
                 <div className="pt-2 border-t border-white/5 space-y-2">
                   <p className="text-xs text-ink-muted">
-                    Onboarding: <span className="text-neon">{billing.onboardingStep}</span>{" "}
-                    · {billing.plan}/{billing.status}
+                    Onboarding:{" "}
+                    <span className="text-neon">{billing.onboardingStep}</span> ·{" "}
+                    {billing.plan}/{billing.status}
                   </p>
                   <PrimaryButton
                     disabled={busy || !orgId}
@@ -797,9 +798,10 @@ export function MerchantPortal() {
           <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
             <h2 className="text-sm font-semibold">POPIA erase by device</h2>
             <p className="text-xs text-ink-muted">
-              Deletes outcomes whose server-attributed <code className="text-neon">data.deviceId</code>{" "}
-              matches (device-auth posts only — clients cannot spoof actor device ids).
-              matches (admin+). See docs/legal/POPIA_DPA_TEMPLATE.md.
+              Deletes outcomes whose server-attributed{" "}
+              <code className="text-neon">data.deviceId</code> matches (device-auth
+              posts only — clients cannot spoof actor device ids). matches (admin+). See
+              docs/legal/POPIA_DPA_TEMPLATE.md.
             </p>
             <input
               className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"

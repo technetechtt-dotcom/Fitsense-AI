@@ -108,7 +108,13 @@ export function verifySessionToken(token: string, secretOverride?: string): stri
 
 export function issueCatalogueToken(
   orgId: string,
-  options?: { secret?: string; kid?: string; ttlMs?: number; jti?: string; uid?: string },
+  options?: {
+    secret?: string;
+    kid?: string;
+    ttlMs?: number;
+    jti?: string;
+    uid?: string;
+  },
 ): { token: string; jti: string; exp: number } {
   const secret = options?.secret ?? config.authSecret;
   if (!secret) throw new Error("AUTH_SECRET is not configured");

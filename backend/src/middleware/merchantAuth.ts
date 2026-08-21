@@ -1,10 +1,7 @@
 import type { NextFunction, Response } from "express";
 import type { AuthedRequest } from "./auth.js";
 import { isAccessJtiRevoked } from "../services/deviceAuthStore.js";
-import {
-  verifyAccessToken,
-  verifyCatalogueToken,
-} from "../services/sessionAuth.js";
+import { verifyAccessToken, verifyCatalogueToken } from "../services/sessionAuth.js";
 import {
   getMemberRole,
   resolveApiKey,

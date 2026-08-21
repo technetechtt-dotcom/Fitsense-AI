@@ -2,15 +2,15 @@
 
 ## Priority 0 — Deployed platform (release gates)
 
-| Gate                                             | Status                                                              |
-| ------------------------------------------------ | ------------------------------------------------------------------- |
-| Separate staging + production Blueprint services | In repo (`render.yaml`); sync on Render + distinct Neon             |
-| Distinct `AUTH_SECRET` + `HANDOFF_SECRET`        | Required in prod/staging (no shared fallback)                       |
-| Auto production deploy                           | **Off** until gates green                                           |
-| Four CI jobs on every `main` push                | `web-and-sdk`, `backend`, `render-api-build`, `android-build`       |
-| APK + unit-test report artifacts                 | Uploaded from `android-build`                                       |
-| Staging smoke + record artifact                  | `staging-smoke` when `STAGING_API_BASE_URL` set                     |
-| Direct push to `main`                            | Superseded — PR protection restored                     |
+| Gate                                             | Status                                                        |
+| ------------------------------------------------ | ------------------------------------------------------------- |
+| Separate staging + production Blueprint services | In repo (`render.yaml`); sync on Render + distinct Neon       |
+| Distinct `AUTH_SECRET` + `HANDOFF_SECRET`        | Required in prod/staging (no shared fallback)                 |
+| Auto production deploy                           | **Off** until gates green                                     |
+| Four CI jobs on every `main` push                | `web-and-sdk`, `backend`, `render-api-build`, `android-build` |
+| APK + unit-test report artifacts                 | Uploaded from `android-build`                                 |
+| Staging smoke + record artifact                  | `staging-smoke` when `STAGING_API_BASE_URL` set               |
+| Pull requests into `main` (branch protection)    | **On** — 1 review + required CI contexts                      |
 
 See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md),
 [docs/records/](./records/).
@@ -61,24 +61,26 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 **P7 still open:** WebAuthn passkeys / durable account linking (no stubs).
 
 Physical + commercial ops: [VALIDATION_COMMERCIAL_CHECKLIST.md](./VALIDATION_COMMERCIAL_CHECKLIST.md).
-Branch policy: [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) (direct push to `main`; PR protection deferred unless requested).
+Branch policy: [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) (**PRs required** into `main`; protection enabled).
+
+**Next milestone (stop horizontal expansion):** physical accuracy validation — Brannock, ≥5 SA phones, 30→100–300 participants, certify device cohorts, then one real retailer assisted-vs-control pilot. See Phase 2 below.
 
 ---
 
 ## Phase 1 — Immediate engineering (current)
 
-| Item | Status |
-| ---- | ------ |
-| Remove permanent Android merchant API keys | Done — device auth + catalogue tokens |
-| Short-lived scoped catalogue tokens | Done — `POST .../catalogue-token` |
-| Exact size+width stock match | Done — Android + web |
-| Mandatory `sizeRangeEu` | Done — ingest, schema, validator, clients |
-| Outcomes order-line + idempotency | Done — `orderLineId` + `Idempotency-Key` |
-| Strip client-controlled outcome `deviceId` | Done — server sets from device auth only |
-| Scan sync deletion tombstones | Done — `deletedScanIds` on pull |
-| Catalogue validator in CI | Done — `web-and-sdk` job |
-| Restore protected PR development | **Done** — protection re-enabled |
-| Deploy head to staging + fresh evidence | **Evidence refreshed** — smoke vs live API in `docs/records/` |
+| Item                                       | Status                                                        |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| Remove permanent Android merchant API keys | Done — device auth + catalogue tokens                         |
+| Short-lived scoped catalogue tokens        | Done — `POST .../catalogue-token`                             |
+| Exact size+width stock match               | Done — Android + web                                          |
+| Mandatory `sizeRangeEu`                    | Done — ingest, schema, validator, clients                     |
+| Outcomes order-line + idempotency          | Done — event = Idempotency-Key; line+kind unique              |
+| Strip client-controlled outcome `deviceId` | Done — server sets from device auth only                      |
+| Scan sync deletion tombstones              | Done — `deletedScanIds` on pull                               |
+| Catalogue validator in CI                  | Done — `web-and-sdk` job                                      |
+| Restore protected PR development           | **Done** — protection enabled on GitHub                       |
+| Deploy head to staging + fresh evidence    | Partial — smoke evidence; promote staging Blueprint on Render |
 
 ## Phase 2 — Accuracy validation (physical)
 

@@ -116,7 +116,7 @@ const outcomeSchema = z.object({
   reason: z.string().trim().max(80).optional(),
   /** Retail / POS order id — stored in outcome `data.orderId` for attribution. */
   orderId: z.string().trim().min(1).max(120).optional(),
-  /** Stable order-line key (unique per org). Preferred over client deviceId. */
+  /** Stable commercial order-line id (shared by purchase/return/exchange). */
   orderLineId: z.string().trim().min(1).max(160).optional(),
   /** Pilot arm: FitSense-assisted vs control (no FitSense size). */
   cohort: z.enum(["assisted", "control"]).optional(),
@@ -367,17 +367,19 @@ merchantRouter.post(
         if (req.apiKeyId) data.apiKeyId = req.apiKeyId;
       }
       const idempotencyKey = req.header("idempotency-key")?.trim() || undefined;
-      const derivedLine =
+      // Commercial line id (shared across purchase/return/exchange for that SKU line).
+      // Do NOT embed kind — event uniqueness is (order_line_id, kind) + Idempotency-Key.
+      const commercialLine =
         orderLineId ??
         (orderId && rest.productId && rest.sizeLabel
-          ? `${orderId}|${rest.kind}|${rest.productId}|${rest.sizeSystem ?? ""}|${rest.sizeLabel}`
+          ? `${orderId}|${rest.productId}|${rest.sizeSystem ?? ""}|${rest.sizeLabel}`
           : undefined);
       const result = await recordOutcome({
         orgId: req.orgId!,
         ...rest,
         cohort,
         data: Object.keys(data).length ? data : undefined,
-        orderLineId: derivedLine,
+        orderLineId: commercialLine,
         idempotencyKey,
       });
       res.status(result.reused ? 200 : 201).json({

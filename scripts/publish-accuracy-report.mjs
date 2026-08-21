@@ -6,9 +6,11 @@
  */
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 
-const input = resolve(process.argv[2] ?? "docs/records/accuracy-sample.jsonl");
+const cwd = process.cwd();
+const inputAbs = resolve(process.argv[2] ?? "docs/records/accuracy-sample.jsonl");
+const inputRel = relative(cwd, inputAbs).replace(/\\/g, "/") || inputAbs;
 const outJson = resolve("docs/records/accuracy-report-latest.json");
 const outMd = resolve("docs/records/accuracy-report-latest.md");
 
@@ -16,12 +18,7 @@ mkdirSync(resolve("docs/records"), { recursive: true });
 
 const analyze = spawnSync(
   process.execPath,
-  [
-    resolve("scripts/analyze-accuracy-dataset.mjs"),
-    input,
-    "--out",
-    outJson,
-  ],
+  [resolve("scripts/analyze-accuracy-dataset.mjs"), inputAbs, "--out", outJson],
   { encoding: "utf8" },
 );
 
@@ -36,7 +33,7 @@ const lines = [
   "# Accuracy report (latest)",
   "",
   `Generated: ${new Date().toISOString()}`,
-  `Source: \`${input}\``,
+  `Source: \`${inputRel}\``,
   "",
   `| Metric | Value |`,
   `| ------ | ----- |`,
@@ -52,4 +49,4 @@ const lines = [
   "",
 ];
 writeFileSync(outMd, lines.join("\n"), "utf8");
-console.log(`published → ${outMd}`);
+console.log(`published → ${relative(cwd, outMd).replace(/\\/g, "/")}`);

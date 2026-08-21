@@ -1,0 +1,23 @@
+{
+  "baseUrl": "https://fitsense-api-1rne.onrender.com",
+  "startedAt": "2026-08-21T12:20:00.132Z",
+  "ok": false,
+  "steps": [
+    {
+      "name": "health",
+      "ok": true,
+      "status": 200
+    },
+    {
+      "name": "auth",
+      "ok": true
+    },
+    {
+      "name": "create_org",
+      "ok": false,
+      "status": 404
+    }
+  ],
+  "error": "create org failed",
+  "finishedAt": "2026-08-21T12:20:02.778Z"
+}

@@ -144,9 +144,8 @@ export function Settings() {
 
       <Section label="Accuracy study (Brannock GT)">
         <p className="text-xs text-ink-muted leading-relaxed">
-          Enter calibrated Brannock / caliper ground truth before scanning. Export
-          JSONL for analysis — never invent millimetres. Device gate:{" "}
-          {deviceCert.message}
+          Enter calibrated Brannock / caliper ground truth before scanning. Export JSONL
+          for analysis — never invent millimetres. Device gate: {deviceCert.message}
         </p>
         <div className="grid grid-cols-2 gap-2">
           <label className="text-xs text-ink-muted">

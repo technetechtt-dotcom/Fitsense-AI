@@ -136,7 +136,9 @@ export function inStockExact(
     if (!widthMatches(row.widthLabel, width)) return false;
     switch (row.sizeSystem) {
       case "eu":
-        return labelsEqual(row.sizeLabel, euLabel) || labelsEqual(row.sizeLabel, sizes.eu);
+        return (
+          labelsEqual(row.sizeLabel, euLabel) || labelsEqual(row.sizeLabel, sizes.eu)
+        );
       case "uk":
         return labelsEqual(row.sizeLabel, sizes.uk);
       case "us":
@@ -174,8 +176,7 @@ export function catalogueProductToProduct(raw: CatalogueProduct): Product | null
   ) {
     return null;
   }
-  const step =
-    typeof range.step === "number" && range.step > 0 ? range.step : 1;
+  const step = typeof range.step === "number" && range.step > 0 ? range.step : 1;
   const sizeRangeEu = { min: range.min, max: range.max, step };
 
   const dq = raw.dataQuality;

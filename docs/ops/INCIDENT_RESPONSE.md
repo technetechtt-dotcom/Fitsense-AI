@@ -2,11 +2,11 @@
 
 ## Severity
 
-| Level | Examples                                      | Response time |
-| ----- | --------------------------------------------- | ------------- |
-| SEV1  | Auth secret leak, mass data exposure, outage  | Immediate     |
-| SEV2  | Sync/handoff degraded, merchant ingest down   | ≤ 4 hours     |
-| SEV3  | Single-store catalogue glitch, non-PII bug    | Next business |
+| Level | Examples                                     | Response time |
+| ----- | -------------------------------------------- | ------------- |
+| SEV1  | Auth secret leak, mass data exposure, outage | Immediate     |
+| SEV2  | Sync/handoff degraded, merchant ingest down  | ≤ 4 hours     |
+| SEV3  | Single-store catalogue glitch, non-PII bug   | Next business |
 
 ## First 30 minutes (SEV1/2)
 
