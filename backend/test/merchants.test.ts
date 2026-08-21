@@ -180,12 +180,15 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
     ),
   );
 
-  for (const kind of ["purchase", "purchase", "return", "exchange"] as const) {
+  for (const [idx, kind] of (
+    ["purchase", "purchase", "return", "exchange"] as const
+  ).entries()) {
     const outcome = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes`, {
       method: "POST",
       headers: {
         "X-Api-Key": keyBody.apiKey,
         "Content-Type": "application/json",
+        "Idempotency-Key": `kim-pilot-${kind}-${idx}`,
       },
       body: JSON.stringify({
         kind,
@@ -194,11 +197,97 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
         sizeLabel: "5",
         sizeSystem: "uk",
         reason: kind === "return" ? "too_small" : undefined,
-        orderId: kind === "purchase" ? "KIM-ORD-1001" : "KIM-ORD-1001",
+        orderId: "KIM-ORD-1001",
+        orderLineId: `KIM-ORD-1001-${kind}-${idx}`,
       }),
     });
     assert.equal(outcome.status, 201);
   }
+
+  // Idempotent replay returns the same outcome id.
+  const replay = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes`, {
+    method: "POST",
+    headers: {
+      "X-Api-Key": keyBody.apiKey,
+      "Content-Type": "application/json",
+      "Idempotency-Key": "kim-pilot-purchase-0",
+    },
+    body: JSON.stringify({
+      kind: "purchase",
+      productId: "bata-power-school-01",
+      brand: "Bata Power",
+      sizeLabel: "5",
+      sizeSystem: "uk",
+      orderId: "KIM-ORD-1001",
+      orderLineId: "KIM-ORD-1001-purchase-0",
+    }),
+  });
+  assert.equal(replay.status, 200);
+  const replayBody = (await replay.json()) as { outcomeId: string; reused: boolean };
+  assert.equal(replayBody.reused, true);
+
+  // Client-supplied deviceId must not be trusted for API-key posts.
+  const spoof = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes`, {
+    method: "POST",
+    headers: {
+      "X-Api-Key": keyBody.apiKey,
+      "Content-Type": "application/json",
+      "Idempotency-Key": "kim-spoof-device",
+    },
+    body: JSON.stringify({
+      kind: "purchase",
+      productId: "bata-power-school-01",
+      orderLineId: "KIM-ORD-spoof-1",
+      data: { deviceId: "dev_attacker_spoof" },
+    }),
+  });
+  assert.equal(spoof.status, 201);
+
+  const bySpoofDevice = await fetch(
+    `${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes?deviceId=dev_attacker_spoof`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  assert.equal(bySpoofDevice.status, 200);
+  const spoofBody = (await bySpoofDevice.json()) as { outcomes: unknown[] };
+  assert.equal(spoofBody.outcomes.length, 0);
+
+  const catToken = await fetch(
+    `${baseUrl}/v1/merchants/orgs/${org.orgId}/catalogue-token`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  assert.equal(catToken.status, 201);
+  const catBody = (await catToken.json()) as { token: string; scope: string };
+  assert.equal(catBody.scope, "merchant:catalogue:read");
+  const catList = await fetch(`${baseUrl}/v1/merchants/orgs/${org.orgId}/catalogue`, {
+    headers: { Authorization: `Bearer ${catBody.token}` },
+  });
+  assert.equal(catList.status, 200);
+  const catIngestDenied = await fetch(
+    `${baseUrl}/v1/merchants/orgs/${org.orgId}/catalogue/ingest`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${catBody.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        products: [
+          {
+            productId: "should-fail",
+            brand: "X",
+            model: "Y",
+            category: "school",
+            fitType: "standard",
+            sizeRangeEu: { min: 30, max: 40, step: 1 },
+          },
+        ],
+      }),
+    },
+  );
+  assert.equal(catIngestDenied.status, 403);
 
   const metrics = await fetch(
     `${baseUrl}/v1/merchants/orgs/${org.orgId}/pilot-metrics`,
@@ -213,12 +302,12 @@ test("merchant org, catalogue ingest, brand fit, outcomes, pilot metrics", async
     exchanges: number;
     returnRate: number | null;
   };
-  assert.equal(body.purchases, 2);
+  assert.equal(body.purchases, 3);
   assert.equal(body.returns, 1);
   assert.equal(body.exchanges, 1);
-  assert.equal(body.returnRate, 0.5);
-  assert.equal(body.exchangeRate, 0.5);
-  assert.equal(body.sizeRelatedRate, 1.0);
+  assert.equal(body.returnRate, 1 / 3);
+  assert.equal(body.exchangeRate, 1 / 3);
+  assert.equal(body.sizeRelatedRate, 2 / 3);
 
   const outcomesList = await fetch(
     `${baseUrl}/v1/merchants/orgs/${org.orgId}/outcomes?limit=10`,

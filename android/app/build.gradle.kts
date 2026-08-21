@@ -50,15 +50,12 @@ android {
             "\"${localProps.getProperty("fitsense.api.baseUrl", "")}\"",
         )
         // Optional Kimberley / partner catalogue defaults (override in Settings).
+        // Permanent merchant API keys are never baked into the APK — use device auth
+        // + short-lived catalogue tokens instead.
         buildConfigField(
             "String",
             "MERCHANT_ORG_ID",
             "\"${localProps.getProperty("fitsense.merchant.orgId", "")}\"",
-        )
-        buildConfigField(
-            "String",
-            "MERCHANT_API_KEY",
-            "\"${localProps.getProperty("fitsense.merchant.apiKey", "")}\"",
         )
     }
 

@@ -74,7 +74,8 @@ export async function restoreFromCloud(): Promise<{
   if (
     !pulled.fitProfile &&
     pulled.fitEvents.length === 0 &&
-    pulled.scans.length === 0
+    pulled.scans.length === 0 &&
+    pulled.deletedScanIds.length === 0
   ) {
     return {
       ok: true,
@@ -86,7 +87,10 @@ export async function restoreFromCloud(): Promise<{
 
   const user = getOrCreateProfile();
   const localProfile = getOrCreateFitProfile();
-  const mergedScans = mergeScans(listScans(), pulled.scans);
+  const deleted = new Set(pulled.deletedScanIds);
+  const mergedScans = mergeScans(listScans(), pulled.scans).filter(
+    (s) => !deleted.has(s.scanId),
+  );
   replaceAllScans(mergedScans);
 
   const mergedEvents = mergeEvents(listFitEvents(), pulled.fitEvents);

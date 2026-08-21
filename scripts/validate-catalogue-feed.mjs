@@ -50,11 +50,20 @@ for (const [i, p] of (feed.products ?? []).entries()) {
     fail(`products[${i}].productId invalid id`);
   }
   if (typeof p.productId === "string") productIds.add(p.productId);
-  if (p.sizeRangeEu != null) {
-    if (!isObj(p.sizeRangeEu)) fail(`products[${i}].sizeRangeEu must be object`);
-    else {
-      if (typeof p.sizeRangeEu.min !== "number") fail(`products[${i}].sizeRangeEu.min`);
-      if (typeof p.sizeRangeEu.max !== "number") fail(`products[${i}].sizeRangeEu.max`);
+  if (!isObj(p.sizeRangeEu)) {
+    fail(`products[${i}].sizeRangeEu required object`);
+  } else {
+    if (typeof p.sizeRangeEu.min !== "number") fail(`products[${i}].sizeRangeEu.min`);
+    if (typeof p.sizeRangeEu.max !== "number") fail(`products[${i}].sizeRangeEu.max`);
+    if (typeof p.sizeRangeEu.step !== "number" || p.sizeRangeEu.step <= 0) {
+      fail(`products[${i}].sizeRangeEu.step must be positive number`);
+    }
+    if (
+      typeof p.sizeRangeEu.min === "number" &&
+      typeof p.sizeRangeEu.max === "number" &&
+      !(p.sizeRangeEu.min < p.sizeRangeEu.max)
+    ) {
+      fail(`products[${i}].sizeRangeEu.min must be < max`);
     }
   }
   if (p.dataQuality != null && !["verified", "unverified"].includes(p.dataQuality)) {

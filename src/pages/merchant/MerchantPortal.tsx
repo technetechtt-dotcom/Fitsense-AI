@@ -702,7 +702,8 @@ export function MerchantPortal() {
           <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
             <h2 className="text-sm font-semibold">POPIA erase by device</h2>
             <p className="text-xs text-ink-muted">
-              Deletes outcomes whose <code className="text-neon">data.deviceId</code>{" "}
+              Deletes outcomes whose server-attributed <code className="text-neon">data.deviceId</code>{" "}
+              matches (device-auth posts only — clients cannot spoof actor device ids).
               matches (admin+). See docs/legal/POPIA_DPA_TEMPLATE.md.
             </p>
             <input

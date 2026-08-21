@@ -1,5 +1,6 @@
 package com.fitsense.ai.recommendation
 
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -53,6 +54,29 @@ internal object SizeMappingTable {
     }
 
     fun euAsDouble(eu: String): Double = eu.replace(",", ".").toDoubleOrNull() ?: 0.0
+
+    /** Nearest published size triplet for an arbitrary EU number. */
+    fun sizeForEu(eu: Double): SizeTriplet {
+        if (!eu.isFinite()) {
+            val first = rows.first()
+            return SizeTriplet(uk = first.uk, us = first.us, eu = first.eu, mondopointMm = first.footLengthMmMax)
+        }
+        var best = rows.first()
+        var bestDelta = Double.POSITIVE_INFINITY
+        for (row in rows) {
+            val delta = abs(euAsDouble(row.eu) - eu)
+            if (delta < bestDelta) {
+                bestDelta = delta
+                best = row
+            }
+        }
+        return SizeTriplet(
+            uk = best.uk,
+            us = best.us,
+            eu = best.eu,
+            mondopointMm = best.footLengthMmMax,
+        )
+    }
 }
 
 data class SizeTriplet(val uk: String, val us: String, val eu: String, val mondopointMm: Int)

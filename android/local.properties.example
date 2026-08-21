@@ -11,5 +11,5 @@ sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk
 # fitsense.api.baseUrl=https://fitsense-api-1rne.onrender.com
 
 # Optional merchant catalogue defaults (also configurable in Settings).
+# Requires device cloud auth + org membership — no permanent API keys on-device.
 # fitsense.merchant.orgId=org_...
-# fitsense.merchant.apiKey=fs_live_...

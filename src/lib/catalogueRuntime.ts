@@ -8,6 +8,7 @@ import {
   type InventoryItem,
 } from "./api/merchantApi";
 import { getApiBaseUrl } from "./api/config";
+import { sizeForEu } from "./sizing";
 
 /**
  * Active recommendation catalogue: merchant org products when loaded,
@@ -77,6 +78,77 @@ export function productHasAnyStock(productId: string): boolean | null {
   return rows.some((r) => r.quantity > 0);
 }
 
+function formatEuLabel(eu: number): string {
+  return Number.isInteger(eu) ? String(eu) : String(eu);
+}
+
+function labelsEqual(a: string, b: string): boolean {
+  const na = Number(a.trim().replace(",", "."));
+  const nb = Number(b.trim().replace(",", "."));
+  if (Number.isFinite(na) && Number.isFinite(nb)) return Math.abs(na - nb) < 1e-6;
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function widthLabelFor(fitType: FitType): string {
+  switch (fitType) {
+    case "narrow":
+      return "narrow";
+    case "wide":
+      return "wide";
+    case "extra_wide":
+      return "extra_wide";
+    default:
+      return "standard";
+  }
+}
+
+function widthMatches(inventoryWidth: string | undefined, expected: string): boolean {
+  const aliases: Record<string, string> = {
+    regular: "standard",
+    std: "standard",
+    d: "standard",
+    ee: "wide",
+    eee: "extra_wide",
+    "extra-wide": "extra_wide",
+    xw: "extra_wide",
+  };
+  const rawLeft = (inventoryWidth ?? "standard").trim().toLowerCase() || "standard";
+  const rawRight = expected.trim().toLowerCase() || "standard";
+  const left = aliases[rawLeft] ?? rawLeft;
+  const right = aliases[rawRight] ?? rawRight;
+  return left === right;
+}
+
+/** Exact SKU stock for recommended EU size + product width. */
+export function inStockExact(
+  productId: string,
+  recommendedEu: number,
+  fitType: FitType,
+): boolean | null {
+  if (merchantInventory.length === 0) return null;
+  const rows = merchantInventory.filter((r) => r.productId === productId);
+  if (rows.length === 0) return false;
+  const width = widthLabelFor(fitType);
+  const sizes = sizeForEu(recommendedEu);
+  const euLabel = formatEuLabel(recommendedEu);
+  return rows.some((row) => {
+    if (row.quantity <= 0) return false;
+    if (!widthMatches(row.widthLabel, width)) return false;
+    switch (row.sizeSystem) {
+      case "eu":
+        return labelsEqual(row.sizeLabel, euLabel) || labelsEqual(row.sizeLabel, sizes.eu);
+      case "uk":
+        return labelsEqual(row.sizeLabel, sizes.uk);
+      case "us":
+        return labelsEqual(row.sizeLabel, sizes.us);
+      case "mondopoint":
+        return labelsEqual(row.sizeLabel, String(Math.round(sizes.mondopointMm)));
+      default:
+        return false;
+    }
+  });
+}
+
 export function catalogueProductToProduct(raw: CatalogueProduct): Product | null {
   const productId = String(raw.productId ?? "").trim();
   const brand = String(raw.brand ?? "").trim();
@@ -94,11 +166,17 @@ export function catalogueProductToProduct(raw: CatalogueProduct): Product | null
     : "casual";
 
   const range = raw.sizeRangeEu;
-  const sizeRangeEu = {
-    min: typeof range?.min === "number" ? range.min : 30,
-    max: typeof range?.max === "number" ? range.max : 46,
-    step: typeof range?.step === "number" && range.step > 0 ? range.step : 1,
-  };
+  if (
+    !range ||
+    typeof range.min !== "number" ||
+    typeof range.max !== "number" ||
+    range.min >= range.max
+  ) {
+    return null;
+  }
+  const step =
+    typeof range.step === "number" && range.step > 0 ? range.step : 1;
+  const sizeRangeEu = { min: range.min, max: range.max, step };
 
   const dq = raw.dataQuality;
   const dataQuality =

@@ -6,6 +6,8 @@ import com.fitsense.ai.models.Product
 import com.fitsense.ai.models.ShoeCategory
 import com.fitsense.ai.models.SizeRange
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -16,6 +18,7 @@ import javax.inject.Singleton
 
 /**
  * Merchant catalogue / inventory HTTP client (SKUs only — never invents mm).
+ * Auth: device access token → mint short-lived catalogue token for GETs.
  */
 @Singleton
 class MerchantApiClient @Inject constructor(
@@ -23,6 +26,10 @@ class MerchantApiClient @Inject constructor(
     private val merchantPrefs: MerchantPrefs,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+    private val tokenMutex = Mutex()
+    private var cachedCatalogueToken: String? = null
+    private var cachedCatalogueExpMs: Long = 0L
+    private var cachedCatalogueOrgId: String? = null
 
     @Serializable
     private data class CatalogueResponse(val products: List<CatalogueProductDto> = emptyList())
@@ -60,10 +67,16 @@ class MerchantApiClient @Inject constructor(
         val quantity: Int = 0,
     )
 
+    @Serializable
+    private data class CatalogueTokenResponse(
+        val token: String,
+        val exp: Long,
+    )
+
     suspend fun listCatalogue(orgId: String): List<Product>? = withContext(Dispatchers.IO) {
         val base = ApiConfig.baseUrl ?: return@withContext null
         val path = "$base/v1/merchants/orgs/${encode(orgId)}/catalogue"
-        val body = get(path) ?: return@withContext null
+        val body = get(path, orgId) ?: return@withContext null
         runCatching {
             json.decodeFromString<CatalogueResponse>(body).products.mapNotNull { it.toProduct() }
         }.getOrNull()
@@ -73,24 +86,55 @@ class MerchantApiClient @Inject constructor(
         withContext(Dispatchers.IO) {
             val base = ApiConfig.baseUrl ?: return@withContext null
             val path = "$base/v1/merchants/orgs/${encode(orgId)}/inventory"
-            val body = get(path) ?: return@withContext null
+            val body = get(path, orgId) ?: return@withContext null
             runCatching {
                 json.decodeFromString<InventoryResponse>(body).items
             }.getOrNull()
         }
 
-    private suspend fun get(url: String): String? {
-        val apiKey = merchantPrefs.apiKey()
-        val bearer = if (apiKey.isNullOrBlank()) authClient.ensureAccessToken() else null
-        if (apiKey.isNullOrBlank() && bearer.isNullOrBlank()) return null
+    private suspend fun ensureCatalogueToken(orgId: String): String? = tokenMutex.withLock {
+        val now = System.currentTimeMillis()
+        if (
+            cachedCatalogueToken != null &&
+            cachedCatalogueOrgId == orgId &&
+            cachedCatalogueExpMs > now + 60_000
+        ) {
+            return cachedCatalogueToken
+        }
+        val base = ApiConfig.baseUrl ?: return null
+        val access = authClient.ensureAccessToken() ?: return null
+        val url = "$base/v1/merchants/orgs/${encode(orgId)}/catalogue-token"
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("Authorization", "Bearer $access")
+            connectTimeout = 15_000
+            readTimeout = 15_000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json")
+            outputStream.use { it.write("{}".toByteArray(Charsets.UTF_8)) }
+        }
+        return try {
+            if (conn.responseCode !in 200..299) null
+            else {
+                val raw = conn.inputStream.bufferedReader().use { it.readText() }
+                val parsed = json.decodeFromString<CatalogueTokenResponse>(raw)
+                cachedCatalogueToken = parsed.token
+                cachedCatalogueExpMs = parsed.exp
+                cachedCatalogueOrgId = orgId
+                parsed.token
+            }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private suspend fun get(url: String, orgId: String): String? {
+        val catalogueToken = ensureCatalogueToken(orgId) ?: return null
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             setRequestProperty("Accept", "application/json")
-            if (!apiKey.isNullOrBlank()) {
-                setRequestProperty("X-Api-Key", apiKey)
-            } else if (!bearer.isNullOrBlank()) {
-                setRequestProperty("Authorization", "Bearer $bearer")
-            }
+            setRequestProperty("Authorization", "Bearer $catalogueToken")
             connectTimeout = 15_000
             readTimeout = 15_000
         }
@@ -110,7 +154,8 @@ class MerchantApiClient @Inject constructor(
         val b = brand.trim()
         val m = model.trim()
         if (id.isEmpty() || b.isEmpty() || m.isEmpty()) return null
-        val range = sizeRangeEu
+        val range = sizeRangeEu ?: return null
+        if (range.min >= range.max || range.step <= 0) return null
         return Product(
             productId = id,
             brand = b,
@@ -118,9 +163,9 @@ class MerchantApiClient @Inject constructor(
             category = mapCategory(category),
             fitType = mapFitType(fitType),
             sizeRangeEu = SizeRange(
-                min = range?.min ?: 30.0,
-                max = range?.max ?: 46.0,
-                step = if ((range?.step ?: 1.0) > 0) range?.step ?: 1.0 else 1.0,
+                min = range.min,
+                max = range.max,
+                step = range.step,
             ),
             priceUsd = priceUsd ?: 0.0,
             imageUrl = imageUrl,

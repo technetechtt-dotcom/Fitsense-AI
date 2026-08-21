@@ -17,6 +17,7 @@ import { brandFitFor } from "../data/brandFit";
 import { hasAiPersonalizationConsent } from "./consent";
 import {
   getActiveInventory,
+  inStockExact,
   inStockUkLabels,
   productHasAnyStock,
 } from "./catalogueRuntime";
@@ -282,7 +283,9 @@ function buildMatch(
     imageUrl: product.imageUrl,
     inStock:
       getActiveInventory().length > 0
-        ? (productHasAnyStock(product.productId) ?? false)
+        ? (inStockExact(product.productId, recommendedEuSize, product.fitType) ??
+          productHasAnyStock(product.productId) ??
+          false)
         : undefined,
     stockUkLabels:
       getActiveInventory().length > 0 ? inStockUkLabels(product.productId) : undefined,

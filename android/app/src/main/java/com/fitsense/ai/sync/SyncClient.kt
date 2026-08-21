@@ -32,6 +32,7 @@ class SyncClient @Inject constructor(
         val fitProfile: JsonElement? = null,
         val fitEvents: List<JsonElement> = emptyList(),
         val scans: List<JsonElement> = emptyList(),
+        val deletedScanIds: List<String> = emptyList(),
     )
 
     suspend fun pull(): CloudPull? = withContext(Dispatchers.IO) {

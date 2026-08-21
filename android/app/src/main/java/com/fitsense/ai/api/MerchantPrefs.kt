@@ -10,8 +10,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Merchant org / API key for catalogue fetch.
- * Prefs override BuildConfig (`fitsense.merchant.*` in local.properties).
+ * Merchant org for catalogue fetch. Permanent API keys are not stored on-device;
+ * catalogue reads use device auth + short-lived catalogue tokens.
  */
 @Singleton
 class MerchantPrefs @Inject constructor(
@@ -24,19 +24,12 @@ class MerchantPrefs @Inject constructor(
         return fromBuild.ifEmpty { null }
     }
 
-    suspend fun apiKey(): String? {
-        val stored = dataStore.data.first()[API_KEY_KEY]?.trim().orEmpty()
-        if (stored.isNotEmpty()) return stored
-        val fromBuild = BuildConfig.MERCHANT_API_KEY.trim()
-        return fromBuild.ifEmpty { null }
-    }
-
-    suspend fun save(orgId: String?, apiKey: String?) {
+    suspend fun save(orgId: String?) {
         dataStore.edit { prefs ->
             val o = orgId?.trim().orEmpty()
-            val k = apiKey?.trim().orEmpty()
             if (o.isEmpty()) prefs.remove(ORG_ID_KEY) else prefs[ORG_ID_KEY] = o
-            if (k.isEmpty()) prefs.remove(API_KEY_KEY) else prefs[API_KEY_KEY] = k
+            // Drop any legacy permanent API key material.
+            prefs.remove(API_KEY_KEY)
         }
     }
 

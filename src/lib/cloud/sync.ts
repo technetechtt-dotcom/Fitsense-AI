@@ -74,6 +74,7 @@ export interface CloudPullResult {
   fitProfile: FitProfile | null;
   fitEvents: FitEvent[];
   scans: ScanResult[];
+  deletedScanIds: string[];
 }
 
 export async function pullAll(): Promise<CloudPullResult> {
@@ -81,6 +82,7 @@ export async function pullAll(): Promise<CloudPullResult> {
     fitProfile: null,
     fitEvents: [],
     scans: [],
+    deletedScanIds: [],
   };
   if (!hasCloudSyncConsent() || !isApiConfigured()) return empty;
 

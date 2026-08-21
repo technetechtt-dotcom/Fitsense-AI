@@ -1,7 +1,10 @@
 import type { NextFunction, Response } from "express";
 import type { AuthedRequest } from "./auth.js";
 import { isAccessJtiRevoked } from "../services/deviceAuthStore.js";
-import { verifyAccessToken } from "../services/sessionAuth.js";
+import {
+  verifyAccessToken,
+  verifyCatalogueToken,
+} from "../services/sessionAuth.js";
 import {
   getMemberRole,
   resolveApiKey,
@@ -13,7 +16,8 @@ import { config } from "../config.js";
 export interface MerchantRequest extends AuthedRequest {
   orgId?: string;
   orgRole?: OrgRole;
-  authVia?: "device" | "api_key";
+  authVia?: "device" | "api_key" | "catalogue_token";
+  apiKeyId?: string;
 }
 
 async function attachDeviceUid(req: MerchantRequest): Promise<void> {
@@ -33,11 +37,14 @@ async function attachDeviceUid(req: MerchantRequest): Promise<void> {
     req.uid = payload.uid;
     req.accessJti = payload.jti;
   } catch {
-    // leave uid unset; role check will 401
+    // leave uid unset; may still be a catalogue token
   }
 }
 
-/** Resolve org from path + authorize via device membership or X-Api-Key. */
+/**
+ * Resolve org from path + authorize via device membership, X-Api-Key,
+ * or a short-lived catalogue read token (viewer-only).
+ */
 export function requireOrgRole(minimum: OrgRole) {
   return async (req: MerchantRequest, res: Response, next: NextFunction) => {
     try {
@@ -62,8 +69,36 @@ export function requireOrgRole(minimum: OrgRole) {
         req.orgId = orgId;
         req.orgRole = "operator";
         req.authVia = "api_key";
+        req.apiKeyId = resolved.keyId;
         next();
         return;
+      }
+
+      const authorization = req.header("authorization");
+      const bearer = authorization?.startsWith("Bearer ")
+        ? authorization.slice("Bearer ".length).trim()
+        : "";
+
+      if (bearer) {
+        try {
+          const catalogue = verifyCatalogueToken(bearer);
+          if (catalogue.orgId !== orgId) {
+            res.status(403).json({ error: "catalogue_token_org_mismatch" });
+            return;
+          }
+          if (!roleAtLeast("viewer", minimum)) {
+            res.status(403).json({ error: "catalogue_token_read_only" });
+            return;
+          }
+          req.orgId = orgId;
+          req.orgRole = "viewer";
+          req.authVia = "catalogue_token";
+          if (catalogue.uid) req.uid = catalogue.uid;
+          next();
+          return;
+        } catch {
+          // not a catalogue token — try device access below
+        }
       }
 
       await attachDeviceUid(req);

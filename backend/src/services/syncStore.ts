@@ -6,6 +6,8 @@ export interface CloudPullResult {
   fitProfile: unknown | null;
   fitEvents: unknown[];
   scans: unknown[];
+  /** Scan ids deleted on this account — clients must drop local copies. */
+  deletedScanIds: string[];
 }
 
 export interface SyncStore {
@@ -39,7 +41,8 @@ class PostgresSyncStore implements SyncStore {
 
   async pullUserData(uid: string): Promise<CloudPullResult> {
     const pool = getPostgresPool();
-    const [profile, events, scans] = await Promise.all([
+    const tombstoneSince = new Date(Date.now() - config.scanTombstoneRetentionMs);
+    const [profile, events, scans, tombstones] = await Promise.all([
       pool.query<{ data: unknown }>("SELECT data FROM fit_profiles WHERE uid = $1", [
         uid,
       ]),
@@ -61,12 +64,22 @@ class PostgresSyncStore implements SyncStore {
         `,
         [uid],
       ),
+      pool.query<{ scan_id: string }>(
+        `
+          SELECT scan_id
+          FROM scan_tombstones
+          WHERE uid = $1 AND deleted_at >= $2
+          ORDER BY deleted_at DESC
+        `,
+        [uid, tombstoneSince],
+      ),
     ]);
 
     return {
       fitProfile: profile.rows[0]?.data ?? null,
       fitEvents: events.rows.map((row) => row.data),
       scans: scans.rows.map((row) => row.data),
+      deletedScanIds: tombstones.rows.map((row) => row.scan_id),
     };
   }
 
@@ -87,24 +100,58 @@ class PostgresSyncStore implements SyncStore {
 
   async upsertScan(uid: string, scanId: string, scan: unknown): Promise<void> {
     const body = scan as { createdAtEpochMs?: number };
-    await getPostgresPool().query(
-      `
-        INSERT INTO scans (uid, scan_id, data, created_at_epoch_ms, updated_at)
-        VALUES ($1, $2, $3::jsonb, $4, now())
-        ON CONFLICT (uid, scan_id) DO UPDATE SET
-          data = EXCLUDED.data,
-          created_at_epoch_ms = EXCLUDED.created_at_epoch_ms,
-          updated_at = now()
-      `,
-      [uid, scanId, JSON.stringify(scan), body.createdAtEpochMs ?? null],
-    );
+    const pool = getPostgresPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM scan_tombstones WHERE uid = $1 AND scan_id = $2", [
+        uid,
+        scanId,
+      ]);
+      await client.query(
+        `
+          INSERT INTO scans (uid, scan_id, data, created_at_epoch_ms, updated_at)
+          VALUES ($1, $2, $3::jsonb, $4, now())
+          ON CONFLICT (uid, scan_id) DO UPDATE SET
+            data = EXCLUDED.data,
+            created_at_epoch_ms = EXCLUDED.created_at_epoch_ms,
+            updated_at = now()
+        `,
+        [uid, scanId, JSON.stringify(scan), body.createdAtEpochMs ?? null],
+      );
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async deleteScan(uid: string, scanId: string): Promise<void> {
-    await getPostgresPool().query("DELETE FROM scans WHERE uid = $1 AND scan_id = $2", [
-      uid,
-      scanId,
-    ]);
+    const pool = getPostgresPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM scans WHERE uid = $1 AND scan_id = $2", [
+        uid,
+        scanId,
+      ]);
+      await client.query(
+        `
+          INSERT INTO scan_tombstones (uid, scan_id, deleted_at)
+          VALUES ($1, $2, now())
+          ON CONFLICT (uid, scan_id) DO UPDATE SET deleted_at = now()
+        `,
+        [uid, scanId],
+      );
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK");
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async upsertFitEvent(uid: string, eventId: string, event: unknown): Promise<void> {
@@ -130,6 +177,7 @@ class PostgresSyncStore implements SyncStore {
       await client.query("BEGIN");
       await client.query("DELETE FROM fit_events WHERE uid = $1", [uid]);
       await client.query("DELETE FROM scans WHERE uid = $1", [uid]);
+      await client.query("DELETE FROM scan_tombstones WHERE uid = $1", [uid]);
       await client.query("DELETE FROM fit_profiles WHERE uid = $1", [uid]);
       await client.query("COMMIT");
     } catch (err) {

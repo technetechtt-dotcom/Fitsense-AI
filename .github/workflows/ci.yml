@@ -16,6 +16,7 @@ jobs:
           cache: npm
       - run: npm ci --include=dev
       - run: npm run format:check
+      - run: npm run validate:catalogue-feed
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:web

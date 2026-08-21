@@ -188,11 +188,15 @@ test("sync CRUD: profile, scan, event, pull, delete scan, erase", async () => {
   const pull3 = await fetch(`${baseUrl}/v1/sync`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  const data3 = (await pull3.json()) as { scans: { scanId?: string }[] };
+  const data3 = (await pull3.json()) as {
+    scans: { scanId?: string }[];
+    deletedScanIds: string[];
+  };
   assert.equal(
     data3.scans.some((s) => s.scanId === scanId),
     false,
   );
+  assert.ok(data3.deletedScanIds.includes(scanId));
 
   const erase = await fetch(`${baseUrl}/v1/sync`, {
     method: "DELETE",

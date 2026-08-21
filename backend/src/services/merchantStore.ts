@@ -223,17 +223,19 @@ export async function revokeApiKey(input: {
   return Boolean(result.rows[0]);
 }
 
-export async function resolveApiKey(apiKey: string): Promise<{ orgId: string } | null> {
+export async function resolveApiKey(
+  apiKey: string,
+): Promise<{ orgId: string; keyId: string } | null> {
   await ensureMerchantSchema();
-  const result = await getPostgresPool().query<{ org_id: string }>(
+  const result = await getPostgresPool().query<{ org_id: string; key_id: string }>(
     `
-      SELECT org_id FROM merchant_api_keys
+      SELECT org_id, key_id FROM merchant_api_keys
       WHERE key_hash = $1 AND revoked_at IS NULL
     `,
     [sha256Hex(apiKey.trim())],
   );
   const row = result.rows[0];
-  return row ? { orgId: row.org_id } : null;
+  return row ? { orgId: row.org_id, keyId: row.key_id } : null;
 }
 
 export async function ingestProducts(
@@ -520,29 +522,100 @@ export async function recordOutcome(input: {
   fitId?: string;
   reason?: string;
   data?: Record<string, unknown>;
-}): Promise<{ outcomeId: string }> {
+  orderLineId?: string;
+  idempotencyKey?: string;
+}): Promise<{ outcomeId: string; reused: boolean }> {
   await ensureMerchantSchema();
+  const orderLineId = input.orderLineId?.trim() || null;
+  const idempotencyKey = input.idempotencyKey?.trim() || null;
+
+  if (idempotencyKey) {
+    const existing = await getPostgresPool().query<{ outcome_id: string }>(
+      `
+        SELECT outcome_id FROM merchant_outcomes
+        WHERE org_id = $1 AND idempotency_key = $2
+        LIMIT 1
+      `,
+      [input.orgId, idempotencyKey],
+    );
+    if (existing.rows[0]) {
+      return { outcomeId: existing.rows[0].outcome_id, reused: true };
+    }
+  }
+  if (orderLineId) {
+    const existing = await getPostgresPool().query<{ outcome_id: string }>(
+      `
+        SELECT outcome_id FROM merchant_outcomes
+        WHERE org_id = $1 AND order_line_id = $2
+        LIMIT 1
+      `,
+      [input.orgId, orderLineId],
+    );
+    if (existing.rows[0]) {
+      return { outcomeId: existing.rows[0].outcome_id, reused: true };
+    }
+  }
+
   const outcomeId = newId("out");
-  await getPostgresPool().query(
-    `
-      INSERT INTO merchant_outcomes (
-        outcome_id, org_id, kind, product_id, brand, size_label, size_system, fit_id, reason, data
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
-    `,
-    [
-      outcomeId,
-      input.orgId,
-      input.kind,
-      input.productId ?? null,
-      input.brand ?? null,
-      input.sizeLabel ?? null,
-      input.sizeSystem ?? null,
-      input.fitId ?? null,
-      input.reason ?? null,
-      JSON.stringify(input.data ?? {}),
-    ],
-  );
-  return { outcomeId };
+  try {
+    await getPostgresPool().query(
+      `
+        INSERT INTO merchant_outcomes (
+          outcome_id, org_id, kind, product_id, brand, size_label, size_system,
+          fit_id, reason, data, order_line_id, idempotency_key
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)
+      `,
+      [
+        outcomeId,
+        input.orgId,
+        input.kind,
+        input.productId ?? null,
+        input.brand ?? null,
+        input.sizeLabel ?? null,
+        input.sizeSystem ?? null,
+        input.fitId ?? null,
+        input.reason ?? null,
+        JSON.stringify(input.data ?? {}),
+        orderLineId,
+        idempotencyKey,
+      ],
+    );
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: string }).code)
+        : "";
+    if (code === "23505") {
+      if (idempotencyKey) {
+        const again = await getPostgresPool().query<{ outcome_id: string }>(
+          `
+            SELECT outcome_id FROM merchant_outcomes
+            WHERE org_id = $1 AND idempotency_key = $2
+            LIMIT 1
+          `,
+          [input.orgId, idempotencyKey],
+        );
+        if (again.rows[0]) {
+          return { outcomeId: again.rows[0].outcome_id, reused: true };
+        }
+      }
+      if (orderLineId) {
+        const again = await getPostgresPool().query<{ outcome_id: string }>(
+          `
+            SELECT outcome_id FROM merchant_outcomes
+            WHERE org_id = $1 AND order_line_id = $2
+            LIMIT 1
+          `,
+          [input.orgId, orderLineId],
+        );
+        if (again.rows[0]) {
+          return { outcomeId: again.rows[0].outcome_id, reused: true };
+        }
+      }
+    }
+    throw err;
+  }
+  return { outcomeId, reused: false };
 }
 
 export async function pilotMetrics(

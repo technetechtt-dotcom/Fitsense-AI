@@ -12,6 +12,7 @@ export async function pullAllViaApi(): Promise<CloudPullResult> {
     fitProfile: body.fitProfile ?? null,
     fitEvents: body.fitEvents ?? [],
     scans: body.scans ?? [],
+    deletedScanIds: body.deletedScanIds ?? [],
   };
 }
 

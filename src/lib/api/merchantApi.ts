@@ -10,11 +10,17 @@ import type { BrandFitDelta } from "../../types";
 
 const ORG_STORAGE_KEY = "fitsense:merchantOrgId";
 
-/** Session override for embed/kiosk X-Api-Key (URL/SDK), else env. */
+/** Session override for embed/kiosk minting (URL/SDK). Prefer catalogue tokens for reads. */
 let sessionMerchantApiKey: string | null = null;
+let sessionCatalogueToken: string | null = null;
+let sessionCatalogueExpMs = 0;
+let sessionCatalogueOrgId: string | null = null;
 
 export function setSessionMerchantApiKey(apiKey: string | null): void {
   sessionMerchantApiKey = apiKey?.trim() || null;
+  sessionCatalogueToken = null;
+  sessionCatalogueExpMs = 0;
+  sessionCatalogueOrgId = null;
 }
 
 export function getMerchantOrgId(): string | null {
@@ -55,6 +61,46 @@ async function merchantFetch(
   return apiFetch(path, init);
 }
 
+/** Mint (or reuse) a short-lived catalogue read token for [orgId]. */
+export async function ensureCatalogueToken(orgId: string): Promise<string | null> {
+  const now = Date.now();
+  if (
+    sessionCatalogueToken &&
+    sessionCatalogueOrgId === orgId &&
+    sessionCatalogueExpMs > now + 60_000
+  ) {
+    return sessionCatalogueToken;
+  }
+  const path = `/v1/merchants/orgs/${encodeURIComponent(orgId)}/catalogue-token`;
+  const res = await merchantFetch(path, {
+    method: "POST",
+    body: "{}",
+  });
+  if (!res.ok) return null;
+  const body = (await res.json()) as { token?: string; exp?: number };
+  if (!body.token || !body.exp) return null;
+  sessionCatalogueToken = body.token;
+  sessionCatalogueExpMs = body.exp;
+  sessionCatalogueOrgId = orgId;
+  return body.token;
+}
+
+async function catalogueReadFetch(orgId: string, path: string): Promise<Response> {
+  const base = getApiBaseUrl();
+  if (base === null) throw new Error("VITE_API_BASE_URL is not configured");
+  const token = await ensureCatalogueToken(orgId);
+  if (token) {
+    return fetch(`${base}${path}`, {
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+  // Fallback: device membership or (legacy) permanent key via merchantFetch.
+  return merchantFetch(path);
+}
+
 type BrandFitRow = BrandFitDelta & { model?: string };
 
 /** Load merchant brand/model fit profiles into the recommendation layer. */
@@ -64,12 +110,7 @@ export async function loadMerchantBrandFits(
   if (!orgId || getApiBaseUrl() === null) return 0;
 
   const path = `/v1/merchants/orgs/${encodeURIComponent(orgId)}/brand-fit`;
-  const apiKey = getMerchantApiKey();
-  const res = apiKey
-    ? await fetch(`${getApiBaseUrl()}${path}`, {
-        headers: { "X-Api-Key": apiKey },
-      })
-    : await apiFetch(path);
+  const res = await catalogueReadFetch(orgId, path);
 
   if (!res.ok) {
     throw new Error(`brand-fit fetch failed: ${res.status}`);
@@ -152,7 +193,8 @@ export async function ingestCatalogue(
 }
 
 export async function listCatalogue(orgId: string): Promise<CatalogueProduct[]> {
-  const res = await merchantFetch(
+  const res = await catalogueReadFetch(
+    orgId,
     `/v1/merchants/orgs/${encodeURIComponent(orgId)}/catalogue`,
   );
   if (!res.ok) throw new Error(`catalogue list failed: ${res.status}`);
@@ -188,7 +230,8 @@ export type InventoryItem = {
 };
 
 export async function listInventory(orgId: string): Promise<InventoryItem[]> {
-  const res = await merchantFetch(
+  const res = await catalogueReadFetch(
+    orgId,
     `/v1/merchants/orgs/${encodeURIComponent(orgId)}/inventory`,
   );
   if (!res.ok) throw new Error(`inventory list failed: ${res.status}`);
@@ -240,15 +283,21 @@ export async function recordMerchantOutcome(
     fitId?: string;
     reason?: string;
     orderId?: string;
+    orderLineId?: string;
     data?: Record<string, unknown>;
   },
-): Promise<{ outcomeId: string }> {
+  opts?: { idempotencyKey?: string },
+): Promise<{ outcomeId: string; reused?: boolean }> {
+  const headers: HeadersInit = {};
+  if (opts?.idempotencyKey) {
+    headers["Idempotency-Key"] = opts.idempotencyKey;
+  }
   const res = await merchantFetch(
     `/v1/merchants/orgs/${encodeURIComponent(orgId)}/outcomes`,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(input), headers },
   );
   if (!res.ok) throw new Error(`outcome failed: ${res.status}`);
-  return (await res.json()) as { outcomeId: string };
+  return (await res.json()) as { outcomeId: string; reused?: boolean };
 }
 
 export type MerchantOutcomeRow = {

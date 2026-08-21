@@ -38,6 +38,17 @@ interface AccessPayload {
   typ: "access";
 }
 
+interface CataloguePayload {
+  orgId: string;
+  scope: "merchant:catalogue:read";
+  exp: number;
+  jti: string;
+  kid: string;
+  typ: "catalogue";
+  /** Optional minting device uid (attribution only; not required for verify). */
+  uid?: string;
+}
+
 export function issueAccessToken(
   uid: string,
   options?: { secret?: string; kid?: string; ttlMs?: number; jti?: string },
@@ -93,4 +104,51 @@ export function issueSessionToken(uid: string, secretOverride?: string): string 
 /** @deprecated Prefer verifyAccessToken. */
 export function verifySessionToken(token: string, secretOverride?: string): string {
   return verifyAccessToken(token, { secret: secretOverride }).uid;
+}
+
+export function issueCatalogueToken(
+  orgId: string,
+  options?: { secret?: string; kid?: string; ttlMs?: number; jti?: string; uid?: string },
+): { token: string; jti: string; exp: number } {
+  const secret = options?.secret ?? config.authSecret;
+  if (!secret) throw new Error("AUTH_SECRET is not configured");
+  const jti = options?.jti ?? generateOpaqueToken(16);
+  const exp = Date.now() + (options?.ttlMs ?? config.catalogueTokenTtlMs);
+  const payload: CataloguePayload = {
+    orgId,
+    scope: "merchant:catalogue:read",
+    exp,
+    jti,
+    kid: options?.kid ?? config.authKid,
+    typ: "catalogue",
+    ...(options?.uid ? { uid: options.uid } : {}),
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const signature = createHmac("sha256", secret).update(body).digest("base64url");
+  return { token: `${body}.${signature}`, jti, exp };
+}
+
+export function verifyCatalogueToken(
+  token: string,
+  options?: { secret?: string },
+): CataloguePayload {
+  const secret = options?.secret ?? config.authSecret;
+  if (!secret) throw new Error("AUTH_SECRET is not configured");
+  const [body, signature] = token.split(".");
+  if (!body || !signature) throw new Error("Invalid token format");
+  const expected = createHmac("sha256", secret).update(body).digest("base64url");
+  if (!timingSafeEqualString(signature, expected)) {
+    throw new Error("Invalid token signature");
+  }
+  const payload = JSON.parse(
+    Buffer.from(body, "base64url").toString("utf8"),
+  ) as CataloguePayload;
+  if (payload.typ !== "catalogue") throw new Error("Invalid token type");
+  if (payload.scope !== "merchant:catalogue:read") throw new Error("Invalid scope");
+  if (!payload.orgId || !isValidUid(payload.orgId)) throw new Error("Invalid orgId");
+  if (!payload.jti) throw new Error("Invalid token jti");
+  if (!Number.isFinite(payload.exp) || payload.exp < Date.now()) {
+    throw new Error("Token expired");
+  }
+  return payload;
 }

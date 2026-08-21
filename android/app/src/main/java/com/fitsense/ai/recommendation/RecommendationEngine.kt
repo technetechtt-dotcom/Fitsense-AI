@@ -101,7 +101,9 @@ class RecommendationEngine(
         val fitScore = fitScore(product, measurement)
         val comfortScore = comfortScore(product, measurement, recommendedSize, euSize)
         val inStock = if (stock.hasInventory()) {
-            stock.productHasAnyStock(product.productId) ?: false
+            stock.inStockExact(product.productId, recommendedSize, product.fitType)
+                ?: stock.productHasAnyStock(product.productId)
+                ?: false
         } else {
             null
         }

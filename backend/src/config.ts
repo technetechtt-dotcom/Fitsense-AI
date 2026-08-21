@@ -97,10 +97,21 @@ export const config = {
   authKid: process.env.AUTH_KID?.trim() || "auth-v1",
   handoffKid: process.env.HANDOFF_KID?.trim() || "handoff-v1",
   accessTokenTtlMs: parseNumber(process.env.ACCESS_TOKEN_TTL_MS, 15 * 60 * 1000),
+  /** Short-lived merchant catalogue/inventory read tokens (not operator keys). */
+  catalogueTokenTtlMs: parseNumber(
+    process.env.CATALOGUE_TOKEN_TTL_MS,
+    30 * 60 * 1000,
+  ),
   refreshTokenTtlMs: parseNumber(
     process.env.REFRESH_TOKEN_TTL_MS,
     30 * 24 * 60 * 60 * 1000,
   ),
+  /** How long scan deletion tombstones are returned on pull. */
+  scanTombstoneRetentionMs: parseNumber(
+    process.env.SCAN_TOMBSTONE_RETENTION_MS,
+    90 * 24 * 60 * 60 * 1000,
+  ),
+
   challengeTtlMs: parseNumber(process.env.AUTH_CHALLENGE_TTL_MS, 5 * 60 * 1000),
   fitRecoveryTtlMs: parseNumber(
     process.env.FIT_RECOVERY_TTL_MS,

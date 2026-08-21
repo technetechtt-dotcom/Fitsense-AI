@@ -5,6 +5,8 @@ import com.fitsense.ai.auth.DeviceAuthClient
 import com.fitsense.ai.local.LocalScanStore
 import com.fitsense.ai.models.ScanResult
 import com.fitsense.ai.models.UserProfile
+import com.fitsense.ai.repository.UserRepository
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.jsonObject
@@ -21,6 +23,7 @@ class CloudSyncCoordinator @Inject constructor(
     private val syncClient: SyncClient,
     private val outbox: SyncOutboxStore,
     private val scanStore: LocalScanStore,
+    private val userRepository: UserRepository,
 ) {
     private val flushMutex = Mutex()
 
@@ -140,6 +143,19 @@ class CloudSyncCoordinator @Inject constructor(
         if (authClient.ensureAccessToken() == null) return 0
         val pull = syncClient.pull() ?: return 0
         var imported = 0
+        val localUserId = userRepository.profile.firstOrNull()?.userId
+        val remoteUserIds = pull.scans.mapNotNull {
+            ScanSyncCodec.decodeScan(it.jsonObject)?.userId
+        }.toSet()
+        val userIds = buildSet {
+            if (localUserId != null) add(localUserId)
+            addAll(remoteUserIds)
+        }
+        for (deletedId in pull.deletedScanIds) {
+            for (uid in userIds) {
+                scanStore.deleteScan(uid, deletedId)
+            }
+        }
         for (element in pull.scans) {
             val remote = ScanSyncCodec.decodeScan(element.jsonObject) ?: continue
             val local = scanStore.getScan(remote.userId, remote.scanId)

@@ -193,13 +193,11 @@ fun SettingsScreen(
 
         SettingsSection(label = "Merchant catalogue") {
             val savedOrg by viewModel.merchantOrgId.collectAsState()
-            val savedKey by viewModel.merchantApiKey.collectAsState()
             val catSource by viewModel.catalogueSource.collectAsState()
             val catCount by viewModel.catalogueCount.collectAsState()
             var catalogueOrg by remember(savedOrg) { mutableStateOf(savedOrg) }
-            var catalogueKey by remember(savedKey) { mutableStateOf(savedKey) }
             Text(
-                text = "Load partner SKUs for recommendations (Kimberley pilot). Falls back to the built-in demo shelf. Does not invent millimetres.",
+                text = "Load partner SKUs for recommendations (Kimberley pilot). Uses device cloud auth and a short-lived catalogue token — never store permanent API keys on the phone. Falls back to the built-in demo shelf. Does not invent millimetres.",
                 style = MaterialTheme.typography.bodySmall,
                 color = FitSenseColors.OnSurfaceMuted,
             )
@@ -215,17 +213,10 @@ fun SettingsScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            OutlinedTextField(
-                value = catalogueKey,
-                onValueChange = { catalogueKey = it },
-                label = { Text("API key (optional if device auth)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = {
-                        viewModel.saveMerchantCatalogueConfig(catalogueOrg, catalogueKey)
+                        viewModel.saveMerchantCatalogueConfig(catalogueOrg)
                     },
                     modifier = Modifier.weight(1f),
                 ) {

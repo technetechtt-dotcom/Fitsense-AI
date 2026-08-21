@@ -61,23 +61,36 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 **P7 still open:** WebAuthn passkeys / durable account linking (no stubs).
 
 Physical + commercial ops: [VALIDATION_COMMERCIAL_CHECKLIST.md](./VALIDATION_COMMERCIAL_CHECKLIST.md).
-Branch policy: [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) (PR-required).
+Branch policy: [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) (direct push to `main`; PR protection deferred unless requested).
 
 ---
 
-## Phases 2–12 (detail)
+## Phase 1 — Immediate engineering (current)
 
-### Phase 2 — Measurement trust
+| Item | Status |
+| ---- | ------ |
+| Remove permanent Android merchant API keys | Done — device auth + catalogue tokens |
+| Short-lived scoped catalogue tokens | Done — `POST .../catalogue-token` |
+| Exact size+width stock match | Done — Android + web |
+| Mandatory `sizeRangeEu` | Done — ingest, schema, validator, clients |
+| Outcomes order-line + idempotency | Done — `orderLineId` + `Idempotency-Key` |
+| Strip client-controlled outcome `deviceId` | Done — server sets from device auth only |
+| Scan sync deletion tombstones | Done — `deletedScanIds` on pull |
+| Catalogue validator in CI | Done — `web-and-sdk` job |
+| Restore protected PR development | **Deferred** — operator chose direct-to-main |
+| Deploy head to staging + fresh evidence | Ops — requires Render/`STAGING_API_BASE_URL` |
 
-- Geometric phone mm (reference / AR depth); quality gates; dual-foot before recommendations.
+## Phase 2 — Accuracy validation (physical)
 
-### Phase 3 — Accuracy study
+Brannock device, ≥5 SA Android phones, 30→100–300 participants, publish accuracy/repeatability/failure rates, certify phones/environments.
 
-- Formal Brannock/known-size study; thresholds for length/width error.
+## Phase 3 — Kimberley retailer pilot
 
-### Phase 4 — Mobile sync
+Real school/safety retailer feed, order/return integration, assisted vs control, merchant ROI, model updates from verified outcomes.
 
-- Android sync client; offline queue; clear not-yet-synced states.
+## Phase 4 — Commercialisation
+
+POPIA agreements, onboarding/billing, monitoring/IR, external pen-test, limited device launch, NC → national.
 
 ### Phase 5 — Recommendations
 

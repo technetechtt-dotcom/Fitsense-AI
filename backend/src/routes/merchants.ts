@@ -24,6 +24,7 @@ import {
   upsertInventory,
   upsertMember,
 } from "../services/merchantStore.js";
+import { issueCatalogueToken } from "../services/sessionAuth.js";
 import { documentIdSchema } from "../validation/schemas.js";
 
 export const merchantRouter = Router();
@@ -57,9 +58,9 @@ const productSchema = z
       .object({
         min: z.number(),
         max: z.number(),
-        step: z.number().positive(),
+        step: z.number().positive().default(1),
       })
-      .optional(),
+      .refine((r) => r.min < r.max, { message: "sizeRangeEu.min must be < max" }),
     priceUsd: z.number().nonnegative().optional(),
     description: z.string().max(2000).optional(),
     colorways: z.array(z.string()).max(50).optional(),
@@ -109,8 +110,8 @@ const outcomeSchema = z.object({
   reason: z.string().trim().max(80).optional(),
   /** Retail / POS order id — stored in outcome `data.orderId` for attribution. */
   orderId: z.string().trim().min(1).max(120).optional(),
-  /** Device that recorded the outcome — stored in `data.deviceId` for POPIA erase. */
-  deviceId: documentIdSchema.optional(),
+  /** Stable order-line key (unique per org). Preferred over client deviceId. */
+  orderLineId: z.string().trim().min(1).max(160).optional(),
   data: z.record(z.unknown()).optional(),
 });
 
@@ -260,6 +261,32 @@ merchantRouter.get(
   },
 );
 
+/** Mint a short-lived catalogue/inventory read token (device or API key only). */
+merchantRouter.post(
+  "/merchants/orgs/:orgId/catalogue-token",
+  requireOrgRole("viewer"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      if (req.authVia === "catalogue_token") {
+        res.status(403).json({ error: "catalogue_token_cannot_mint" });
+        return;
+      }
+      const issued = issueCatalogueToken(req.orgId!, {
+        uid: req.uid,
+        ttlMs: config.catalogueTokenTtlMs,
+      });
+      res.status(201).json({
+        token: issued.token,
+        exp: issued.exp,
+        scope: "merchant:catalogue:read",
+        orgId: req.orgId,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 merchantRouter.put(
   "/merchants/orgs/:orgId/inventory",
   requireOrgRole("operator"),
@@ -318,17 +345,35 @@ merchantRouter.post(
   async (req: MerchantRequest, res, next) => {
     try {
       const body = outcomeSchema.parse(req.body);
-      const { orderId, deviceId, data: rawData, ...rest } = body;
+      const { orderId, orderLineId, data: rawData, ...rest } = body;
       const data: Record<string, unknown> = { ...(rawData ?? {}) };
+      // Never trust client-supplied actor device attribution.
+      delete data.deviceId;
       if (orderId) data.orderId = orderId;
-      const actorDeviceId = deviceId ?? req.uid;
-      if (actorDeviceId) data.deviceId = actorDeviceId;
+      if (orderLineId) data.orderLineId = orderLineId;
+      if (req.authVia === "device" && req.uid) {
+        data.deviceId = req.uid;
+      } else if (req.authVia === "api_key") {
+        data.authVia = "api_key";
+        if (req.apiKeyId) data.apiKeyId = req.apiKeyId;
+      }
+      const idempotencyKey = req.header("idempotency-key")?.trim() || undefined;
+      const derivedLine =
+        orderLineId ??
+        (orderId && rest.productId && rest.sizeLabel
+          ? `${orderId}|${rest.kind}|${rest.productId}|${rest.sizeSystem ?? ""}|${rest.sizeLabel}`
+          : undefined);
       const result = await recordOutcome({
         orgId: req.orgId!,
         ...rest,
         data: Object.keys(data).length ? data : undefined,
+        orderLineId: derivedLine,
+        idempotencyKey,
       });
-      res.status(201).json(result);
+      res.status(result.reused ? 200 : 201).json({
+        outcomeId: result.outcomeId,
+        reused: result.reused,
+      });
     } catch (err) {
       next(err);
     }
