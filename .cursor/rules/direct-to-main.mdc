@@ -1,0 +1,12 @@
+---
+description: Push FitSense work directly to main; do not open PRs unless asked
+alwaysApply: true
+---
+
+# Direct push to `main`
+
+- Land all code by committing and **pushing directly to `main`**.
+- **Do not** create pull requests for routine development unless the user explicitly asks for a PR.
+- Branch protection on `main` is disabled; do not re-enable it unless requested.
+- Prefer deleting finished remote feature branches after their work is on `main`.
+- See `docs/BRANCH_PROTECTION.md`.
