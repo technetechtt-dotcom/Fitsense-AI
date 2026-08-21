@@ -293,6 +293,15 @@ export function Scan() {
         },
       };
       saveScan(scan);
+      void import("../lib/accuracyStudy").then(({ recordAccuracyIfReady }) => {
+        recordAccuracyIfReady({
+          measuredLengthMm: sizingFoot.lengthMm,
+          measuredWidthMm: sizingFoot.widthMm,
+          calibration,
+          confidence: sizingFoot.confidence ?? null,
+          foot: sizingFoot.foot === "right" ? "right" : "left",
+        });
+      });
 
       // Update the persistent fit profile with this scan's geometry,
       // log a scan event so the learning engine can spot growth trends,

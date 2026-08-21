@@ -21,7 +21,10 @@
     "check": "npm run format:check && npm run typecheck && npm run lint && npm run test && npm run build:all",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "validate:catalogue-feed": "node scripts/validate-catalogue-feed.mjs"
+    "validate:catalogue-feed": "node scripts/validate-catalogue-feed.mjs",
+    "analyze:accuracy": "node scripts/analyze-accuracy-dataset.mjs",
+    "publish:accuracy": "node scripts/publish-accuracy-report.mjs",
+    "staging:smoke": "npm run staging:smoke --prefix backend"
   },
   "dependencies": {
     "@capacitor/core": "^8.3.3",

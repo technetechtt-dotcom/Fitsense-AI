@@ -1,12 +1,11 @@
 ---
-description: Push FitSense work directly to main; do not open PRs unless asked
+description: Prefer PRs into main; branch protection is enabled
 alwaysApply: true
 ---
 
-# Direct push to `main`
+# Pull requests into `main`
 
-- Land all code by committing and **pushing directly to `main`**.
-- **Do not** create pull requests for routine development unless the user explicitly asks for a PR.
-- Branch protection on `main` is disabled; do not re-enable it unless requested.
-- Prefer deleting finished remote feature branches after their work is on `main`.
-- See `docs/BRANCH_PROTECTION.md`.
+- Land routine engineering via **pull requests** into `main` (branch protection on).
+- Do not force-push `main`. Do not disable protection unless the operator asks.
+- See `docs/BRANCH_PROTECTION.md` and `docs/branch-protection-payload.json`.
+- Exception: only when the operator explicitly requests a direct push and protection is temporarily off.

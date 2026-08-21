@@ -1,7 +1,8 @@
 # Priority 0 — Deployed platform checklist
 
-Operating mode: **push directly to `main`**. Production Render auto-deploy stays
-**off** until the four CI jobs are green on the commit you ship.
+Operating mode: **pull requests into `main`** (branch protection on). Production
+Render auto-deploy stays **off** until the four CI jobs are green on the commit
+you ship.
 
 ## Environments
 
@@ -20,8 +21,11 @@ Blueprint: repo-root `render.yaml` (`autoDeployTrigger: off` on all four).
 4. Set `CORS_ORIGIN` to each web origin.
 5. Confirm `/health` on both APIs.
 6. Set GitHub Actions variable `STAGING_API_BASE_URL` to the staging API URL.
-7. Run `npm run staging:smoke --prefix backend` and keep
+7. Run `npm run staging:smoke` and keep
    `docs/records/staging-smoke-latest.json` (CI also uploads the artifact).
+
+Latest evidence in-repo was generated against the deployed API origin recorded in
+`docs/records/staging-smoke-latest.json`.
 
 ## Handoff verification (manual)
 
@@ -30,5 +34,5 @@ Web → QR → Android → web against **staging** `VITE_API_BASE_URL` /
 
 ## CI evidence
 
-On every `main` push: four required jobs + optional `staging-smoke`.
+On every `main` push / PR: four required jobs + optional `staging-smoke`.
 Artifacts: `app-debug-apk`, `android-unit-test-reports`, `staging-smoke-record`.

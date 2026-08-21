@@ -10,6 +10,14 @@ import { canUseCloudSync, isApiConfigured } from "../lib/api/config";
 import { getOrCreateProfile, signOut, updatePreferences } from "../lib/storage";
 import { signOutCloudAccount } from "../lib/cloud/auth";
 import { getActiveCatalogue } from "../lib/catalogueRuntime";
+import {
+  clearAccuracyRows,
+  exportAccuracyJsonl,
+  getAccuracyGroundTruth,
+  listAccuracyRows,
+  setAccuracyGroundTruth,
+} from "../lib/accuracyStudy";
+import { evaluateDeviceCertification } from "../lib/supportedDevices";
 import type { CalibrationReference, MeasurementUnit, UserProfile } from "../types";
 import { CALIBRATION_META } from "../types";
 
@@ -18,10 +26,28 @@ export function Settings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [gtLength, setGtLength] = useState("");
+  const [gtWidth, setGtWidth] = useState("");
+  const [gtFoot, setGtFoot] = useState<"left" | "right" | "unknown">("left");
+  const [gtNotes, setGtNotes] = useState("");
+  const [accuracyCount, setAccuracyCount] = useState(0);
 
   useEffect(() => {
     setProfile(getOrCreateProfile());
+    setAccuracyCount(listAccuracyRows().length);
+    const existing = getAccuracyGroundTruth();
+    if (existing) {
+      setGtLength(String(existing.lengthMm));
+      setGtWidth(String(existing.widthMm));
+      setGtFoot(existing.foot);
+      setGtNotes(existing.sessionNotes);
+    }
   }, []);
+
+  const deviceCert = useMemo(
+    () => evaluateDeviceCertification("web", navigator.userAgent),
+    [],
+  );
 
   // Distinct brand list from the catalog — used for the brand-preference chips.
   const brands = useMemo(
@@ -113,6 +139,101 @@ export function Settings() {
               <Chip key={b} active={active} label={b} onClick={() => toggleBrand(b)} />
             );
           })}
+        </div>
+      </Section>
+
+      <Section label="Accuracy study (Brannock GT)">
+        <p className="text-xs text-ink-muted leading-relaxed">
+          Enter calibrated Brannock / caliper ground truth before scanning. Export
+          JSONL for analysis — never invent millimetres. Device gate:{" "}
+          {deviceCert.message}
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="text-xs text-ink-muted">
+            GT length (mm)
+            <input
+              className="mt-1 w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              value={gtLength}
+              onChange={(e) => setGtLength(e.target.value)}
+              inputMode="decimal"
+            />
+          </label>
+          <label className="text-xs text-ink-muted">
+            GT width (mm)
+            <input
+              className="mt-1 w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              value={gtWidth}
+              onChange={(e) => setGtWidth(e.target.value)}
+              inputMode="decimal"
+            />
+          </label>
+        </div>
+        <div className="flex gap-2">
+          {(["left", "right", "unknown"] as const).map((f) => (
+            <Chip
+              key={f}
+              active={gtFoot === f}
+              label={f}
+              onClick={() => setGtFoot(f)}
+            />
+          ))}
+        </div>
+        <label className="text-xs text-ink-muted block">
+          Session notes
+          <input
+            className="mt-1 w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+            value={gtNotes}
+            onChange={(e) => setGtNotes(e.target.value)}
+            placeholder="Lighting / operator / socks"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-2xl bg-neon/20 border border-neon/40 px-4 py-2 text-sm font-semibold"
+            onClick={() => {
+              const lengthMm = Number(gtLength);
+              const widthMm = Number(gtWidth);
+              if (!Number.isFinite(lengthMm) || !Number.isFinite(widthMm)) return;
+              setAccuracyGroundTruth({
+                lengthMm,
+                widthMm,
+                foot: gtFoot,
+                sessionNotes: gtNotes.trim(),
+              });
+              setRestoreMsg("Ground truth saved for next scan(s).");
+            }}
+          >
+            Save GT
+          </button>
+          <button
+            type="button"
+            className="rounded-2xl bg-surface-2 border border-white/10 px-4 py-2 text-sm"
+            onClick={() => {
+              const blob = new Blob([exportAccuracyJsonl()], {
+                type: "application/x-ndjson",
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `accuracy_dataset_${Date.now()}.jsonl`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            Export JSONL ({accuracyCount})
+          </button>
+          <button
+            type="button"
+            className="rounded-2xl bg-surface-2 border border-white/10 px-4 py-2 text-sm"
+            onClick={() => {
+              clearAccuracyRows();
+              setAccuracyGroundTruth(null);
+              setAccuracyCount(0);
+            }}
+          >
+            Clear
+          </button>
         </div>
       </Section>
 

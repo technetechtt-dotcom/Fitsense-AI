@@ -15,17 +15,28 @@ stores — without inventing millimetres or skipping reference calibration.
 | Size-related return / exchange rate vs baseline       | Relative reduction ≥ 15% after 6 weeks |
 | Consent + erase path exercised                        | 100% of pilot stores trained           |
 
-Track merchant KPIs via `GET /v1/merchants/orgs/:orgId/pilot-metrics`.
+Track merchant KPIs via `GET /v1/merchants/orgs/:orgId/pilot-metrics` (assisted vs control)
+and ROI via `GET .../pilot-roi`. Outcome fit suggestions: `GET .../outcome-fit-insights`.
+
+## Assisted vs control
+
+| Cohort | Definition |
+| ------ | ---------- |
+| `assisted` | Size recommendation from FitSense used at till |
+| `control` | Traditional sizing / no FitSense size applied |
+
+Record `cohort` on every outcome (`POST .../outcomes`). Portal outcomes tab has a cohort selector.
 
 ## Setup checklist
 
 1. Create merchant org (`POST /v1/merchants/orgs`) with `region: "Northern Cape"`.
-2. Issue store API key (`POST .../api-keys`) — POS / feed uses `X-Api-Key`.
-3. Ingest catalogue + inventory (`.../catalogue/ingest`, `.../inventory`).
+2. Issue store API key (`POST .../api-keys`) — POS / feed uses `X-Api-Key` (server-side only).
+3. Ingest catalogue + inventory (`.../catalogue/ingest`, `.../inventory`); validate with `npm run validate:catalogue-feed`.
 4. Upload brand/model fit profiles (`PUT .../brand-fit`) for local SKUs.
 5. Wire embed with `locale=en-ZA` (or `af-ZA` / `xh-ZA` / `zu-ZA`) and UK sizing.
 6. Enable low-data mode on mid/low-end Android phones (`fitsense:lowDataMode`).
-7. POPIA: consent banners, export/erase runbooks, retention job scheduled.
+7. POPIA: consent banners, [POPIA_PROCESS.md](../legal/POPIA_PROCESS.md), mark `popia_signed` in billing.
+8. Randomise or schedule assisted vs control days; log cohort on outcomes.
 
 ## Store SOP (brief)
 

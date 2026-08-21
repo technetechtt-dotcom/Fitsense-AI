@@ -2,38 +2,52 @@
 
 Operational work that cannot be completed in code alone. Track progress here.
 
-## Physical validation
+## Phase 1 — Engineering
 
-| Item                                      | Status              | Notes                                                                           |
-| ----------------------------------------- | ------------------- | ------------------------------------------------------------------------------- |
-| Obtain 5–10 representative Android phones | Open                | Fill [DEVICE_MATRIX.md](./DEVICE_MATRIX.md)                                     |
-| Obtain Brannock / calibrated tool         | Open                | Required for P6 accuracy study                                                  |
-| Recruit 100–300 pilot participants        | Open                | Kimberley runbook: [ops/PILOT_KIMBERLEY.md](./ops/PILOT_KIMBERLEY.md)           |
-| Record both feet separately               | Supported in app    | Dual-foot scan path                                                             |
-| Repeated scans                            | Protocol documented | [ops/PILOT_KIMBERLEY.md](./ops/PILOT_KIMBERLEY.md) § Repeated-scan              |
-| Lighting / floors / operators             | Open                | Matrix cohorts                                                                  |
-| Replace sample accuracy records           | Open                | Export JSONL from Settings; analyze with `scripts/analyze-accuracy-dataset.mjs` |
-| Publish internal accuracy + failure rates | Open                | Write to `docs/records/`                                                        |
+| Item | Status |
+| ---- | ------ |
+| Android permanent API keys removed | Done |
+| Catalogue tokens | Done |
+| Exact size+width stock | Done |
+| Mandatory sizeRangeEu | Done |
+| Outcomes order-line + idempotency | Done |
+| Client deviceId stripped | Done |
+| Sync tombstones | Done |
+| Catalogue validator in CI | Done |
+| Protected PR development | Done (re-enabled) |
+| Staging smoke evidence | Done — `docs/records/staging-smoke-latest.json` (live API) |
 
-## Commercial development
+## Phase 2 — Accuracy (physical)
 
-| Item                                | Status  | Notes                                                               |
-| ----------------------------------- | ------- | ------------------------------------------------------------------- |
-| Merchant portal UI                  | Done    | `/merchant` — orgs, catalogue, inventory, brand-fit, outcomes, keys |
-| Real footwear retailer catalogue    | Partial | Sample feed + schema + `npm run validate:catalogue-feed`            |
-| Variants, sizes, widths, inventory  | Partial | `widthLabel` on inventory; portal + sample feed; stock-aware recs   |
-| Outcomes ↔ real orders              | Partial | `orderId` filter + list/CSV; deviceId erase for POPIA               |
-| Passkey customer accounts           | Open    | Explicitly deferred — no stubs                                      |
-| Complete POPIA implementation       | Partial | DPA template + retention + outcomes erase by deviceId               |
-| Controlled Kimberley pilot          | Open    | Runbook ready                                                       |
-| Prove reduced returns / conversions | Open    | Fixed return-rate = returns÷purchases                               |
+| Item | Status | Notes |
+| ---- | ------ | ----- |
+| Calibrated Brannock | Open (ops) | Protocol in ACCURACY_STUDY |
+| ≥5 SA Android phones | Open (ops) | DEVICE_MATRIX + SUPPORTED_DEVICES candidates |
+| 30 internal participants | Open (ops) | Recruitment table in ACCURACY_STUDY |
+| Fix measurement issues found | Scaffolded | Quality gates remain; iterate from study |
+| 100–300 expansion | Open (ops) | |
+| Publish accuracy report | Tooling done | `npm run publish:accuracy` |
+| Certify phones | Tooling done | Promote candidates → certified in JSON |
 
-## Engineering fixes landed (this batch)
+## Phase 3 — Kimberley pilot
 
-- Android cloud scan foot deserialization + merge
-- Encrypted sync outbox
-- FSP1 distrust for sizing
-- Scan revision / conflict merge
-- Merchant return-rate + API-key list/revoke
-- Staging smoke PUT→GET round-trip
-- Direct-to-main policy documented (branch protection off)
+| Item | Status | Notes |
+| ---- | ------ | ----- |
+| Secure real retailer | Open (ops) | Runbook ready |
+| Import real catalogue/stock | Scaffolded | Schema + portal + sample |
+| Order/return integration | Scaffolded | Outcomes + orderId + cohort |
+| Assisted vs control | Done (API/UI) | `cohort` field + metrics split |
+| Measure conversion/returns | Done (API/UI) | pilot-metrics + CSV |
+| Merchant ROI | Done (API/UI) | pilot-roi estimates |
+| Improve model from outcomes | Done (API/UI) | outcome-fit-insights → brand ΔEU |
+
+## Phase 4 — Commercialisation
+
+| Item | Status | Notes |
+| ---- | ------ | ----- |
+| POPIA agreements | Partial | Template + PROCESS; counsel signing open |
+| Onboarding / billing / integrations | Scaffolded | billing + integrations tables/API |
+| Monitoring / backup / IR | Done (docs+hooks) | INCIDENT_RESPONSE + BACKUP_RESTORE |
+| External pen-test | Open (ops) | PENTEST_SCOPE ready |
+| Limited supported-device launch | Scaffolded | supported-devices.json |
+| NC → national expand | Open (ops) | Pilot runbook expansion path |

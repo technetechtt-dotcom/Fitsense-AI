@@ -69,6 +69,14 @@ export async function createOrg(input: {
   } finally {
     client.release();
   }
+  await upsertBilling(orgId, {
+    plan: "pilot",
+    status: "trialing",
+    region: input.region,
+    onboardingStep: "org_created",
+  }).catch(() => {
+    /* billing table may lag migration on first boot — non-fatal */
+  });
   return { orgId, name: input.name, region: input.region ?? null };
 }
 
@@ -521,6 +529,7 @@ export async function recordOutcome(input: {
   sizeSystem?: string;
   fitId?: string;
   reason?: string;
+  cohort?: string;
   data?: Record<string, unknown>;
   orderLineId?: string;
   idempotencyKey?: string;
@@ -528,6 +537,7 @@ export async function recordOutcome(input: {
   await ensureMerchantSchema();
   const orderLineId = input.orderLineId?.trim() || null;
   const idempotencyKey = input.idempotencyKey?.trim() || null;
+  const cohort = input.cohort?.trim() || null;
 
   if (idempotencyKey) {
     const existing = await getPostgresPool().query<{ outcome_id: string }>(
@@ -562,8 +572,8 @@ export async function recordOutcome(input: {
       `
         INSERT INTO merchant_outcomes (
           outcome_id, org_id, kind, product_id, brand, size_label, size_system,
-          fit_id, reason, data, order_line_id, idempotency_key
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)
+          fit_id, reason, data, order_line_id, idempotency_key, cohort
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13)
       `,
       [
         outcomeId,
@@ -578,6 +588,7 @@ export async function recordOutcome(input: {
         JSON.stringify(input.data ?? {}),
         orderLineId,
         idempotencyKey,
+        cohort,
       ],
     );
   } catch (err) {
@@ -618,40 +629,21 @@ export async function recordOutcome(input: {
   return { outcomeId, reused: false };
 }
 
-export async function pilotMetrics(
-  orgId: string,
-  sinceEpochMs?: number,
-): Promise<{
+type CohortCounts = {
   purchases: number;
   returns: number;
   exchanges: number;
   returnRate: number | null;
   exchangeRate: number | null;
   sizeRelatedRate: number | null;
-}> {
-  await ensureMerchantSchema();
-  // Explicit 0 means "all time"; undefined/null defaults to last 90 days.
-  const since =
-    sinceEpochMs === undefined || sinceEpochMs === null
-      ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
-      : new Date(sinceEpochMs);
-  const result = await getPostgresPool().query<{ kind: string; n: string }>(
-    `
-      SELECT kind, COUNT(*)::text AS n
-      FROM merchant_outcomes
-      WHERE org_id = $1 AND created_at >= $2
-      GROUP BY kind
-    `,
-    [orgId, since],
-  );
-  const counts: Record<string, number> = {};
-  for (const row of result.rows) {
-    counts[row.kind] = Number(row.n);
-  }
-  const purchases = counts.purchase ?? 0;
-  const returns = counts.return ?? 0;
-  const exchanges = counts.exchange ?? 0;
-  // Retail rates are outcomes ÷ purchases (not diluted by mixing kinds).
+};
+
+function ratesFromCounts(c: {
+  purchases: number;
+  returns: number;
+  exchanges: number;
+}): CohortCounts {
+  const { purchases, returns, exchanges } = c;
   return {
     purchases,
     returns,
@@ -660,4 +652,384 @@ export async function pilotMetrics(
     exchangeRate: purchases > 0 ? exchanges / purchases : null,
     sizeRelatedRate: purchases > 0 ? (returns + exchanges) / purchases : null,
   };
+}
+
+export async function pilotMetrics(
+  orgId: string,
+  sinceEpochMs?: number,
+): Promise<
+  CohortCounts & {
+    assisted: CohortCounts;
+    control: CohortCounts;
+    unassigned: CohortCounts;
+  }
+> {
+  await ensureMerchantSchema();
+  const since =
+    sinceEpochMs === undefined || sinceEpochMs === null
+      ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      : new Date(sinceEpochMs);
+  const result = await getPostgresPool().query<{
+    kind: string;
+    cohort: string | null;
+    n: string;
+  }>(
+    `
+      SELECT kind, cohort, COUNT(*)::text AS n
+      FROM merchant_outcomes
+      WHERE org_id = $1 AND created_at >= $2
+      GROUP BY kind, cohort
+    `,
+    [orgId, since],
+  );
+
+  const buckets: Record<string, { purchases: number; returns: number; exchanges: number }> =
+    {
+      assisted: { purchases: 0, returns: 0, exchanges: 0 },
+      control: { purchases: 0, returns: 0, exchanges: 0 },
+      unassigned: { purchases: 0, returns: 0, exchanges: 0 },
+      all: { purchases: 0, returns: 0, exchanges: 0 },
+    };
+
+  for (const row of result.rows) {
+    const n = Number(row.n);
+    const arm =
+      row.cohort === "assisted" || row.cohort === "control"
+        ? row.cohort
+        : "unassigned";
+    const kindKey =
+      row.kind === "purchase"
+        ? "purchases"
+        : row.kind === "return"
+          ? "returns"
+          : row.kind === "exchange"
+            ? "exchanges"
+            : null;
+    if (!kindKey) continue;
+    buckets[arm][kindKey] += n;
+    buckets.all[kindKey] += n;
+  }
+
+  return {
+    ...ratesFromCounts(buckets.all),
+    assisted: ratesFromCounts(buckets.assisted),
+    control: ratesFromCounts(buckets.control),
+    unassigned: ratesFromCounts(buckets.unassigned),
+  };
+}
+
+/** Estimate merchant savings from assisted vs control size-related rates. */
+export async function pilotRoi(
+  orgId: string,
+  opts: {
+    sinceEpochMs?: number;
+    avgMarginZar?: number;
+    avgReturnCostZar?: number;
+  } = {},
+): Promise<{
+  metrics: Awaited<ReturnType<typeof pilotMetrics>>;
+  avgMarginZar: number;
+  avgReturnCostZar: number;
+  estimatedReturnCostSavedZar: number | null;
+  estimatedExtraMarginZar: number | null;
+  relativeSizeRelatedReduction: number | null;
+  note: string;
+}> {
+  const metrics = await pilotMetrics(orgId, opts.sinceEpochMs);
+  const avgMarginZar = opts.avgMarginZar ?? 120;
+  const avgReturnCostZar = opts.avgReturnCostZar ?? 85;
+  const controlRate = metrics.control.sizeRelatedRate;
+  const assistedRate = metrics.assisted.sizeRelatedRate;
+  const assistedPurchases = metrics.assisted.purchases;
+
+  let relativeSizeRelatedReduction: number | null = null;
+  let estimatedReturnCostSavedZar: number | null = null;
+  let estimatedExtraMarginZar: number | null = null;
+
+  if (
+    controlRate != null &&
+    assistedRate != null &&
+    controlRate > 0 &&
+    assistedPurchases > 0
+  ) {
+    relativeSizeRelatedReduction = (controlRate - assistedRate) / controlRate;
+    const avoided =
+      Math.max(0, controlRate - assistedRate) * assistedPurchases;
+    estimatedReturnCostSavedZar = avoided * avgReturnCostZar;
+    estimatedExtraMarginZar = avoided * avgMarginZar * 0.25;
+  }
+
+  return {
+    metrics,
+    avgMarginZar,
+    avgReturnCostZar,
+    estimatedReturnCostSavedZar,
+    estimatedExtraMarginZar,
+    relativeSizeRelatedReduction,
+    note:
+      "Estimates only — requires assisted vs control cohorts with real POS outcomes. Does not invent sizing millimetres.",
+  };
+}
+
+/** Suggest brand EU deltas from verified return/exchange reasons. */
+export async function outcomeFitInsights(
+  orgId: string,
+  sinceEpochMs?: number,
+): Promise<{
+  suggestions: Array<{
+    brand: string;
+    productId: string | null;
+    sampleSize: number;
+    suggestedEuSizeDelta: number;
+    reasons: Record<string, number>;
+  }>;
+}> {
+  await ensureMerchantSchema();
+  const since =
+    sinceEpochMs === undefined || sinceEpochMs === null
+      ? new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+      : new Date(sinceEpochMs);
+  const result = await getPostgresPool().query<{
+    brand: string | null;
+    product_id: string | null;
+    reason: string | null;
+    n: string;
+  }>(
+    `
+      SELECT brand, product_id, reason, COUNT(*)::text AS n
+      FROM merchant_outcomes
+      WHERE org_id = $1
+        AND created_at >= $2
+        AND kind IN ('return', 'exchange')
+        AND brand IS NOT NULL
+      GROUP BY brand, product_id, reason
+    `,
+    [orgId, since],
+  );
+
+  type Acc = {
+    brand: string;
+    productId: string | null;
+    sampleSize: number;
+    reasons: Record<string, number>;
+    deltaVotes: number;
+  };
+  const byKey = new Map<string, Acc>();
+  for (const row of result.rows) {
+    const brand = (row.brand ?? "").trim();
+    if (!brand) continue;
+    const key = `${brand}|${row.product_id ?? ""}`;
+    const acc =
+      byKey.get(key) ??
+      ({
+        brand,
+        productId: row.product_id,
+        sampleSize: 0,
+        reasons: {},
+        deltaVotes: 0,
+      } satisfies Acc);
+    const n = Number(row.n);
+    const reason = (row.reason ?? "unspecified").toLowerCase();
+    acc.sampleSize += n;
+    acc.reasons[reason] = (acc.reasons[reason] ?? 0) + n;
+    if (reason.includes("small") || reason.includes("tight") || reason.includes("short")) {
+      acc.deltaVotes += n; // need larger size → positive EU delta
+    } else if (
+      reason.includes("large") ||
+      reason.includes("big") ||
+      reason.includes("wide") ||
+      reason.includes("long")
+    ) {
+      acc.deltaVotes -= n;
+    }
+    byKey.set(key, acc);
+  }
+
+  const suggestions = Array.from(byKey.values())
+    .filter((a) => a.sampleSize >= 3)
+    .map((a) => {
+      const raw = a.deltaVotes / a.sampleSize;
+      const suggestedEuSizeDelta = Math.max(
+        -1.5,
+        Math.min(1.5, Math.round(raw * 2) / 2),
+      );
+      return {
+        brand: a.brand,
+        productId: a.productId,
+        sampleSize: a.sampleSize,
+        suggestedEuSizeDelta,
+        reasons: a.reasons,
+      };
+    })
+    .sort((a, b) => b.sampleSize - a.sampleSize);
+
+  return { suggestions };
+}
+
+export async function getBilling(orgId: string): Promise<{
+  orgId: string;
+  plan: string;
+  status: string;
+  billingEmail: string | null;
+  region: string | null;
+  onboardingStep: string;
+  data: Record<string, unknown>;
+  updatedAtEpochMs: number;
+}> {
+  await ensureMerchantSchema();
+  const result = await getPostgresPool().query<{
+    plan: string;
+    status: string;
+    billing_email: string | null;
+    region: string | null;
+    onboarding_step: string;
+    data: Record<string, unknown> | null;
+    updated_at: Date;
+  }>(
+    `
+      SELECT plan, status, billing_email, region, onboarding_step, data, updated_at
+      FROM merchant_billing WHERE org_id = $1
+    `,
+    [orgId],
+  );
+  const row = result.rows[0];
+  if (!row) {
+    return {
+      orgId,
+      plan: "pilot",
+      status: "trialing",
+      billingEmail: null,
+      region: null,
+      onboardingStep: "org_created",
+      data: {},
+      updatedAtEpochMs: Date.now(),
+    };
+  }
+  return {
+    orgId,
+    plan: row.plan,
+    status: row.status,
+    billingEmail: row.billing_email,
+    region: row.region,
+    onboardingStep: row.onboarding_step,
+    data:
+      row.data && typeof row.data === "object" && !Array.isArray(row.data)
+        ? row.data
+        : {},
+    updatedAtEpochMs: row.updated_at.getTime(),
+  };
+}
+
+export async function upsertBilling(
+  orgId: string,
+  input: {
+    plan?: string;
+    status?: string;
+    billingEmail?: string;
+    region?: string;
+    onboardingStep?: string;
+    data?: Record<string, unknown>;
+  },
+): Promise<Awaited<ReturnType<typeof getBilling>>> {
+  await ensureMerchantSchema();
+  const current = await getBilling(orgId);
+  const next = {
+    plan: input.plan ?? current.plan,
+    status: input.status ?? current.status,
+    billingEmail: input.billingEmail ?? current.billingEmail,
+    region: input.region ?? current.region,
+    onboardingStep: input.onboardingStep ?? current.onboardingStep,
+    data: { ...current.data, ...(input.data ?? {}) },
+  };
+  await getPostgresPool().query(
+    `
+      INSERT INTO merchant_billing (
+        org_id, plan, status, billing_email, region, onboarding_step, data, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())
+      ON CONFLICT (org_id) DO UPDATE SET
+        plan = EXCLUDED.plan,
+        status = EXCLUDED.status,
+        billing_email = EXCLUDED.billing_email,
+        region = EXCLUDED.region,
+        onboarding_step = EXCLUDED.onboarding_step,
+        data = EXCLUDED.data,
+        updated_at = now()
+    `,
+    [
+      orgId,
+      next.plan,
+      next.status,
+      next.billingEmail,
+      next.region,
+      next.onboardingStep,
+      JSON.stringify(next.data),
+    ],
+  );
+  return getBilling(orgId);
+}
+
+export async function listIntegrations(orgId: string): Promise<
+  Array<{
+    provider: string;
+    status: string;
+    externalRef: string | null;
+    data: Record<string, unknown>;
+    updatedAtEpochMs: number;
+  }>
+> {
+  await ensureMerchantSchema();
+  const result = await getPostgresPool().query<{
+    provider: string;
+    status: string;
+    external_ref: string | null;
+    data: Record<string, unknown> | null;
+    updated_at: Date;
+  }>(
+    `
+      SELECT provider, status, external_ref, data, updated_at
+      FROM merchant_integrations WHERE org_id = $1
+      ORDER BY provider
+    `,
+    [orgId],
+  );
+  return result.rows.map((r) => ({
+    provider: r.provider,
+    status: r.status,
+    externalRef: r.external_ref,
+    data:
+      r.data && typeof r.data === "object" && !Array.isArray(r.data) ? r.data : {},
+    updatedAtEpochMs: r.updated_at.getTime(),
+  }));
+}
+
+export async function upsertIntegration(
+  orgId: string,
+  input: {
+    provider: string;
+    status: string;
+    externalRef?: string;
+    data?: Record<string, unknown>;
+  },
+): Promise<{ provider: string; status: string }> {
+  await ensureMerchantSchema();
+  await getPostgresPool().query(
+    `
+      INSERT INTO merchant_integrations (
+        org_id, provider, status, external_ref, data, updated_at
+      ) VALUES ($1, $2, $3, $4, $5::jsonb, now())
+      ON CONFLICT (org_id, provider) DO UPDATE SET
+        status = EXCLUDED.status,
+        external_ref = EXCLUDED.external_ref,
+        data = EXCLUDED.data,
+        updated_at = now()
+    `,
+    [
+      orgId,
+      input.provider,
+      input.status,
+      input.externalRef ?? null,
+      JSON.stringify(input.data ?? {}),
+    ],
+  );
+  return { provider: input.provider, status: input.status };
 }

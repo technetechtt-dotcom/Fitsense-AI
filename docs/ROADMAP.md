@@ -10,7 +10,7 @@
 | Four CI jobs on every `main` push                | `web-and-sdk`, `backend`, `render-api-build`, `android-build`       |
 | APK + unit-test report artifacts                 | Uploaded from `android-build`                                       |
 | Staging smoke + record artifact                  | `staging-smoke` when `STAGING_API_BASE_URL` set                     |
-| Direct push to `main`                            | Current policy — see [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) |
+| Direct push to `main`                            | Superseded — PR protection restored                     |
 
 See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_READINESS.md),
 [docs/records/](./records/).
@@ -77,8 +77,8 @@ Branch policy: [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) (direct push to `m
 | Strip client-controlled outcome `deviceId` | Done — server sets from device auth only |
 | Scan sync deletion tombstones | Done — `deletedScanIds` on pull |
 | Catalogue validator in CI | Done — `web-and-sdk` job |
-| Restore protected PR development | **Deferred** — operator chose direct-to-main |
-| Deploy head to staging + fresh evidence | Ops — requires Render/`STAGING_API_BASE_URL` |
+| Restore protected PR development | **Done** — protection re-enabled |
+| Deploy head to staging + fresh evidence | **Evidence refreshed** — smoke vs live API in `docs/records/` |
 
 ## Phase 2 — Accuracy validation (physical)
 

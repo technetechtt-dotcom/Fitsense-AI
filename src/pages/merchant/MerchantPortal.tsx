@@ -19,6 +19,10 @@ import {
   createMerchantOrg,
   createOrgApiKey,
   fetchPilotMetrics,
+  fetchPilotRoi,
+  fetchOutcomeFitInsights,
+  fetchBilling,
+  updateBilling,
   getMerchantOrgId,
   ingestCatalogue,
   listCatalogue,
@@ -41,6 +45,8 @@ import {
   type MerchantOrg,
   type MerchantOutcomeRow,
   type PilotMetrics,
+  type PilotRoi,
+  type MerchantBilling,
 } from "../../lib/api/merchantApi";
 
 type Tab = "org" | "catalogue" | "inventory" | "brandfit" | "outcomes" | "keys";
@@ -63,11 +69,24 @@ export function MerchantPortal() {
   const [newOrgRegion, setNewOrgRegion] = useState("ZA-NC");
   const [products, setProducts] = useState<CatalogueProduct[]>([]);
   const [metrics, setMetrics] = useState<PilotMetrics | null>(null);
+  const [roi, setRoi] = useState<PilotRoi | null>(null);
+  const [billing, setBilling] = useState<MerchantBilling | null>(null);
+  const [fitInsights, setFitInsights] = useState<
+    Array<{
+      brand: string;
+      productId: string | null;
+      sampleSize: number;
+      suggestedEuSizeDelta: number;
+    }>
+  >([]);
   const [keys, setKeys] = useState<ApiKeyRow[]>([]);
   const [freshKey, setFreshKey] = useState<string | null>(null);
 
   const [outcomeKind, setOutcomeKind] = useState<"purchase" | "return" | "exchange">(
     "purchase",
+  );
+  const [outcomeCohort, setOutcomeCohort] = useState<"assisted" | "control">(
+    "assisted",
   );
   const [outcomeProductId, setOutcomeProductId] = useState("");
   const [outcomeOrderId, setOutcomeOrderId] = useState("");
@@ -105,21 +124,28 @@ export function MerchantPortal() {
   async function refreshCatalogueAndMetrics() {
     if (!apiReady || !orgId) return;
     const since = Date.now() - metricsDays * 24 * 60 * 60 * 1000;
-    const [cat, met, inv, fits, outs] = await Promise.all([
-      listCatalogue(orgId),
-      fetchPilotMetrics(orgId, since),
-      listInventory(orgId),
-      listOrgBrandFits(orgId),
-      listMerchantOutcomes(orgId, {
-        limit: 50,
-        orderId: outcomeFilterOrderId.trim() || undefined,
-      }).catch(() => [] as MerchantOutcomeRow[]),
-    ]);
+    const [cat, met, inv, fits, outs, roiBody, billingBody, insights] =
+      await Promise.all([
+        listCatalogue(orgId),
+        fetchPilotMetrics(orgId, since),
+        listInventory(orgId),
+        listOrgBrandFits(orgId),
+        listMerchantOutcomes(orgId, {
+          limit: 50,
+          orderId: outcomeFilterOrderId.trim() || undefined,
+        }).catch(() => [] as MerchantOutcomeRow[]),
+        fetchPilotRoi(orgId, { sinceEpochMs: since }).catch(() => null),
+        fetchBilling(orgId).catch(() => null),
+        fetchOutcomeFitInsights(orgId, since).catch(() => ({ suggestions: [] })),
+      ]);
     setProducts(cat);
     setMetrics(met);
     setInventory(inv);
     setBrandFits(fits);
     setOutcomes(outs);
+    setRoi(roiBody);
+    setBilling(billingBody);
+    setFitInsights(insights.suggestions.slice(0, 8));
     if (!outcomeProductId && cat[0]) setOutcomeProductId(cat[0].productId);
     await loadMerchantCatalogue(orgId).catch(() => 0);
   }
@@ -304,6 +330,64 @@ export function MerchantPortal() {
                 <Metric label="Exchange rate" value={pct(metrics.exchangeRate)} />
                 <Metric label="Size-related" value={pct(metrics.sizeRelatedRate)} />
               </div>
+              {metrics.assisted && metrics.control ? (
+                <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-white/5">
+                  <Metric
+                    label="Assisted size-related"
+                    value={pct(metrics.assisted.sizeRelatedRate)}
+                  />
+                  <Metric
+                    label="Control size-related"
+                    value={pct(metrics.control.sizeRelatedRate)}
+                  />
+                </div>
+              ) : null}
+              {roi ? (
+                <p className="text-[11px] text-ink-muted pt-1">
+                  Est. return-cost saved:{" "}
+                  {roi.estimatedReturnCostSavedZar != null
+                    ? `R${roi.estimatedReturnCostSavedZar.toFixed(0)}`
+                    : "—"}
+                  {roi.relativeSizeRelatedReduction != null
+                    ? ` · relative Δ ${(roi.relativeSizeRelatedReduction * 100).toFixed(0)}%`
+                    : ""}
+                </p>
+              ) : null}
+              {billing ? (
+                <div className="pt-2 border-t border-white/5 space-y-2">
+                  <p className="text-xs text-ink-muted">
+                    Onboarding: <span className="text-neon">{billing.onboardingStep}</span>{" "}
+                    · {billing.plan}/{billing.status}
+                  </p>
+                  <PrimaryButton
+                    disabled={busy || !orgId}
+                    onClick={() =>
+                      void withBusy(async () => {
+                        if (!orgId) return;
+                        const next = await updateBilling(orgId, {
+                          onboardingStep: "popia_signed",
+                          data: { popiaSignedAt: new Date().toISOString() },
+                        });
+                        setBilling(next);
+                        setStatus("Marked POPIA signed on billing record");
+                      })
+                    }
+                  >
+                    Mark POPIA signed
+                  </PrimaryButton>
+                </div>
+              ) : null}
+              {fitInsights.length > 0 ? (
+                <ul className="text-[11px] text-ink-muted space-y-1 pt-2 border-t border-white/5">
+                  {fitInsights.map((s) => (
+                    <li key={`${s.brand}-${s.productId ?? ""}`}>
+                      {s.brand}
+                      {s.productId ? ` / ${s.productId}` : ""}: suggest ΔEU{" "}
+                      {s.suggestedEuSizeDelta} (n={s.sampleSize})
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           ) : null}
         </section>
@@ -557,6 +641,16 @@ export function MerchantPortal() {
               <option value="return">Return</option>
               <option value="exchange">Exchange</option>
             </select>
+            <select
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              value={outcomeCohort}
+              onChange={(e) =>
+                setOutcomeCohort(e.target.value as "assisted" | "control")
+              }
+            >
+              <option value="assisted">Cohort: FitSense-assisted</option>
+              <option value="control">Cohort: control (no FitSense size)</option>
+            </select>
             <input
               className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
               placeholder="Product ID"
@@ -605,6 +699,7 @@ export function MerchantPortal() {
                     sizeSystem: "uk",
                     reason: outcomeReason.trim() || undefined,
                     orderId: outcomeOrderId.trim() || undefined,
+                    cohort: outcomeCohort,
                   });
                   setStatus(`Recorded ${outcomeKind} (${result.outcomeId})`);
                   setMetrics(

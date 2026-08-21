@@ -18,6 +18,12 @@ import {
   eraseOutcomesByDevice,
   listProducts,
   pilotMetrics,
+  pilotRoi,
+  outcomeFitInsights,
+  getBilling,
+  upsertBilling,
+  listIntegrations,
+  upsertIntegration,
   recordOutcome,
   revokeApiKey,
   upsertBrandFitProfile,
@@ -112,6 +118,8 @@ const outcomeSchema = z.object({
   orderId: z.string().trim().min(1).max(120).optional(),
   /** Stable order-line key (unique per org). Preferred over client deviceId. */
   orderLineId: z.string().trim().min(1).max(160).optional(),
+  /** Pilot arm: FitSense-assisted vs control (no FitSense size). */
+  cohort: z.enum(["assisted", "control"]).optional(),
   data: z.record(z.unknown()).optional(),
 });
 
@@ -345,12 +353,13 @@ merchantRouter.post(
   async (req: MerchantRequest, res, next) => {
     try {
       const body = outcomeSchema.parse(req.body);
-      const { orderId, orderLineId, data: rawData, ...rest } = body;
+      const { orderId, orderLineId, cohort, data: rawData, ...rest } = body;
       const data: Record<string, unknown> = { ...(rawData ?? {}) };
       // Never trust client-supplied actor device attribution.
       delete data.deviceId;
       if (orderId) data.orderId = orderId;
       if (orderLineId) data.orderLineId = orderLineId;
+      if (cohort) data.cohort = cohort;
       if (req.authVia === "device" && req.uid) {
         data.deviceId = req.uid;
       } else if (req.authVia === "api_key") {
@@ -366,6 +375,7 @@ merchantRouter.post(
       const result = await recordOutcome({
         orgId: req.orgId!,
         ...rest,
+        cohort,
         data: Object.keys(data).length ? data : undefined,
         orderLineId: derivedLine,
         idempotencyKey,
@@ -459,6 +469,119 @@ merchantRouter.get(
     try {
       const since = req.query.sinceEpochMs ? Number(req.query.sinceEpochMs) : undefined;
       res.json(await pilotMetrics(req.orgId!, since));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.get(
+  "/merchants/orgs/:orgId/pilot-roi",
+  requireOrgRole("viewer"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      const since = req.query.sinceEpochMs ? Number(req.query.sinceEpochMs) : undefined;
+      const avgMarginZar = req.query.avgMarginZar
+        ? Number(req.query.avgMarginZar)
+        : undefined;
+      const avgReturnCostZar = req.query.avgReturnCostZar
+        ? Number(req.query.avgReturnCostZar)
+        : undefined;
+      res.json(
+        await pilotRoi(req.orgId!, {
+          sinceEpochMs: since,
+          avgMarginZar,
+          avgReturnCostZar,
+        }),
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.get(
+  "/merchants/orgs/:orgId/outcome-fit-insights",
+  requireOrgRole("viewer"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      const since = req.query.sinceEpochMs ? Number(req.query.sinceEpochMs) : undefined;
+      res.json(await outcomeFitInsights(req.orgId!, since));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const billingSchema = z.object({
+  plan: z.enum(["pilot", "starter", "growth", "enterprise"]).optional(),
+  status: z.enum(["trialing", "active", "past_due", "cancelled"]).optional(),
+  billingEmail: z.string().email().optional(),
+  region: z.string().trim().max(80).optional(),
+  onboardingStep: z
+    .enum([
+      "org_created",
+      "catalogue_loaded",
+      "inventory_loaded",
+      "popia_signed",
+      "pos_integrated",
+      "live",
+    ])
+    .optional(),
+  data: z.record(z.unknown()).optional(),
+});
+
+merchantRouter.get(
+  "/merchants/orgs/:orgId/billing",
+  requireOrgRole("admin"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      res.json(await getBilling(req.orgId!));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.put(
+  "/merchants/orgs/:orgId/billing",
+  requireOrgRole("admin"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      const body = billingSchema.parse(req.body);
+      res.json(await upsertBilling(req.orgId!, body));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const integrationSchema = z.object({
+  provider: z.enum(["pos", "ecommerce", "erp", "catalogue_feed"]),
+  status: z.enum(["pending", "connected", "error"]).default("pending"),
+  externalRef: z.string().trim().max(160).optional(),
+  data: z.record(z.unknown()).optional(),
+});
+
+merchantRouter.get(
+  "/merchants/orgs/:orgId/integrations",
+  requireOrgRole("admin"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      res.json({ integrations: await listIntegrations(req.orgId!) });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+merchantRouter.put(
+  "/merchants/orgs/:orgId/integrations",
+  requireOrgRole("admin"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      const body = integrationSchema.parse(req.body);
+      res.json(await upsertIntegration(req.orgId!, body));
     } catch (err) {
       next(err);
     }

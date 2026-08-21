@@ -150,6 +150,9 @@ export type PilotMetrics = {
   returnRate: number | null;
   exchangeRate: number | null;
   sizeRelatedRate: number | null;
+  assisted?: PilotMetrics;
+  control?: PilotMetrics;
+  unassigned?: PilotMetrics;
 };
 
 export type ApiKeyRow = {
@@ -284,6 +287,7 @@ export async function recordMerchantOutcome(
     reason?: string;
     orderId?: string;
     orderLineId?: string;
+    cohort?: "assisted" | "control";
     data?: Record<string, unknown>;
   },
   opts?: { idempotencyKey?: string },
@@ -374,6 +378,113 @@ export async function fetchPilotMetrics(
   );
   if (!res.ok) throw new Error(`pilot metrics failed: ${res.status}`);
   return (await res.json()) as PilotMetrics;
+}
+
+export type PilotRoi = {
+  metrics: PilotMetrics;
+  avgMarginZar: number;
+  avgReturnCostZar: number;
+  estimatedReturnCostSavedZar: number | null;
+  estimatedExtraMarginZar: number | null;
+  relativeSizeRelatedReduction: number | null;
+  note: string;
+};
+
+export async function fetchPilotRoi(
+  orgId: string,
+  opts?: {
+    sinceEpochMs?: number;
+    avgMarginZar?: number;
+    avgReturnCostZar?: number;
+  },
+): Promise<PilotRoi> {
+  const params = new URLSearchParams();
+  if (opts?.sinceEpochMs != null) params.set("sinceEpochMs", String(opts.sinceEpochMs));
+  if (opts?.avgMarginZar != null) params.set("avgMarginZar", String(opts.avgMarginZar));
+  if (opts?.avgReturnCostZar != null) {
+    params.set("avgReturnCostZar", String(opts.avgReturnCostZar));
+  }
+  const q = params.toString() ? `?${params}` : "";
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/pilot-roi${q}`,
+  );
+  if (!res.ok) throw new Error(`pilot roi failed: ${res.status}`);
+  return (await res.json()) as PilotRoi;
+}
+
+export async function fetchOutcomeFitInsights(
+  orgId: string,
+  sinceEpochMs?: number,
+): Promise<{
+  suggestions: Array<{
+    brand: string;
+    productId: string | null;
+    sampleSize: number;
+    suggestedEuSizeDelta: number;
+    reasons: Record<string, number>;
+  }>;
+}> {
+  const q =
+    sinceEpochMs === undefined
+      ? ""
+      : `?sinceEpochMs=${encodeURIComponent(String(sinceEpochMs))}`;
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/outcome-fit-insights${q}`,
+  );
+  if (!res.ok) throw new Error(`outcome fit insights failed: ${res.status}`);
+  return (await res.json()) as {
+    suggestions: Array<{
+      brand: string;
+      productId: string | null;
+      sampleSize: number;
+      suggestedEuSizeDelta: number;
+      reasons: Record<string, number>;
+    }>;
+  };
+}
+
+export type MerchantBilling = {
+  orgId: string;
+  plan: string;
+  status: string;
+  billingEmail: string | null;
+  region: string | null;
+  onboardingStep: string;
+  data: Record<string, unknown>;
+  updatedAtEpochMs: number;
+};
+
+export async function fetchBilling(orgId: string): Promise<MerchantBilling> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/billing`,
+  );
+  if (!res.ok) throw new Error(`billing fetch failed: ${res.status}`);
+  return (await res.json()) as MerchantBilling;
+}
+
+export async function updateBilling(
+  orgId: string,
+  body: Partial<{
+    plan: "pilot" | "starter" | "growth" | "enterprise";
+    status: "trialing" | "active" | "past_due" | "cancelled";
+    billingEmail: string;
+    region: string;
+    onboardingStep:
+      | "org_created"
+      | "catalogue_loaded"
+      | "inventory_loaded"
+      | "popia_signed"
+      | "pos_integrated"
+      | "live";
+    data: Record<string, unknown>;
+  }>,
+): Promise<MerchantBilling> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/billing`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+  if (!res.ok) throw new Error(`billing update failed: ${res.status}`);
+  return (await res.json()) as MerchantBilling;
 }
 
 export async function createOrgApiKey(

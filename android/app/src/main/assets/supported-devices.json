@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-21",
+  "policy": "Launch with this limited list until Phase 2 certifies more cohorts. Unlisted devices may scan but should show a certification warning; never invent millimetres.",
+  "minAndroidApi": 29,
+  "devices": [
+    {
+      "manufacturer": "Samsung",
+      "modelContains": ["SM-A", "Galaxy A", "SM-S"],
+      "status": "candidate",
+      "region": "ZA",
+      "notes": "Primary SA mid-range target — certify after Brannock study"
+    },
+    {
+      "manufacturer": "Xiaomi",
+      "modelContains": ["Redmi", "220", "230"],
+      "status": "candidate",
+      "region": "ZA",
+      "notes": "Budget cohort"
+    },
+    {
+      "manufacturer": "Google",
+      "modelContains": ["Pixel"],
+      "status": "candidate",
+      "region": "ZA",
+      "notes": "Reference CameraX / ARCore cohort"
+    },
+    {
+      "manufacturer": "Huawei",
+      "modelContains": ["ANE-", "MAR-", "JNY-"],
+      "status": "candidate",
+      "region": "ZA",
+      "notes": "Optional; verify GMS/ARCore availability"
+    },
+    {
+      "manufacturer": "Nokia",
+      "modelContains": ["TA-"],
+      "status": "candidate",
+      "region": "ZA",
+      "notes": "Entry Android Go / mid-range"
+    }
+  ]
+}
