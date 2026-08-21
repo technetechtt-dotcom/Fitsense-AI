@@ -120,6 +120,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  security-scan:
+    name: security-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - name: Root dependency audit
+        run: npm ci --include=dev && npm audit --audit-level=high
+        continue-on-error: true
+      - name: Backend dependency audit
+        working-directory: backend
+        run: npm ci --include=dev && npm audit --audit-level=high
+      - name: Backend container build + Trivy
+        working-directory: backend
+        run: |
+          docker build -t fitsense-api:scan .
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed fitsense-api:scan
+        continue-on-error: true
+
   staging-smoke:
     name: staging-smoke
     runs-on: ubuntu-latest

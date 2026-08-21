@@ -6,10 +6,12 @@ import { rateLimit } from "./middleware/rateLimit.js";
 import { requestContext } from "./middleware/requestContext.js";
 import { securityHeaders } from "./middleware/securityHeaders.js";
 import { authRouter } from "./routes/auth.js";
+import { accountsRouter } from "./routes/accounts.js";
 import { fitIdentityRouter } from "./routes/fitIdentity.js";
 import { healthRouter } from "./routes/health.js";
 import { handoffRouter } from "./routes/handoff.js";
 import { merchantRouter } from "./routes/merchants.js";
+import { platformRouter } from "./routes/platform.js";
 import { syncRouter } from "./routes/sync.js";
 import { telemetryRouter } from "./routes/telemetry.js";
 
@@ -24,18 +26,26 @@ export function createApp() {
   app.use(
     cors({
       origin: config.corsOrigin,
-      methods: ["GET", "PUT", "POST", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization", "X-Debug-Uid", "X-Api-Key"],
+      methods: ["GET", "PUT", "POST", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Debug-Uid",
+        "X-Api-Key",
+        "Idempotency-Key",
+      ],
     }),
   );
   app.use(express.json({ limit: config.jsonLimit }));
 
   app.use(healthRouter);
   app.use("/v1", authRouter);
+  app.use("/v1", accountsRouter);
   app.use("/v1", handoffRouter);
   app.use("/v1", syncRouter);
   app.use("/v1", fitIdentityRouter);
   app.use("/v1", merchantRouter);
+  app.use("/v1", platformRouter);
   app.use("/v1", telemetryRouter);
 
   app.use((_req, res) => {

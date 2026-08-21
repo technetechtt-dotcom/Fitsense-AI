@@ -30,6 +30,16 @@ Partner **API keys** (`X-Api-Key: fs_live_…`) act as **operator**.
 | GET     | `/v1/merchants/orgs/:orgId/outcomes`               | viewer+ (`?format=csv`, `sinceEpochMs`, `limit`)            |
 | GET     | `/v1/merchants/orgs/:orgId/pilot-metrics`          | viewer+                                                     |
 
+## Webhooks
+
+`POST /v1/merchants/orgs/:orgId/webhooks` creates an endpoint. Deliveries retry with exponential backoff and move to `dead_letter` after 8 failures. Process with `POST .../webhooks/process` or `npm run webhooks:process`.
+
+Verify: `HMAC-SHA256(secret, `${timestamp}.${body}`)` → `X-FitSense-Signature: v1=<hex>`.
+
+## Multi-store / CSV / invitations
+
+See [PLATFORM_CAPABILITIES.md](PLATFORM_CAPABILITIES.md). Portal **Platform** tab covers stores, invites, webhooks, CSV, reconciliation.
+
 Catalogue ingest accepts ≤ 200 products per request. Inventory ≤ 500 rows.
 
 Inventory rows support optional `widthLabel` (default `standard`) so UK 5 / wide stock can sit beside UK 5 / standard.

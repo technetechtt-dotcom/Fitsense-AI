@@ -9,6 +9,7 @@ import {
   RefreshCw,
   ShoppingBag,
   Upload,
+  Network,
 } from "lucide-react";
 import { PageLayout, StickyPageHeader } from "../../components/PageLayout";
 import { TopBar } from "../../components/TopBar";
@@ -18,6 +19,7 @@ import { loadMerchantCatalogue } from "../../lib/catalogueRuntime";
 import {
   createMerchantOrg,
   createOrgApiKey,
+  createOrgWebhook,
   fetchPilotMetrics,
   fetchPilotRoi,
   fetchOutcomeFitInsights,
@@ -25,6 +27,7 @@ import {
   updateBilling,
   getMerchantOrgId,
   ingestCatalogue,
+  inviteStaff,
   listCatalogue,
   listInventory,
   listMerchantOrgs,
@@ -33,11 +36,15 @@ import {
   eraseMerchantOutcomesByDevice,
   listOrgApiKeys,
   listOrgBrandFits,
+  listStoreLocations,
   recordMerchantOutcome,
   revokeOrgApiKey,
+  runOrgReconciliation,
   setMerchantOrgId,
+  uploadMerchantCsv,
   upsertInventory,
   upsertOrgBrandFit,
+  upsertStoreLocation,
   type ApiKeyRow,
   type BrandFitProfileInput,
   type CatalogueProduct,
@@ -49,7 +56,8 @@ import {
   type MerchantBilling,
 } from "../../lib/api/merchantApi";
 
-type Tab = "org" | "catalogue" | "inventory" | "brandfit" | "outcomes" | "keys";
+type Tab =
+  "org" | "catalogue" | "inventory" | "brandfit" | "outcomes" | "platform" | "keys";
 
 function pct(rate: number | null): string {
   if (rate === null || Number.isNaN(rate)) return "—";
@@ -108,6 +116,26 @@ export function MerchantPortal() {
   const [bfMidsole, setBfMidsole] =
     useState<BrandFitProfileInput["midsoleFeel"]>("firm");
   const [bfNote, setBfNote] = useState("Pilot model — true to size");
+  const [locations, setLocations] = useState<
+    Array<{
+      locationId: string;
+      code: string;
+      name: string;
+      kind: string;
+      region: string | null;
+    }>
+  >([]);
+  const [locCode, setLocCode] = useState("STORE-01");
+  const [locName, setLocName] = useState("Flagship");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [lastWebhookSecret, setLastWebhookSecret] = useState<string | null>(null);
+  const [csvKind, setCsvKind] = useState<"catalogue" | "inventory" | "prices">(
+    "inventory",
+  );
+  const [csvText, setCsvText] = useState(
+    "productId,sizeSystem,sizeLabel,quantity,locationId\n",
+  );
 
   const apiReady = isApiConfigured();
 
@@ -210,6 +238,7 @@ export function MerchantPortal() {
             ["inventory", "Inventory", Layers],
             ["brandfit", "Brand fit", Ruler],
             ["outcomes", "Outcomes", ShoppingBag],
+            ["platform", "Platform", Network],
             ["keys", "API keys", KeyRound],
           ] as const
         ).map(([id, label, Icon]) => (
@@ -826,6 +855,166 @@ export function MerchantPortal() {
               Erase device outcomes
             </PrimaryButton>
           </div>
+        </section>
+      ) : null}
+
+      {tab === "platform" ? (
+        <section className="space-y-4">
+          <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
+            <h2 className="text-sm font-semibold">Stores & warehouses</h2>
+            <div className="flex flex-wrap gap-2">
+              <input
+                className="rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm flex-1 min-w-[8rem]"
+                value={locCode}
+                onChange={(e) => setLocCode(e.target.value)}
+                placeholder="Code"
+              />
+              <input
+                className="rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm flex-1 min-w-[8rem]"
+                value={locName}
+                onChange={(e) => setLocName(e.target.value)}
+                placeholder="Name"
+              />
+              <PrimaryButton
+                disabled={busy || !orgId}
+                onClick={() =>
+                  void withBusy(async () => {
+                    if (!orgId) return;
+                    await upsertStoreLocation(orgId, {
+                      code: locCode,
+                      name: locName,
+                      kind: "store",
+                      region: newOrgRegion,
+                    });
+                    setLocations(await listStoreLocations(orgId));
+                    setStatus("Location saved");
+                  })
+                }
+              >
+                Save store
+              </PrimaryButton>
+              <button
+                type="button"
+                className="text-xs text-neon"
+                disabled={!orgId}
+                onClick={() =>
+                  void withBusy(async () => {
+                    if (!orgId) return;
+                    setLocations(await listStoreLocations(orgId));
+                  })
+                }
+              >
+                Refresh
+              </button>
+            </div>
+            <ul className="text-xs text-ink-muted space-y-1">
+              {locations.map((l) => (
+                <li key={l.locationId}>
+                  {l.code} · {l.name} ({l.kind}
+                  {l.region ? ` · ${l.region}` : ""})
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
+            <h2 className="text-sm font-semibold">Staff invitation</h2>
+            <input
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              placeholder="staff@retailer.co.za"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <PrimaryButton
+              disabled={busy || !orgId || !inviteEmail.includes("@")}
+              onClick={() =>
+                void withBusy(async () => {
+                  if (!orgId) return;
+                  const inv = await inviteStaff(orgId, inviteEmail, "operator");
+                  setStatus(`Invite token (share once): ${inv.token}`);
+                })
+              }
+            >
+              Invite operator
+            </PrimaryButton>
+          </div>
+
+          <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
+            <h2 className="text-sm font-semibold">Webhooks</h2>
+            <input
+              className="w-full rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              placeholder="https://partner.example/hooks/fitsense"
+              value={webhookUrl}
+              onChange={(e) => setWebhookUrl(e.target.value)}
+            />
+            <PrimaryButton
+              disabled={busy || !orgId || !webhookUrl.startsWith("http")}
+              onClick={() =>
+                void withBusy(async () => {
+                  if (!orgId) return;
+                  const wh = await createOrgWebhook(orgId, webhookUrl, [
+                    "order.ingested",
+                    "return.created",
+                    "*",
+                  ]);
+                  setLastWebhookSecret(wh.secret);
+                  setStatus(`Webhook ${wh.endpointId} created`);
+                })
+              }
+            >
+              Create endpoint
+            </PrimaryButton>
+            {lastWebhookSecret ? (
+              <p className="text-xs text-coral break-all">
+                Signing secret (copy now): {lastWebhookSecret}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="rounded-2xl bg-card-grad border border-white/5 p-4 space-y-3">
+            <h2 className="text-sm font-semibold">CSV fallback</h2>
+            <select
+              className="rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-sm"
+              value={csvKind}
+              onChange={(e) =>
+                setCsvKind(e.target.value as "catalogue" | "inventory" | "prices")
+              }
+            >
+              <option value="inventory">Inventory</option>
+              <option value="prices">Prices</option>
+              <option value="catalogue">Catalogue</option>
+            </select>
+            <textarea
+              className="w-full min-h-[6rem] rounded-xl bg-surface-2 border border-white/10 px-3 py-2 text-xs font-mono"
+              value={csvText}
+              onChange={(e) => setCsvText(e.target.value)}
+            />
+            <PrimaryButton
+              disabled={busy || !orgId}
+              onClick={() =>
+                void withBusy(async () => {
+                  if (!orgId) return;
+                  await uploadMerchantCsv(orgId, csvKind, csvText);
+                  setStatus(`CSV ${csvKind} uploaded`);
+                })
+              }
+            >
+              Upload CSV
+            </PrimaryButton>
+          </div>
+
+          <PrimaryButton
+            disabled={busy || !orgId}
+            onClick={() =>
+              void withBusy(async () => {
+                if (!orgId) return;
+                const r = await runOrgReconciliation(orgId);
+                setStatus(`Recon ${r.runId}: ${JSON.stringify(r.summary)}`);
+              })
+            }
+          >
+            Run reconciliation
+          </PrimaryButton>
         </section>
       ) : null}
 

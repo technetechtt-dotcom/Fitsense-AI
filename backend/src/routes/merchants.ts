@@ -90,6 +90,8 @@ const inventorySchema = z.object({
         sizeLabel: z.string().trim().min(1).max(32),
         /** Fitting width (e.g. standard, wide, D, EE). Defaults to standard. */
         widthLabel: z.string().trim().min(1).max(32).optional(),
+        /** Store or warehouse location id (default = org-wide). */
+        locationId: z.string().trim().min(1).max(80).optional(),
         quantity: z.number().int().nonnegative(),
       }),
     )
@@ -314,7 +316,9 @@ merchantRouter.get(
   requireOrgRole("viewer"),
   async (req: MerchantRequest, res, next) => {
     try {
-      res.json({ items: await listInventory(req.orgId!) });
+      const locationId =
+        typeof req.query.locationId === "string" ? req.query.locationId : undefined;
+      res.json({ items: await listInventory(req.orgId!, locationId) });
     } catch (err) {
       next(err);
     }

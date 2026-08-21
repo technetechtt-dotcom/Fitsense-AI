@@ -163,3 +163,27 @@ services:
         value: "true"
       - key: DATABASE_SSL_REJECT_UNAUTHORIZED
         value: "true"
+
+  # Webhook delivery retries + DLQ drain.
+  - type: cron
+    name: fitsense-webhooks
+    runtime: node
+    rootDir: backend
+    plan: starter
+    schedule: "*/5 * * * *"
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run webhooks:process
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          name: fitsense-api
+          type: web
+          envVarKey: DATABASE_URL
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: "true"
