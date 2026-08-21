@@ -515,3 +515,99 @@ export async function revokeOrgApiKey(orgId: string, keyId: string): Promise<voi
   );
   if (res.status !== 204) throw new Error(`revoke api key failed: ${res.status}`);
 }
+
+export async function upsertStoreLocation(
+  orgId: string,
+  body: {
+    code: string;
+    name: string;
+    kind: "store" | "warehouse" | "region";
+    region?: string;
+    locationId?: string;
+  },
+): Promise<{ locationId: string }> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/locations`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+  if (!res.ok) throw new Error(`location upsert failed: ${res.status}`);
+  return (await res.json()) as { locationId: string };
+}
+
+export async function listStoreLocations(orgId: string): Promise<
+  Array<{
+    locationId: string;
+    code: string;
+    name: string;
+    kind: string;
+    region: string | null;
+  }>
+> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/locations`,
+  );
+  if (!res.ok) throw new Error(`locations failed: ${res.status}`);
+  const body = (await res.json()) as { locations?: Array<Record<string, unknown>> };
+  return (body.locations ?? []).map((l) => ({
+    locationId: String(l.locationId),
+    code: String(l.code),
+    name: String(l.name),
+    kind: String(l.kind),
+    region: (l.region as string | null) ?? null,
+  }));
+}
+
+export async function inviteStaff(
+  orgId: string,
+  email: string,
+  role: "owner" | "admin" | "operator" | "viewer",
+): Promise<{ invitationId: string; token: string; expiresAt: string }> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/invitations`,
+    { method: "POST", body: JSON.stringify({ email, role }) },
+  );
+  if (!res.ok) throw new Error(`invite failed: ${res.status}`);
+  return (await res.json()) as {
+    invitationId: string;
+    token: string;
+    expiresAt: string;
+  };
+}
+
+export async function createOrgWebhook(
+  orgId: string,
+  url: string,
+  events: string[],
+): Promise<{ endpointId: string; secret: string }> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/webhooks`,
+    { method: "POST", body: JSON.stringify({ url, events }) },
+  );
+  if (!res.ok) throw new Error(`webhook create failed: ${res.status}`);
+  return (await res.json()) as { endpointId: string; secret: string };
+}
+
+export async function runOrgReconciliation(orgId: string): Promise<{
+  runId: string;
+  summary: Record<string, unknown>;
+}> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/reconciliation`,
+    { method: "POST", body: "{}" },
+  );
+  if (!res.ok) throw new Error(`reconciliation failed: ${res.status}`);
+  return (await res.json()) as { runId: string; summary: Record<string, unknown> };
+}
+
+export async function uploadMerchantCsv(
+  orgId: string,
+  kind: "catalogue" | "inventory" | "prices",
+  csv: string,
+): Promise<unknown> {
+  const res = await merchantFetch(
+    `/v1/merchants/orgs/${encodeURIComponent(orgId)}/csv/${kind}`,
+    { method: "POST", body: JSON.stringify({ csv }) },
+  );
+  if (!res.ok) throw new Error(`csv ${kind} failed: ${res.status}`);
+  return res.json();
+}

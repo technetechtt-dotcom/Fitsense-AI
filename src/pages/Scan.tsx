@@ -44,6 +44,7 @@ import {
 import type { CalibrationReference, Foot, FootMeasurement, ScanResult } from "../types";
 import type { Point } from "../lib/homography";
 import type { RealMeasurementResult } from "../lib/realMeasurement";
+import { resolveLocale } from "../lib/i18n/locale";
 
 type Phase = "permission" | "live" | "captured" | "ar" | "ar-unsupported";
 
@@ -849,6 +850,9 @@ function ArProbe({
   onUseReference: () => void;
   onClose: () => void;
 }) {
+  const locale = resolveLocale(
+    typeof navigator !== "undefined" ? navigator.language : "en-ZA",
+  );
   const message = useMemo(() => {
     if (support.kind === "supported") {
       return {
@@ -860,9 +864,7 @@ function ArProbe({
     if (support.kind === "unsupported") {
       return {
         title: "AR plane isn't supported here",
-        body:
-          (support as { reason: string }).reason ??
-          "Your device doesn't support WebXR AR sessions. Use a flat A4 sheet or bank card for the validated reference workflow.",
+        body: locale.strings.unsupportedDevice,
         tone: "warn" as const,
       };
     }
@@ -871,7 +873,7 @@ function ArProbe({
       body: "One moment while we probe your device's WebXR capabilities.",
       tone: "info" as const,
     };
-  }, [support]);
+  }, [support, locale.strings.unsupportedDevice]);
   return (
     <div className="max-w-md mx-auto rounded-3xl bg-card-grad border border-white/10 p-6 space-y-5">
       <div className="flex items-start gap-3">

@@ -297,35 +297,48 @@ export type InventoryRow = {
   sizeSystem: string;
   sizeLabel: string;
   widthLabel: string;
+  locationId: string;
   quantity: number;
   updatedAtEpochMs?: number;
 };
 
-export async function listInventory(orgId: string): Promise<InventoryRow[]> {
+export async function listInventory(
+  orgId: string,
+  locationId?: string,
+): Promise<InventoryRow[]> {
   await ensureMerchantSchema();
+  const params: unknown[] = [orgId];
+  let filter = "";
+  if (locationId?.trim()) {
+    params.push(locationId.trim());
+    filter = ` AND location_id = $${params.length}`;
+  }
   const result = await getPostgresPool().query<{
     product_id: string;
     size_system: string;
     size_label: string;
     width_label: string;
+    location_id: string;
     quantity: number;
     updated_at: Date;
   }>(
     `
       SELECT product_id, size_system, size_label,
              COALESCE(width_label, 'standard') AS width_label,
+             COALESCE(location_id, 'default') AS location_id,
              quantity, updated_at
       FROM catalogue_inventory
-      WHERE org_id = $1
-      ORDER BY product_id, size_system, size_label, width_label
+      WHERE org_id = $1${filter}
+      ORDER BY location_id, product_id, size_system, size_label, width_label
     `,
-    [orgId],
+    params,
   );
   return result.rows.map((r) => ({
     productId: r.product_id,
     sizeSystem: r.size_system,
     sizeLabel: r.size_label,
     widthLabel: r.width_label || "standard",
+    locationId: r.location_id || "default",
     quantity: r.quantity,
     updatedAtEpochMs: r.updated_at?.getTime?.() ?? undefined,
   }));
@@ -338,6 +351,7 @@ export async function upsertInventory(
     sizeSystem: string;
     sizeLabel: string;
     widthLabel?: string;
+    locationId?: string;
     quantity: number;
   }>,
 ): Promise<{ upserted: number }> {
@@ -349,16 +363,25 @@ export async function upsertInventory(
     await client.query("BEGIN");
     for (const row of rows) {
       const widthLabel = (row.widthLabel ?? "standard").trim() || "standard";
+      const locationId = (row.locationId ?? "default").trim() || "default";
       await client.query(
         `
           INSERT INTO catalogue_inventory (
-            org_id, product_id, size_system, size_label, width_label, quantity, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, now())
-          ON CONFLICT (org_id, product_id, size_system, size_label, width_label) DO UPDATE SET
+            org_id, location_id, product_id, size_system, size_label, width_label, quantity, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+          ON CONFLICT (org_id, location_id, product_id, size_system, size_label, width_label) DO UPDATE SET
             quantity = EXCLUDED.quantity,
             updated_at = now()
         `,
-        [orgId, row.productId, row.sizeSystem, row.sizeLabel, widthLabel, row.quantity],
+        [
+          orgId,
+          locationId,
+          row.productId,
+          row.sizeSystem,
+          row.sizeLabel,
+          widthLabel,
+          row.quantity,
+        ],
       );
       upserted += 1;
     }

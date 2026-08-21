@@ -21,6 +21,13 @@ export interface LocalePack {
     retake: string;
     weakNetwork: string;
     offlineQueued: string;
+    confidenceHigh: string;
+    confidenceMedium: string;
+    confidenceLow: string;
+    confidenceLabel: string;
+    unsupportedDevice: string;
+    localAvailability: string;
+    reserveHold: string;
   };
 }
 
@@ -36,6 +43,14 @@ const PACKS: Record<LocaleId, LocalePack> = {
       retake: "Retake",
       weakNetwork: "Slow connection — working offline where possible.",
       offlineQueued: "Saved on device. Will sync when online.",
+      confidenceHigh: "High confidence — suitable for sizing.",
+      confidenceMedium: "Moderate confidence — confirm fit in store if unsure.",
+      confidenceLow: "Low confidence — retake before relying on this size.",
+      confidenceLabel: "Recommendation confidence",
+      unsupportedDevice:
+        "This device cannot run AR measurement. Use reference-object scan, or try a supported phone.",
+      localAvailability: "Available nearby",
+      reserveHold: "Reserve for click & collect",
     },
   },
   "af-ZA": {
@@ -49,6 +64,14 @@ const PACKS: Record<LocaleId, LocalePack> = {
       retake: "Neem weer",
       weakNetwork: "Stadige verbinding — werk vanlyn waar moontlik.",
       offlineQueued: "Op toestel gestoor. Sal sinchroniseer wanneer aanlyn.",
+      confidenceHigh: "Hoë vertroue — geskik vir groottebepaling.",
+      confidenceMedium: "Matige vertroue — bevestig pas in die winkel indien onseker.",
+      confidenceLow: "Lae vertroue — neem weer voordat jy hierdie grootte gebruik.",
+      confidenceLabel: "Aanbevelingvertroue",
+      unsupportedDevice:
+        "Hierdie toestel kan nie AR-meting doen nie. Gebruik verwysingsobjek-skandering, of probeer 'n ondersteunde foon.",
+      localAvailability: "Beskikbaar naby jou",
+      reserveHold: "Bespreek vir klik-en-versamel",
     },
   },
   "xh-ZA": {
@@ -62,6 +85,13 @@ const PACKS: Record<LocaleId, LocalePack> = {
       retake: "Phinda uthathe",
       weakNetwork: "Uqhagamshelo olucothayo — sisebenza ngaphandle kwe-intanethi.",
       offlineQueued: "Kugcinwe esixhobenii. Kuzahambelana xa ukwi-intanethi.",
+      confidenceHigh: "Ukuzithemba okuphezulu.",
+      confidenceMedium: "Ukuzithemba okuphakathi.",
+      confidenceLow: "Ukuzithemba okuphantsi — phinda uthathe.",
+      confidenceLabel: "Ukuzithemba kwengcebiso",
+      unsupportedDevice: "Esi sixhobo asikwazi ukulinganisa nge-AR.",
+      localAvailability: "Iyafumaneka kufutshane",
+      reserveHold: "Gcina ukuze uthathe evenkileni",
     },
   },
   "zu-ZA": {
@@ -75,6 +105,13 @@ const PACKS: Record<LocaleId, LocalePack> = {
       retake: "Thatha futhi",
       weakNetwork: "Uxhumano olucothayo — sisebenza ngaphandle kwe-inthanethi.",
       offlineQueued: "Kugcinwe kudivaysi. Kuzovumelanisa uma ku-inthanethi.",
+      confidenceHigh: "Ukuzethemba okuphezulu.",
+      confidenceMedium: "Ukuzethemba okuphakathi.",
+      confidenceLow: "Ukuzethemba okuphansi — thatha futhi.",
+      confidenceLabel: "Ukuzethemba kwesincomo",
+      unsupportedDevice: "Leli divayisi alikwazi ukulinganisa nge-AR.",
+      localAvailability: "Iyatholakala eduze",
+      reserveHold: "Beka eceleni ukuze uthathe esitolo",
     },
   },
   en: {
@@ -88,6 +125,14 @@ const PACKS: Record<LocaleId, LocalePack> = {
       retake: "Retake",
       weakNetwork: "Slow connection — working offline where possible.",
       offlineQueued: "Saved on device. Will sync when online.",
+      confidenceHigh: "High confidence — suitable for sizing.",
+      confidenceMedium: "Moderate confidence — confirm fit in store if unsure.",
+      confidenceLow: "Low confidence — retake before relying on this size.",
+      confidenceLabel: "Recommendation confidence",
+      unsupportedDevice:
+        "This device cannot run AR measurement. Use reference-object scan, or try a supported phone.",
+      localAvailability: "Available nearby",
+      reserveHold: "Reserve for click & collect",
     },
   },
 };

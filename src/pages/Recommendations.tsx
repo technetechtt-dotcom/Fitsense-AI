@@ -18,6 +18,7 @@ import { getOrCreateProfile, getScan } from "../lib/storage";
 import { getOrCreateFitProfile } from "../lib/fitProfile";
 import { primaryFoot } from "../types";
 import type { FitProfile, ScanResult, SizeRecommendation, UserProfile } from "../types";
+import { resolveLocale } from "../lib/i18n/locale";
 
 export function Recommendations() {
   const { scanId = "" } = useParams();
@@ -25,6 +26,9 @@ export function Recommendations() {
   const [scan, setScan] = useState<ScanResult | null | undefined>(undefined);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [fitProfile, setFitProfile] = useState<FitProfile | null>(null);
+  const locale = resolveLocale(
+    typeof navigator !== "undefined" ? navigator.language : "en-ZA",
+  );
 
   useEffect(() => {
     setScan(getScan(scanId) ?? null);
@@ -81,6 +85,13 @@ export function Recommendations() {
     fitProfile?.insights?.brandConfidence ?? {},
   ).length;
 
+  const confidenceCopy =
+    rec.recommendationConfidence >= 0.8
+      ? locale.strings.confidenceHigh
+      : rec.recommendationConfidence >= 0.65
+        ? locale.strings.confidenceMedium
+        : locale.strings.confidenceLow;
+
   return (
     <PageLayout withTopBar gap="gap-4">
       <TopBar title="Recommended for you" />
@@ -89,6 +100,29 @@ export function Recommendations() {
         <StatTile label="UK" value={rec.uk} accent />
         <StatTile label="US" value={rec.us} accent />
         <StatTile label="EU" value={rec.eu} accent />
+      </div>
+
+      <div
+        className="rounded-2xl border border-white/10 bg-surface-2 px-4 py-3"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="text-[10px] uppercase tracking-widest text-ink-muted">
+          {locale.strings.confidenceLabel}
+        </div>
+        <div className="mt-1 flex items-baseline justify-between gap-3">
+          <p className="text-sm font-semibold text-ink">
+            {Math.round(rec.recommendationConfidence * 100)}% · {confidenceCopy}
+          </p>
+        </div>
+        <div className="mt-2 h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-neon"
+            style={{
+              width: `${Math.max(4, Math.round(rec.recommendationConfidence * 100))}%`,
+            }}
+          />
+        </div>
       </div>
 
       {learnedFromCount > 0 ? (

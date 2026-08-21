@@ -26,7 +26,10 @@ Without consent (no grant) or without the matching org API key, partners cannot 
 
 ## Passkeys
 
-WebAuthn / passkeys are **not implemented yet**. Do not invent client-side stub credentials. When added, they will link durable accounts across devices without replacing geometric measurement trust.
+WebAuthn / passkeys are implemented for durable customer accounts
+(`POST /v1/accounts/webauthn/...`, Settings → Durable account).
+Configure `WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN` in production.
+Passkeys authenticate the account; they do **not** replace geometric measurement trust.
 
 ## Surfaces
 

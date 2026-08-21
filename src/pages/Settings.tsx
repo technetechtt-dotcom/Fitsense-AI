@@ -18,6 +18,12 @@ import {
   setAccuracyGroundTruth,
 } from "../lib/accuracyStudy";
 import { evaluateDeviceCertification } from "../lib/supportedDevices";
+import {
+  ensureCustomerAccount,
+  exportMyAccount,
+  passkeysSupported,
+  registerPasskey,
+} from "../lib/api/accountsApi";
 import type { CalibrationReference, MeasurementUnit, UserProfile } from "../types";
 import { CALIBRATION_META } from "../types";
 
@@ -26,6 +32,8 @@ export function Settings() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [restoreMsg, setRestoreMsg] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const [accountMsg, setAccountMsg] = useState<string | null>(null);
   const [gtLength, setGtLength] = useState("");
   const [gtWidth, setGtWidth] = useState("");
   const [gtFoot, setGtFoot] = useState<"left" | "right" | "unknown">("left");
@@ -301,6 +309,98 @@ export function Settings() {
             {restoring ? "Restoring…" : "Restore from cloud"}
           </button>
           {restoreMsg ? <p className="text-xs text-neon">{restoreMsg}</p> : null}
+        </Section>
+      ) : null}
+
+      {isApiConfigured() ? (
+        <Section label="Durable account">
+          <p className="text-xs text-ink-muted leading-relaxed">
+            Link this device to a FitSense account, add a passkey, export your data, or
+            delete the account (POPIA).
+          </p>
+          <button
+            type="button"
+            disabled={accountBusy}
+            onClick={() =>
+              void (async () => {
+                setAccountBusy(true);
+                setAccountMsg(null);
+                try {
+                  const acct = await ensureCustomerAccount({
+                    locale: navigator.language || "en-ZA",
+                  });
+                  setAccountMsg(`Account ready: ${acct.accountId}`);
+                } catch (e) {
+                  setAccountMsg(e instanceof Error ? e.message : "Account failed");
+                } finally {
+                  setAccountBusy(false);
+                }
+              })()
+            }
+            className="w-full rounded-2xl bg-surface-2 border border-white/5 px-4 py-3 text-sm font-semibold hover:bg-surface-3 disabled:opacity-50"
+          >
+            Create / link account
+          </button>
+          {passkeysSupported() ? (
+            <button
+              type="button"
+              disabled={accountBusy}
+              onClick={() =>
+                void (async () => {
+                  setAccountBusy(true);
+                  setAccountMsg(null);
+                  try {
+                    const r = await registerPasskey();
+                    setAccountMsg(`Passkey saved: ${r.credentialId.slice(0, 16)}…`);
+                  } catch (e) {
+                    setAccountMsg(
+                      e instanceof Error ? e.message : "Passkey registration failed",
+                    );
+                  } finally {
+                    setAccountBusy(false);
+                  }
+                })()
+              }
+              className="w-full rounded-2xl bg-surface-2 border border-white/5 px-4 py-3 text-sm font-semibold hover:bg-surface-3 disabled:opacity-50"
+            >
+              Add passkey
+            </button>
+          ) : (
+            <p className="text-xs text-ink-muted">
+              Passkeys are not available on this browser.
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={accountBusy}
+            onClick={() =>
+              void (async () => {
+                setAccountBusy(true);
+                setAccountMsg(null);
+                try {
+                  const data = await exportMyAccount();
+                  const blob = new Blob([JSON.stringify(data, null, 2)], {
+                    type: "application/json",
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "fitsense-account-export.json";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  setAccountMsg("Export downloaded.");
+                } catch (e) {
+                  setAccountMsg(e instanceof Error ? e.message : "Export failed");
+                } finally {
+                  setAccountBusy(false);
+                }
+              })()
+            }
+            className="w-full rounded-2xl bg-surface-2 border border-white/5 px-4 py-3 text-sm font-semibold hover:bg-surface-3 disabled:opacity-50"
+          >
+            Export account data
+          </button>
+          {accountMsg ? <p className="text-xs text-neon">{accountMsg}</p> : null}
         </Section>
       ) : null}
 
