@@ -636,12 +636,10 @@ platformRouter.post(
         res.json(await ingestProducts(req.orgId!, products));
         return;
       }
-      res
-        .status(400)
-        .json({
-          error: "unknown_csv_kind",
-          allowed: ["inventory", "prices", "catalogue"],
-        });
+      res.status(400).json({
+        error: "unknown_csv_kind",
+        allowed: ["inventory", "prices", "catalogue"],
+      });
     } catch (err) {
       next(err);
     }
