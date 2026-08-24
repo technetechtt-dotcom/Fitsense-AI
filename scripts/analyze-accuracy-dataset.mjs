@@ -88,12 +88,27 @@ if (rows.length === 0) {
   process.exit(2);
 }
 
+function percentile(sorted, p) {
+  if (sorted.length === 1) return sorted[0];
+  const idx = (sorted.length - 1) * p;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sorted[lo];
+  const w = idx - lo;
+  return sorted[lo] * (1 - w) + sorted[hi] * w;
+}
+
 function stats(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const p95 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
-  const median = sorted[Math.floor(sorted.length / 2)];
-  return { n: values.length, mae: mean, median, p95 };
+  const median = percentile(sorted, 0.5);
+  const p95 = percentile(sorted, 0.95);
+  return {
+    n: values.length,
+    mae: mean,
+    median: Number(median.toFixed(3)),
+    p95: Number(p95.toFixed(3)),
+  };
 }
 
 function cohortKey(row) {
@@ -131,6 +146,25 @@ const cohorts = Object.fromEntries(
   Object.entries(byDevice).map(([key, subset]) => [key, analyze(subset)]),
 );
 
+const MIN_CERTIFY_N = 30;
+const sampleDataset = /accuracy-sample|synthetic|demo[_-]dataset/i.test(path);
+const reasons = [];
+if (sampleDataset) {
+  reasons.push("source is a sample/synthetic dataset, not a Brannock study export");
+}
+if (rows.length < MIN_CERTIFY_N) {
+  reasons.push(`n=${rows.length} is below the internal-validation floor (${MIN_CERTIFY_N})`);
+}
+const failingCohorts = Object.entries(cohorts).filter(
+  ([, c]) => c.length.n >= 5 && !c.pass,
+);
+if (failingCohorts.length) {
+  reasons.push(
+    `cohorts below gate with n≥5: ${failingCohorts.map(([k]) => k).join("; ")}`,
+  );
+}
+const certified = overall.pass && !sampleDataset && rows.length >= MIN_CERTIFY_N && failingCohorts.length === 0;
+
 const report = {
   path,
   mode: strict ? "strict-study" : "product-definition",
@@ -138,7 +172,18 @@ const report = {
   n: rows.length,
   overall,
   cohorts,
+  /** Thresholds on this file only — not launch certification. */
   pass: overall.pass,
+  sampleDataset,
+  minCertifyN: MIN_CERTIFY_N,
+  certified,
+  reasons,
+  length: overall.length,
+  width: overall.width,
+  lengthMedianAbsErrorMm: overall.length.median,
+  lengthP95AbsErrorMm: overall.length.p95,
+  widthMedianAbsErrorMm: overall.width?.median ?? null,
+  widthP95AbsErrorMm: overall.width?.p95 ?? null,
 };
 
 const json = JSON.stringify(report, null, 2);

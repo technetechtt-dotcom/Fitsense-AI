@@ -2,6 +2,8 @@ import { createHmac } from "node:crypto";
 import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
 import { requireMigrationsApplied } from "./migrate.js";
 import { appendAudit, mintSecret, newPlatformId } from "./auditLog.js";
+import { timingSafeEqualString } from "./sessionAuth.js";
+import { assertSafeWebhookUrl } from "./webhookSafety.js";
 
 async function ensure(): Promise<void> {
   if (!isPostgresConfigured()) throw new Error("DATABASE_URL is required.");
@@ -18,6 +20,7 @@ export async function createWebhookEndpoint(input: {
   actorId?: string;
 }): Promise<{ endpointId: string; secret: string }> {
   await ensure();
+  await assertSafeWebhookUrl(input.url.trim());
   const endpointId = newPlatformId("wh");
   const secret = mintSecret("whsec");
   await getPostgresPool().query(
@@ -127,7 +130,17 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
   deadLetter: number;
 }> {
   await ensure();
-  const due = await getPostgresPool().query<{
+  const pool = getPostgresPool();
+  await pool.query(
+    `
+      UPDATE merchant_webhook_deliveries
+      SET status = 'retrying', next_attempt_at = now(), updated_at = now()
+      WHERE status = 'delivering'
+        AND COALESCE(claimed_at, updated_at) < now() - interval '2 minutes'
+    `,
+  );
+
+  const claimed = await pool.query<{
     delivery_id: string;
     endpoint_id: string;
     org_id: string;
@@ -138,22 +151,46 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
     signing_secret: string;
   }>(
     `
-      SELECT d.delivery_id, d.endpoint_id, d.org_id, d.event_type, d.payload, d.attempts,
-             e.url, e.signing_secret
-      FROM merchant_webhook_deliveries d
-      JOIN merchant_webhook_endpoints e ON e.endpoint_id = d.endpoint_id
-      WHERE d.status IN ('pending', 'retrying')
-        AND d.next_attempt_at <= now()
-        AND e.active = true
-      ORDER BY d.next_attempt_at ASC
-      LIMIT $1
+      WITH due AS (
+        SELECT d.delivery_id
+        FROM merchant_webhook_deliveries d
+        JOIN merchant_webhook_endpoints e ON e.endpoint_id = d.endpoint_id
+        WHERE d.status IN ('pending', 'retrying')
+          AND d.next_attempt_at <= now()
+          AND e.active = true
+        ORDER BY d.next_attempt_at ASC
+        LIMIT $1
+        FOR UPDATE OF d SKIP LOCKED
+      )
+      UPDATE merchant_webhook_deliveries d
+      SET status = 'delivering', claimed_at = now(), updated_at = now()
+      FROM due
+      WHERE d.delivery_id = due.delivery_id
+      RETURNING d.delivery_id, d.endpoint_id, d.org_id, d.event_type, d.payload, d.attempts,
+                (SELECT url FROM merchant_webhook_endpoints e WHERE e.endpoint_id = d.endpoint_id) AS url,
+                (SELECT signing_secret FROM merchant_webhook_endpoints e WHERE e.endpoint_id = d.endpoint_id) AS signing_secret
     `,
     [limit],
   );
 
   let delivered = 0;
   let deadLetter = 0;
-  for (const row of due.rows) {
+  for (const row of claimed.rows) {
+    try {
+      await assertSafeWebhookUrl(row.url);
+    } catch (err) {
+      await pool.query(
+        `
+          UPDATE merchant_webhook_deliveries
+          SET status = 'dead_letter', attempts = attempts + 1,
+              last_error = $2, updated_at = now()
+          WHERE delivery_id = $1
+        `,
+        [row.delivery_id, err instanceof Error ? err.message : "unsafe_url"],
+      );
+      deadLetter += 1;
+      continue;
+    }
     const body = JSON.stringify(row.payload);
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const signature = signBody(row.signing_secret, body, timestamp);
@@ -170,6 +207,7 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
           "X-FitSense-Event": row.event_type,
         },
         body,
+        redirect: "error",
         signal: AbortSignal.timeout(10_000),
       });
       statusCode = res.status;
@@ -181,7 +219,7 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
 
     const attempts = row.attempts + 1;
     if (ok) {
-      await getPostgresPool().query(
+      await pool.query(
         `
           UPDATE merchant_webhook_deliveries
           SET status = 'delivered', attempts = $2, last_status_code = $3,
@@ -192,7 +230,7 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
       );
       delivered += 1;
     } else if (attempts >= MAX_ATTEMPTS) {
-      await getPostgresPool().query(
+      await pool.query(
         `
           UPDATE merchant_webhook_deliveries
           SET status = 'dead_letter', attempts = $2, last_status_code = $3,
@@ -204,7 +242,7 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
       deadLetter += 1;
     } else {
       const delay = BASE_DELAY_MS * 2 ** Math.min(attempts - 1, 6);
-      await getPostgresPool().query(
+      await pool.query(
         `
           UPDATE merchant_webhook_deliveries
           SET status = 'retrying', attempts = $2, last_status_code = $3,
@@ -216,7 +254,7 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
       );
     }
   }
-  return { processed: due.rows.length, delivered, deadLetter };
+  return { processed: claimed.rows.length, delivered, deadLetter };
 }
 
 export async function listWebhookDeliveries(
@@ -274,5 +312,7 @@ export function verifyWebhookSignature(opts: {
   signatureHeader: string;
 }): boolean {
   const expected = `v1=${signBody(opts.secret, opts.body, opts.timestamp)}`;
-  return opts.signatureHeader === expected;
+  const header = opts.signatureHeader.trim();
+  if (!header.startsWith("v1=")) return false;
+  return timingSafeEqualString(header, expected);
 }

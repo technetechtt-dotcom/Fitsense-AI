@@ -56,31 +56,33 @@ See [RENDER_NEON.md](./RENDER_NEON.md), [PRODUCTION_READINESS.md](./PRODUCTION_R
 
 **P4 still open:** live quality HUD before shutter, socks/footwear detector, true coplanarity / fold detection, magnified landmark loupe, floor suitability ML.
 
-**P5/P6 still open:** fill device matrix with real phones; complete Brannock participant study; per-foot GT; web/iOS study path.
+**P5/P6 still open (physical):** fill device matrix with real phones; run the 30-person Brannock study ([BRANNOCK_STUDY_30.md](./ops/BRANNOCK_STUDY_30.md)); certify cohorts. Sample `accuracy-sample.jsonl` is **not** certified.
 
-**P7 still open:** WebAuthn passkeys / durable account linking (no stubs).
+**P7 landed in code:** WebAuthn passkeys + durable accounts (`/v1/accounts`, Settings). Still needs production `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN`.
+
+**Merchant platform (code vs ops):** catalogue, multi-store inventory, orders, webhooks+DLQ, invitations, billing/entitlements, tickets/SLA are in API + portal. Not yet: live Stripe charges, signed retailer contract, certified accuracy, external pen-test.
 
 Physical + commercial ops: [VALIDATION_COMMERCIAL_CHECKLIST.md](./VALIDATION_COMMERCIAL_CHECKLIST.md).
 Branch policy: [BRANCH_PROTECTION.md](./BRANCH_PROTECTION.md) (**PRs required** into `main`; protection enabled).
 
-**Next milestone (stop horizontal expansion):** physical accuracy validation — Brannock, ≥5 SA phones, 30→100–300 participants, certify device cohorts, then one real retailer assisted-vs-control pilot. See Phase 2 below.
+**Next milestone:** physical accuracy validation — Brannock, ≥5 SA phones, 30 participants, then one Kimberley retailer assisted-vs-control pilot. Do not treat sample accuracy reports as launch truth.
 
 ---
 
 ## Phase 1 — Immediate engineering (current)
 
-| Item                                       | Status                                                        |
-| ------------------------------------------ | ------------------------------------------------------------- |
-| Remove permanent Android merchant API keys | Done — device auth + catalogue tokens                         |
-| Short-lived scoped catalogue tokens        | Done — `POST .../catalogue-token`                             |
-| Exact size+width stock match               | Done — Android + web                                          |
-| Mandatory `sizeRangeEu`                    | Done — ingest, schema, validator, clients                     |
-| Outcomes order-line + idempotency          | Done — event = Idempotency-Key; line+kind unique              |
-| Strip client-controlled outcome `deviceId` | Done — server sets from device auth only                      |
-| Scan sync deletion tombstones              | Done — `deletedScanIds` on pull                               |
-| Catalogue validator in CI                  | Done — `web-and-sdk` job                                      |
-| Restore protected PR development           | **Done** — protection enabled on GitHub                       |
-| Deploy head to staging + fresh evidence    | Partial — smoke evidence; promote staging Blueprint on Render |
+| Item                                       | Status                                                                                            |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Remove permanent Android merchant API keys | Done — device auth + catalogue tokens                                                             |
+| Short-lived scoped catalogue tokens        | Done — `POST .../catalogue-token`                                                                 |
+| Exact size+width stock match               | Done — Android + web                                                                              |
+| Mandatory `sizeRangeEu`                    | Done — ingest, schema, validator, clients                                                         |
+| Outcomes order-line + idempotency          | Done — event = Idempotency-Key; line+kind unique                                                  |
+| Strip client-controlled outcome `deviceId` | Done — server sets from device auth only                                                          |
+| Scan sync deletion tombstones              | Done — `deletedScanIds` on pull                                                                   |
+| Catalogue validator in CI                  | Done — `web-and-sdk` job                                                                          |
+| Restore protected PR development           | **Done** — protection enabled on GitHub                                                           |
+| Deploy head to staging + fresh evidence    | Partial — staging Blueprint auto-deploys on commit; `STAGING_API_BASE_URL` must not be production |
 
 ## Phase 2 — Accuracy validation (physical)
 
@@ -125,3 +127,17 @@ POPIA agreements, onboarding/billing, monitoring/IR, external pen-test, limited 
 ### Phase 12 — Release engineering
 
 - Store listings, staged rollouts, accuracy-tied release checklist.
+
+## Feature maturity (honest)
+
+| Area                                           | Maturity            | Notes                                                                  |
+| ---------------------------------------------- | ------------------- | ---------------------------------------------------------------------- |
+| Phone mm measurement                           | Product path        | Real geometric/AR; demo must be labelled                               |
+| Accuracy certification                         | Ops blocked         | Sample report fixed but **not certified**; need 30-person Brannock     |
+| Durable accounts / passkeys                    | Code complete       | Needs prod WebAuthn env                                                |
+| Merchant catalogue / stock / orders / webhooks | Code complete       | Needs live retailer + staging                                          |
+| Billing / invoices                             | Scaffold            | No live Stripe charges until configured                                |
+| Kimberley pilot                                | Runbook + bootstrap | Needs signed retailer + certified accuracy                             |
+| Staging deploy                                 | Blueprint ready     | Staging hostname 404 as of 2026-08-24; never use production as staging |
+
+GitHub milestones: [M1 staging](https://github.com/technetechtt-dotcom/Fitsense-AI/milestone/1) → [M2 Brannock](https://github.com/technetechtt-dotcom/Fitsense-AI/milestone/2) → [M3 Kimberley](https://github.com/technetechtt-dotcom/Fitsense-AI/milestone/3) → [M4 security/commercial](https://github.com/technetechtt-dotcom/Fitsense-AI/milestone/4).

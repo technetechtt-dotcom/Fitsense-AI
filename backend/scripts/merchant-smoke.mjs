@@ -18,6 +18,13 @@ if (!base) {
   process.exit(1);
 }
 
+if (/fitsense-api-1rne\.onrender\.com/i.test(base)) {
+  console.error(
+    "STAGING_API_BASE_URL points at production (fitsense-api-1rne). Set it to the staging service.",
+  );
+  process.exit(2);
+}
+
 function sha256Hex(value) {
   return createHash("sha256").update(value).digest("hex");
 }

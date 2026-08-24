@@ -53,6 +53,8 @@ npm run analyze:accuracy -- path/to/accuracy_dataset.jsonl --strict
 
 The script prints overall stats and per-device cohorts (`deviceModel | OS | calibration`).
 
+`certified` is true only when n≥30, the file is not a sample dataset, thresholds pass, and no n≥5 cohort fails. Sample JSONL always publishes as **not certified**.
+
 ## Thresholds
 
 | Gate                         | Product definition (default) | Strict study (`--strict`) |

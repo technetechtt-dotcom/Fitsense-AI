@@ -129,25 +129,30 @@ jobs:
         with:
           node-version-file: .node-version
           cache: npm
-      - name: Root dependency audit
+          cache-dependency-path: backend/package-lock.json
+      - name: Backend production dependency audit
+        working-directory: backend
+        run: npm ci --omit=dev && npm audit --omit=dev --audit-level=high
+      - name: Root full audit (report)
         run: npm ci --include=dev && npm audit --audit-level=high
         continue-on-error: true
-      - name: Backend dependency audit
+      - name: Build API image
         working-directory: backend
-        run: npm ci --include=dev && npm audit --audit-level=high
-      - name: Backend container build + Trivy
-        working-directory: backend
-        run: |
-          docker build -t fitsense-api:scan .
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed fitsense-api:scan
-        continue-on-error: true
+        run: docker build -t fitsense-api:scan .
+      - name: Trivy image scan (CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: fitsense-api:scan
+          format: table
+          exit-code: "1"
+          severity: CRITICAL
+          ignore-unfixed: true
 
   staging-smoke:
     name: staging-smoke
     runs-on: ubuntu-latest
-    # Set repo variable STAGING_API_BASE_URL (Settings → Variables) to enable.
-    if: ${{ vars.STAGING_API_BASE_URL != '' }}
+    # Requires a live staging API (not production) and an explicit enable flag.
+    if: ${{ vars.STAGING_API_BASE_URL != '' && vars.STAGING_SMOKE_ENABLED == 'true' }}
     needs: [backend]
     defaults:
       run:

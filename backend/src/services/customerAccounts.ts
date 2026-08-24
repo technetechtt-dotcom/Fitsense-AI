@@ -450,33 +450,103 @@ export async function createReservation(input: {
   accountId?: string;
   deviceId?: string;
   holdMinutes?: number;
-}): Promise<{ reservationId: string; holdUntil: string }> {
+  quantity?: number;
+}): Promise<{ reservationId: string; holdUntil: string; availableAfter: number }> {
   await ensure();
+  const width = input.widthLabel ?? "standard";
+  const qty = Math.max(1, Math.floor(input.quantity ?? 1));
   const reservationId = newPlatformId("rsv");
   const holdUntil = new Date(
     Date.now() + (input.holdMinutes ?? 120) * 60 * 1000,
   ).toISOString();
-  await getPostgresPool().query(
-    `
-      INSERT INTO store_reservations (
-        reservation_id, org_id, location_id, account_id, device_id,
-        product_id, size_system, size_label, width_label, hold_until, updated_at
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::timestamptz, now())
-    `,
-    [
-      reservationId,
-      input.orgId,
-      input.locationId,
-      input.accountId ?? null,
-      input.deviceId ?? null,
-      input.productId,
-      input.sizeSystem,
-      input.sizeLabel,
-      input.widthLabel ?? "standard",
-      holdUntil,
-    ],
-  );
-  return { reservationId, holdUntil };
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `
+        UPDATE store_reservations
+        SET status = 'expired', updated_at = now()
+        WHERE org_id = $1
+          AND location_id = $2
+          AND status IN ('held', 'ready')
+          AND hold_until < now()
+      `,
+      [input.orgId, input.locationId],
+    );
+    const stock = await client.query<{ quantity: number }>(
+      `
+        SELECT quantity FROM catalogue_inventory
+        WHERE org_id = $1 AND location_id = $2 AND product_id = $3
+          AND size_system = $4 AND size_label = $5 AND width_label = $6
+        FOR UPDATE
+      `,
+      [
+        input.orgId,
+        input.locationId,
+        input.productId,
+        input.sizeSystem,
+        input.sizeLabel,
+        width,
+      ],
+    );
+    const onHand = stock.rows[0]?.quantity;
+    if (onHand === undefined) {
+      throw Object.assign(new Error("sku_not_stocked"), { status: 409 });
+    }
+    const held = await client.query<{ held: string }>(
+      `
+        SELECT COALESCE(SUM(quantity), 0)::text AS held
+        FROM store_reservations
+        WHERE org_id = $1 AND location_id = $2 AND product_id = $3
+          AND size_system = $4 AND size_label = $5 AND width_label = $6
+          AND status IN ('held', 'ready')
+          AND hold_until > now()
+      `,
+      [
+        input.orgId,
+        input.locationId,
+        input.productId,
+        input.sizeSystem,
+        input.sizeLabel,
+        width,
+      ],
+    );
+    const heldQty = Number(held.rows[0]?.held ?? 0);
+    const available = onHand - heldQty;
+    if (available < qty) {
+      throw Object.assign(new Error("insufficient_stock"), { status: 409 });
+    }
+    await client.query(
+      `
+        INSERT INTO store_reservations (
+          reservation_id, org_id, location_id, account_id, device_id,
+          product_id, size_system, size_label, width_label, quantity,
+          hold_until, updated_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz, now())
+      `,
+      [
+        reservationId,
+        input.orgId,
+        input.locationId,
+        input.accountId ?? null,
+        input.deviceId ?? null,
+        input.productId,
+        input.sizeSystem,
+        input.sizeLabel,
+        width,
+        qty,
+        holdUntil,
+      ],
+    );
+    await client.query("COMMIT");
+    return { reservationId, holdUntil, availableAfter: available - qty };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function listLocalAvailability(input: {
@@ -503,7 +573,22 @@ export async function listLocalAvailability(input: {
   }
   const result = await getPostgresPool().query(
     `
-      SELECT l.location_id, l.code, l.name, l.region, i.quantity
+      SELECT l.location_id, l.code, l.name, l.region,
+             GREATEST(
+               i.quantity - COALESCE((
+                 SELECT SUM(r.quantity)
+                 FROM store_reservations r
+                 WHERE r.org_id = i.org_id
+                   AND r.location_id = i.location_id
+                   AND r.product_id = i.product_id
+                   AND r.size_system = i.size_system
+                   AND r.size_label = i.size_label
+                   AND r.width_label = i.width_label
+                   AND r.status IN ('held', 'ready')
+                   AND r.hold_until > now()
+               ), 0),
+               0
+             )::int AS quantity
       FROM catalogue_inventory i
       JOIN merchant_locations l
         ON l.org_id = i.org_id AND l.location_id = i.location_id
@@ -512,20 +597,21 @@ export async function listLocalAvailability(input: {
         AND i.size_system = $3
         AND i.size_label = $4
         AND i.width_label = $5
-        AND i.quantity > 0
         AND l.kind = 'store'
         ${regionFilter}
-      ORDER BY i.quantity DESC
+      ORDER BY quantity DESC
     `,
     params,
   );
-  return result.rows.map((r) => ({
-    locationId: r.location_id,
-    code: r.code,
-    name: r.name,
-    region: r.region,
-    quantity: r.quantity,
-  }));
+  return result.rows
+    .filter((r) => Number(r.quantity) > 0)
+    .map((r) => ({
+      locationId: r.location_id,
+      code: r.code,
+      name: r.name,
+      region: r.region,
+      quantity: r.quantity,
+    }));
 }
 
 export { sha256 };

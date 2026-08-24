@@ -1,0 +1,3 @@
+participant_id,date_iso,foot,device_model,os,calibration,brannock_length_mm,brannock_width_mm,measured_length_mm,measured_width_mm,confidence,operator,notes
+P01,,,,,,,,,,
+P02,,,,,,,,,,
