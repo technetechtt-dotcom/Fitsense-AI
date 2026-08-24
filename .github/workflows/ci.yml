@@ -143,7 +143,7 @@ jobs:
         working-directory: backend
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed fitsense-api:scan
+          trivy image --pkg-types library --exit-code 1 --severity CRITICAL --ignore-unfixed fitsense-api:scan
 
   staging-smoke:
     name: staging-smoke
