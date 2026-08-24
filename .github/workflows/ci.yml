@@ -140,13 +140,10 @@ jobs:
         working-directory: backend
         run: docker build -t fitsense-api:scan .
       - name: Trivy image scan (CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: fitsense-api:scan
-          format: table
-          exit-code: "1"
-          severity: CRITICAL
-          ignore-unfixed: true
+        working-directory: backend
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+          trivy image --exit-code 1 --severity CRITICAL --ignore-unfixed fitsense-api:scan
 
   staging-smoke:
     name: staging-smoke

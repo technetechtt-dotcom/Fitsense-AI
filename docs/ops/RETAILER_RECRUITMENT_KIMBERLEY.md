@@ -8,11 +8,11 @@ FitSense measures feet on a phone in millimetres using a printed A4 or bank-card
 
 ## Outreach list (edit with real names)
 
-| Store | Contact | Phone / email | Status | Notes |
-| ----- | ------- | ------------- | ------ | ----- |
-| TBD — school outfitter, Kimberley CBD | | | not_contacted | Prefer POS that can POST outcomes |
-| TBD — safety / industrial footwear | | | not_contacted | Width fittings (D/EE) matter |
-| TBD — sports retail | | | not_contacted | Brand-fit deltas |
+| Store                                 | Contact | Phone / email | Status        | Notes                             |
+| ------------------------------------- | ------- | ------------- | ------------- | --------------------------------- |
+| TBD — school outfitter, Kimberley CBD |         |               | not_contacted | Prefer POS that can POST outcomes |
+| TBD — safety / industrial footwear    |         |               | not_contacted | Width fittings (D/EE) matter      |
+| TBD — sports retail                   |         |               | not_contacted | Brand-fit deltas                  |
 
 ## First meeting checklist
 

@@ -153,7 +153,9 @@ if (sampleDataset) {
   reasons.push("source is a sample/synthetic dataset, not a Brannock study export");
 }
 if (rows.length < MIN_CERTIFY_N) {
-  reasons.push(`n=${rows.length} is below the internal-validation floor (${MIN_CERTIFY_N})`);
+  reasons.push(
+    `n=${rows.length} is below the internal-validation floor (${MIN_CERTIFY_N})`,
+  );
 }
 const failingCohorts = Object.entries(cohorts).filter(
   ([, c]) => c.length.n >= 5 && !c.pass,
@@ -163,7 +165,11 @@ if (failingCohorts.length) {
     `cohorts below gate with n≥5: ${failingCohorts.map(([k]) => k).join("; ")}`,
   );
 }
-const certified = overall.pass && !sampleDataset && rows.length >= MIN_CERTIFY_N && failingCohorts.length === 0;
+const certified =
+  overall.pass &&
+  !sampleDataset &&
+  rows.length >= MIN_CERTIFY_N &&
+  failingCohorts.length === 0;
 
 const report = {
   path,
