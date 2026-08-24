@@ -69,8 +69,7 @@ services:
     buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
     startCommand: npm run migrate && npm start
     healthCheckPath: /health
-    # Manual / blueprint sync until a staging branch auto-deploy policy is chosen.
-    autoDeployTrigger: off
+    autoDeployTrigger: commit
     envVars:
       - key: NODE_VERSION
         value: "22"
@@ -98,7 +97,7 @@ services:
     runtime: static
     buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
     staticPublishPath: dist
-    autoDeployTrigger: off
+    autoDeployTrigger: commit
     envVars:
       - key: NODE_VERSION
         value: "22"

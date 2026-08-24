@@ -1,0 +1,40 @@
+# Deploy current `main` to Render staging.
+
+name: deploy-staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trigger Render staging deploys
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_STAGING_API_ID: ${{ secrets.RENDER_STAGING_API_SERVICE_ID }}
+          RENDER_STAGING_WEB_ID: ${{ secrets.RENDER_STAGING_WEB_SERVICE_ID }}
+        run: |
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "RENDER_API_KEY not configured — skip live deploy. Sync Blueprint in Render dashboard."
+            exit 0
+          fi
+          deploy() {
+            local id="$1"
+            local label="$2"
+            if [ -z "$id" ]; then
+              echo "skip $label (service id unset)"
+              return 0
+            fi
+            echo "deploy $label $id"
+            curl -fsS -X POST "https://api.render.com/v1/services/${id}/deploys" \
+              -H "Authorization: Bearer ${RENDER_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d '{"clearCache":"do_not_clear"}'
+            echo
+          }
+          deploy "$RENDER_STAGING_API_ID" api
+          deploy "$RENDER_STAGING_WEB_ID" web
