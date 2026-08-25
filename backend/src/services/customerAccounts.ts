@@ -610,7 +610,10 @@ export async function confirmReservation(input: {
     params.push(input.deviceId);
     scope += ` AND device_id = $${params.length}`;
   }
-  const result = await getPostgresPool().query<{ reservation_id: string; status: string }>(
+  const result = await getPostgresPool().query<{
+    reservation_id: string;
+    status: string;
+  }>(
     `
       UPDATE store_reservations
       SET status = 'ready', updated_at = now()
@@ -650,7 +653,10 @@ export async function cancelReservation(input: {
     params.push(input.deviceId);
     scope += ` AND device_id = $${params.length}`;
   }
-  const result = await getPostgresPool().query<{ reservation_id: string; status: string }>(
+  const result = await getPostgresPool().query<{
+    reservation_id: string;
+    status: string;
+  }>(
     `
       UPDATE store_reservations
       SET status = 'cancelled', updated_at = now()

@@ -78,11 +78,7 @@ export async function assertSafeWebhookUrl(raw: string): Promise<URL> {
   if (url.hash) {
     throw Object.assign(new Error("webhook_url_fragment"), { status: 400 });
   }
-  const port = url.port
-    ? Number(url.port)
-    : url.protocol === "https:"
-      ? 443
-      : 80;
+  const port = url.port ? Number(url.port) : url.protocol === "https:" ? 443 : 80;
   if (config.isProduction && BLOCKED_PORTS_PRODUCTION.has(port)) {
     throw Object.assign(new Error("webhook_port_blocked"), { status: 400 });
   }
@@ -92,7 +88,11 @@ export async function assertSafeWebhookUrl(raw: string): Promise<URL> {
   }
 
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (BLOCKED_HOSTS.has(host) || host.endsWith(".localhost") || host.endsWith(".local")) {
+  if (
+    BLOCKED_HOSTS.has(host) ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local")
+  ) {
     if (config.isProduction) {
       throw Object.assign(new Error("webhook_host_blocked"), { status: 400 });
     }

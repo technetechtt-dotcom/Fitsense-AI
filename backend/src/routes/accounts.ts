@@ -558,9 +558,7 @@ accountsRouter.post(
         .parse(req.body);
       const account = await getAccountForDevice(req.uid);
       const idempotencyKey =
-        body.idempotencyKey ??
-        req.header("idempotency-key")?.trim() ??
-        undefined;
+        body.idempotencyKey ?? req.header("idempotency-key")?.trim() ?? undefined;
       const created = await createReservation({
         ...body,
         idempotencyKey,
