@@ -22,3 +22,14 @@ test("rejects webhook URLs aimed at private IPs", async () => {
     /webhook_private_ip/,
   );
 });
+
+test("rejects credentials and fragments in webhook URLs", async () => {
+  await assert.rejects(
+    () => assertSafeWebhookUrl("https://user:pass@example.com/hooks"),
+    /webhook_url_credentials/,
+  );
+  await assert.rejects(
+    () => assertSafeWebhookUrl("https://example.com/hooks#frag"),
+    /webhook_url_fragment/,
+  );
+});

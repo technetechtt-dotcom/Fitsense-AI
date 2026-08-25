@@ -1,0 +1,26 @@
+{
+  "issue": 9,
+  "date": "2026-08-25",
+  "neonStaging": {
+    "projectId": "snowy-truth-81855391",
+    "projectName": "FitSense AI Staging",
+    "branchId": "br-quiet-bread-a6iarl84",
+    "migrationsLatest": "010_reservation_lifecycle_webhook_enc.sql",
+    "migrationsPending": [],
+    "githubSecret": "STAGING_DATABASE_URL"
+  },
+  "github": {
+    "STAGING_API_BASE_URL": "https://fitsense-api-staging.onrender.com",
+    "STAGING_SMOKE_ENABLED": false,
+    "note": "Do not enable smoke until Render staging /health returns 200"
+  },
+  "render": {
+    "fitsense-api-staging": "not_provisioned",
+    "fitsense-web-staging": "not_provisioned",
+    "blocker": "RENDER_API_KEY unset — sync Blueprint in Render dashboard per docs/ops/STAGING_DEPLOY.md"
+  },
+  "healthProbe": {
+    "url": "https://fitsense-api-staging.onrender.com/health",
+    "status": 404
+  }
+}

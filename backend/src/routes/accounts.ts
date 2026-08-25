@@ -15,6 +15,8 @@ import type { AuthedRequest } from "../middleware/auth.js";
 import { requireAuth } from "../middleware/auth.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import {
+  cancelReservation,
+  confirmReservation,
   consumeRecoveryToken,
   consumeWebAuthnChallenge,
   createCustomerAccount,
@@ -291,10 +293,13 @@ accountsRouter.post(
         res.status(400).json({ error: "authentication_failed" });
         return;
       }
-      await updateWebAuthnCounter(
-        stored.credentialId,
-        verification.authenticationInfo.newCounter,
-      );
+      const newCounter = verification.authenticationInfo.newCounter;
+      // Reject replay / cloned authenticators when counter does not advance.
+      if (newCounter > 0 && newCounter <= stored.counter) {
+        res.status(400).json({ error: "passkey_replay" });
+        return;
+      }
+      await updateWebAuthnCounter(stored.credentialId, newCounter);
       res.json({ verified: true, accountId: stored.accountId });
     } catch (err) {
       next(err);
@@ -548,12 +553,61 @@ accountsRouter.post(
             .positive()
             .max(24 * 60)
             .optional(),
+          idempotencyKey: z.string().min(8).max(128).optional(),
         })
         .parse(req.body);
       const account = await getAccountForDevice(req.uid);
-      res.status(201).json(
-        await createReservation({
-          ...body,
+      const idempotencyKey =
+        body.idempotencyKey ?? req.header("idempotency-key")?.trim() ?? undefined;
+      const created = await createReservation({
+        ...body,
+        idempotencyKey,
+        accountId: account?.accountId,
+        deviceId: req.uid,
+      });
+      res.status(created.replayed ? 200 : 201).json(created);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+accountsRouter.post(
+  "/stores/reservations/:reservationId/confirm",
+  requireAuth,
+  async (req: AuthedRequest, res, next) => {
+    try {
+      if (!req.uid) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const account = await getAccountForDevice(req.uid);
+      res.json(
+        await confirmReservation({
+          reservationId: req.params.reservationId,
+          accountId: account?.accountId,
+          deviceId: req.uid,
+        }),
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+accountsRouter.post(
+  "/stores/reservations/:reservationId/cancel",
+  requireAuth,
+  async (req: AuthedRequest, res, next) => {
+    try {
+      if (!req.uid) {
+        res.status(401).json({ error: "unauthorized" });
+        return;
+      }
+      const account = await getAccountForDevice(req.uid);
+      res.json(
+        await cancelReservation({
+          reservationId: req.params.reservationId,
           accountId: account?.accountId,
           deviceId: req.uid,
         }),

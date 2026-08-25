@@ -3,7 +3,11 @@ import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
 import { requireMigrationsApplied } from "./migrate.js";
 import { appendAudit, mintSecret, newPlatformId } from "./auditLog.js";
 import { timingSafeEqualString } from "./sessionAuth.js";
-import { assertSafeWebhookUrl } from "./webhookSafety.js";
+import {
+  assertSafeWebhookUrl,
+  assertSafeWebhookUrlAtDelivery,
+} from "./webhookSafety.js";
+import { openSecret, sealSecret } from "./secretSeal.js";
 
 async function ensure(): Promise<void> {
   if (!isPostgresConfigured()) throw new Error("DATABASE_URL is required.");
@@ -23,11 +27,13 @@ export async function createWebhookEndpoint(input: {
   await assertSafeWebhookUrl(input.url.trim());
   const endpointId = newPlatformId("wh");
   const secret = mintSecret("whsec");
+  const sealed = sealSecret(secret.raw);
   await getPostgresPool().query(
     `
       INSERT INTO merchant_webhook_endpoints (
-        endpoint_id, org_id, url, secret_hash, secret_prefix, signing_secret, events, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, now())
+        endpoint_id, org_id, url, secret_hash, secret_prefix,
+        signing_secret, signing_secret_enc, events, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, now())
     `,
     [
       endpointId,
@@ -35,7 +41,9 @@ export async function createWebhookEndpoint(input: {
       input.url.trim(),
       secret.hash,
       secret.prefix,
-      secret.raw,
+      // Do not store plaintext at rest; placeholder for legacy column NOT NULL constraints.
+      "sealed",
+      sealed,
       JSON.stringify(input.events),
     ],
   );
@@ -149,6 +157,7 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
     attempts: number;
     url: string;
     signing_secret: string;
+    signing_secret_enc: string | null;
   }>(
     `
       WITH due AS (
@@ -168,7 +177,8 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
       WHERE d.delivery_id = due.delivery_id
       RETURNING d.delivery_id, d.endpoint_id, d.org_id, d.event_type, d.payload, d.attempts,
                 (SELECT url FROM merchant_webhook_endpoints e WHERE e.endpoint_id = d.endpoint_id) AS url,
-                (SELECT signing_secret FROM merchant_webhook_endpoints e WHERE e.endpoint_id = d.endpoint_id) AS signing_secret
+                (SELECT signing_secret FROM merchant_webhook_endpoints e WHERE e.endpoint_id = d.endpoint_id) AS signing_secret,
+                (SELECT signing_secret_enc FROM merchant_webhook_endpoints e WHERE e.endpoint_id = d.endpoint_id) AS signing_secret_enc
     `,
     [limit],
   );
@@ -177,7 +187,7 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
   let deadLetter = 0;
   for (const row of claimed.rows) {
     try {
-      await assertSafeWebhookUrl(row.url);
+      await assertSafeWebhookUrlAtDelivery(row.url);
     } catch (err) {
       await pool.query(
         `
@@ -191,9 +201,25 @@ export async function processWebhookDeliveries(limit = 25): Promise<{
       deadLetter += 1;
       continue;
     }
+    let signingSecret: string;
+    try {
+      signingSecret = openSecret(row.signing_secret_enc || row.signing_secret);
+    } catch {
+      await pool.query(
+        `
+          UPDATE merchant_webhook_deliveries
+          SET status = 'dead_letter', attempts = attempts + 1,
+              last_error = $2, updated_at = now()
+          WHERE delivery_id = $1
+        `,
+        [row.delivery_id, "webhook_secret_unreadable"],
+      );
+      deadLetter += 1;
+      continue;
+    }
     const body = JSON.stringify(row.payload);
     const timestamp = Math.floor(Date.now() / 1000).toString();
-    const signature = signBody(row.signing_secret, body, timestamp);
+    const signature = signBody(signingSecret, body, timestamp);
     let statusCode: number | null = null;
     let error: string | null = null;
     let ok = false;

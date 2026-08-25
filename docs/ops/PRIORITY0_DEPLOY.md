@@ -11,7 +11,10 @@ you ship.
 | Production | `fitsense-api`         | `fitsense-web`         | Neon prod               | Distinct `AUTH_SECRET`, `HANDOFF_SECRET` |
 | Staging    | `fitsense-api-staging` | `fitsense-web-staging` | Neon staging (separate) | Distinct pair — never reuse prod         |
 
-Blueprint: repo-root `render.yaml` (`autoDeployTrigger: off` on all four).
+Blueprint: repo-root `render.yaml` (production `autoDeployTrigger: off`;
+staging services use `commit` once the Blueprint is synced).
+
+See [STAGING_DEPLOY.md](./STAGING_DEPLOY.md) and [MONITORING.md](./MONITORING.md).
 
 ## Operator steps (Render + Neon)
 

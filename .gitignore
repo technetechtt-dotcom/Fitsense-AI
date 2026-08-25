@@ -31,6 +31,11 @@ service-account.json
 vite.config.js
 vite.config.d.ts
 
+# Generated security artifacts
+backend/sbom.cdx.json
+backend/trivy-critical.json
+**/sbom.cdx.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
