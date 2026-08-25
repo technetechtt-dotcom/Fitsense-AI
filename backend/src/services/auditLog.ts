@@ -26,6 +26,9 @@ export async function appendAudit(input: {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    // Serialize chain appends even when the table is empty (FOR UPDATE on 0 rows
+    // does not block concurrent writers).
+    await client.query("SELECT pg_advisory_xact_lock(87201401)");
     const prev = await client.query<{ entry_hash: string }>(
       `SELECT entry_hash FROM audit_log ORDER BY seq DESC LIMIT 1 FOR UPDATE`,
     );

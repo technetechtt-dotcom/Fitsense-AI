@@ -6,6 +6,13 @@ import { getMigrationStatus } from "../services/migrate.js";
 
 export const healthRouter = Router();
 
+const deploymentSha =
+  process.env.RENDER_GIT_COMMIT?.trim() ||
+  process.env.GIT_COMMIT_SHA?.trim() ||
+  process.env.GITHUB_SHA?.trim() ||
+  process.env.COMMIT_SHA?.trim() ||
+  null;
+
 healthRouter.get("/health", async (_req, res) => {
   const syncStore = getSyncStore();
   let migrations: Awaited<ReturnType<typeof getMigrationStatus>> | null = null;
@@ -21,6 +28,8 @@ healthRouter.get("/health", async (_req, res) => {
     ok: schemaOk,
     service: "fitsense-api",
     version: "0.1.0",
+    deploymentSha,
+    migrationVersion: migrations?.latest ?? null,
     handoffStore: config.handoffStore,
     syncStore: syncStore.name,
     syncReady: syncStore.isReady(),

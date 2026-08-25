@@ -451,10 +451,18 @@ export async function createReservation(input: {
   deviceId?: string;
   holdMinutes?: number;
   quantity?: number;
-}): Promise<{ reservationId: string; holdUntil: string; availableAfter: number }> {
+  idempotencyKey?: string;
+}): Promise<{
+  reservationId: string;
+  holdUntil: string;
+  availableAfter: number;
+  status: string;
+  replayed?: boolean;
+}> {
   await ensure();
   const width = input.widthLabel ?? "standard";
   const qty = Math.max(1, Math.floor(input.quantity ?? 1));
+  const idempotencyKey = input.idempotencyKey?.trim() || null;
   const reservationId = newPlatformId("rsv");
   const holdUntil = new Date(
     Date.now() + (input.holdMinutes ?? 120) * 60 * 1000,
@@ -463,6 +471,32 @@ export async function createReservation(input: {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
+    if (idempotencyKey) {
+      const existing = await client.query<{
+        reservation_id: string;
+        hold_until: Date;
+        status: string;
+      }>(
+        `
+          SELECT reservation_id, hold_until, status
+          FROM store_reservations
+          WHERE org_id = $1 AND idempotency_key = $2
+          FOR UPDATE
+        `,
+        [input.orgId, idempotencyKey],
+      );
+      if (existing.rows[0]) {
+        const row = existing.rows[0];
+        await client.query("COMMIT");
+        return {
+          reservationId: row.reservation_id,
+          holdUntil: row.hold_until.toISOString(),
+          availableAfter: -1,
+          status: row.status,
+          replayed: true,
+        };
+      }
+    }
     await client.query(
       `
         UPDATE store_reservations
@@ -522,8 +556,8 @@ export async function createReservation(input: {
         INSERT INTO store_reservations (
           reservation_id, org_id, location_id, account_id, device_id,
           product_id, size_system, size_label, width_label, quantity,
-          hold_until, updated_at
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz, now())
+          hold_until, idempotency_key, updated_at
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::timestamptz,$12, now())
       `,
       [
         reservationId,
@@ -537,10 +571,190 @@ export async function createReservation(input: {
         width,
         qty,
         holdUntil,
+        idempotencyKey,
       ],
     );
     await client.query("COMMIT");
-    return { reservationId, holdUntil, availableAfter: available - qty };
+    return {
+      reservationId,
+      holdUntil,
+      availableAfter: available - qty,
+      status: "held",
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/** Confirm a held reservation for pickup (`held` → `ready`). */
+export async function confirmReservation(input: {
+  reservationId: string;
+  orgId?: string;
+  accountId?: string;
+  deviceId?: string;
+}): Promise<{ reservationId: string; status: string }> {
+  await ensure();
+  const params: unknown[] = [input.reservationId];
+  let scope = "";
+  if (input.orgId) {
+    params.push(input.orgId);
+    scope += ` AND org_id = $${params.length}`;
+  }
+  if (input.accountId) {
+    params.push(input.accountId);
+    scope += ` AND account_id = $${params.length}`;
+  } else if (input.deviceId) {
+    params.push(input.deviceId);
+    scope += ` AND device_id = $${params.length}`;
+  }
+  const result = await getPostgresPool().query<{ reservation_id: string; status: string }>(
+    `
+      UPDATE store_reservations
+      SET status = 'ready', updated_at = now()
+      WHERE reservation_id = $1
+        AND status = 'held'
+        AND hold_until > now()
+        ${scope}
+      RETURNING reservation_id, status
+    `,
+    params,
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw Object.assign(new Error("reservation_not_confirmable"), { status: 409 });
+  }
+  return { reservationId: row.reservation_id, status: row.status };
+}
+
+/** Cancel a held/ready reservation (releases hold without selling stock). */
+export async function cancelReservation(input: {
+  reservationId: string;
+  orgId?: string;
+  accountId?: string;
+  deviceId?: string;
+}): Promise<{ reservationId: string; status: string }> {
+  await ensure();
+  const params: unknown[] = [input.reservationId];
+  let scope = "";
+  if (input.orgId) {
+    params.push(input.orgId);
+    scope += ` AND org_id = $${params.length}`;
+  }
+  if (input.accountId) {
+    params.push(input.accountId);
+    scope += ` AND account_id = $${params.length}`;
+  } else if (input.deviceId) {
+    params.push(input.deviceId);
+    scope += ` AND device_id = $${params.length}`;
+  }
+  const result = await getPostgresPool().query<{ reservation_id: string; status: string }>(
+    `
+      UPDATE store_reservations
+      SET status = 'cancelled', updated_at = now()
+      WHERE reservation_id = $1
+        AND status IN ('held', 'ready')
+        ${scope}
+      RETURNING reservation_id, status
+    `,
+    params,
+  );
+  const row = result.rows[0];
+  if (!row) {
+    throw Object.assign(new Error("reservation_not_cancellable"), { status: 409 });
+  }
+  return { reservationId: row.reservation_id, status: row.status };
+}
+
+/**
+ * Collect (sell) a confirmed reservation: `ready` → `collected` and decrement
+ * on-hand inventory by the reserved quantity.
+ */
+export async function collectReservation(input: {
+  reservationId: string;
+  orgId: string;
+}): Promise<{ reservationId: string; status: string; quantitySold: number }> {
+  await ensure();
+  const pool = getPostgresPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const rsv = await client.query<{
+      reservation_id: string;
+      location_id: string;
+      product_id: string;
+      size_system: string;
+      size_label: string;
+      width_label: string;
+      quantity: number;
+      status: string;
+    }>(
+      `
+        SELECT reservation_id, location_id, product_id, size_system, size_label,
+               width_label, quantity, status
+        FROM store_reservations
+        WHERE reservation_id = $1 AND org_id = $2
+        FOR UPDATE
+      `,
+      [input.reservationId, input.orgId],
+    );
+    const row = rsv.rows[0];
+    if (!row || row.status !== "ready") {
+      throw Object.assign(new Error("reservation_not_collectable"), { status: 409 });
+    }
+    const stock = await client.query<{ quantity: number }>(
+      `
+        SELECT quantity FROM catalogue_inventory
+        WHERE org_id = $1 AND location_id = $2 AND product_id = $3
+          AND size_system = $4 AND size_label = $5 AND width_label = $6
+        FOR UPDATE
+      `,
+      [
+        input.orgId,
+        row.location_id,
+        row.product_id,
+        row.size_system,
+        row.size_label,
+        row.width_label,
+      ],
+    );
+    const onHand = stock.rows[0]?.quantity;
+    if (onHand === undefined || onHand < row.quantity) {
+      throw Object.assign(new Error("insufficient_stock_to_collect"), { status: 409 });
+    }
+    await client.query(
+      `
+        UPDATE catalogue_inventory
+        SET quantity = quantity - $7, updated_at = now()
+        WHERE org_id = $1 AND location_id = $2 AND product_id = $3
+          AND size_system = $4 AND size_label = $5 AND width_label = $6
+      `,
+      [
+        input.orgId,
+        row.location_id,
+        row.product_id,
+        row.size_system,
+        row.size_label,
+        row.width_label,
+        row.quantity,
+      ],
+    );
+    await client.query(
+      `
+        UPDATE store_reservations
+        SET status = 'collected', updated_at = now()
+        WHERE reservation_id = $1
+      `,
+      [input.reservationId],
+    );
+    await client.query("COMMIT");
+    return {
+      reservationId: row.reservation_id,
+      status: "collected",
+      quantitySold: row.quantity,
+    };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

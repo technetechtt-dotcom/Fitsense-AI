@@ -57,6 +57,11 @@ import {
 } from "../services/platformRetail.js";
 import { upsertInventory, ingestProducts } from "../services/merchantStore.js";
 import {
+  cancelReservation,
+  collectReservation,
+  confirmReservation,
+} from "../services/customerAccounts.js";
+import {
   createWebhookEndpoint,
   enqueueWebhookEvent,
   listWebhookDeliveries,
@@ -390,6 +395,58 @@ platformRouter.post(
   async (_req: MerchantRequest, res, next) => {
     try {
       res.json(await processWebhookDeliveries(50));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ---- Reservations (merchant lifecycle) ----
+platformRouter.post(
+  "/merchants/orgs/:orgId/reservations/:reservationId/confirm",
+  requireOrgRole("operator"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      res.json(
+        await confirmReservation({
+          reservationId: String(req.params.reservationId),
+          orgId: req.orgId!,
+        }),
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+platformRouter.post(
+  "/merchants/orgs/:orgId/reservations/:reservationId/cancel",
+  requireOrgRole("operator"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      res.json(
+        await cancelReservation({
+          reservationId: String(req.params.reservationId),
+          orgId: req.orgId!,
+        }),
+      );
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+platformRouter.post(
+  "/merchants/orgs/:orgId/reservations/:reservationId/collect",
+  requireOrgRole("operator"),
+  async (req: MerchantRequest, res, next) => {
+    try {
+      res.json(
+        await collectReservation({
+          reservationId: String(req.params.reservationId),
+          orgId: req.orgId!,
+        }),
+      );
     } catch (err) {
       next(err);
     }

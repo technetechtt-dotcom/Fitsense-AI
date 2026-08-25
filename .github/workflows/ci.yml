@@ -136,15 +136,38 @@ jobs:
       - name: Root full audit (report)
         run: npm ci --include=dev && npm audit --audit-level=high
         continue-on-error: true
+      - name: Backend SBOM (CycloneDX)
+        working-directory: backend
+        run: |
+          npm ci --omit=dev
+          npm sbom --omit=dev --sbom-format cyclonedx > sbom.cdx.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-sbom
+          path: backend/sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Build API image
         working-directory: backend
         run: docker build -t fitsense-api:scan .
       - name: Trivy image scan (CRITICAL app libraries)
         working-directory: backend
+        id: trivy
         continue-on-error: true
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-          trivy image --pkg-types library --exit-code 1 --severity CRITICAL --ignore-unfixed fitsense-api:scan
+          trivy image --pkg-types library --exit-code 1 --severity CRITICAL --ignore-unfixed \
+            --format json --output trivy-critical.json fitsense-api:scan
+          trivy image --pkg-types library --severity CRITICAL --ignore-unfixed fitsense-api:scan
+      - name: Upload Trivy security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-security-report
+          path: backend/trivy-critical.json
+          if-no-files-found: warn
+          retention-days: 90
 
   staging-smoke:
     name: staging-smoke
