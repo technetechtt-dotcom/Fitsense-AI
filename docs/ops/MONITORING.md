@@ -4,13 +4,13 @@ Minimum signal for FitSense API / web / retention after staging and production a
 
 ## Health
 
-| Check | Expect |
-| --- | --- |
-| `GET /health` | HTTP 200, `ok: true` |
-| `deploymentSha` | Matches the commit you intended to ship |
-| `migrationVersion` | Latest applied SQL (currently `010_…`) |
-| `syncReady` | `true` when Postgres sync store is up |
-| `migrations.pending` | `[]` — else treat as deploy failure |
+| Check                | Expect                                  |
+| -------------------- | --------------------------------------- |
+| `GET /health`        | HTTP 200, `ok: true`                    |
+| `deploymentSha`      | Matches the commit you intended to ship |
+| `migrationVersion`   | Latest applied SQL (currently `010_…`)  |
+| `syncReady`          | `true` when Postgres sync store is up   |
+| `migrations.pending` | `[]` — else treat as deploy failure     |
 
 Poll staging and production every 1–5 minutes (UptimeRobot, Better Stack, Render
 health checks already hit `/health`).

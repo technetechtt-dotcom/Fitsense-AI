@@ -6,12 +6,12 @@ Production hostname `fitsense-api-1rne.onrender.com` is **not** staging. Smoke s
 
 ## Neon staging (provisioned)
 
-| Field | Value |
-| --- | --- |
-| Neon project | `FitSense AI Staging` (`snowy-truth-81855391`) |
-| Branch | `main` (`br-quiet-bread-a6iarl84`) |
-| Database | `neondb` |
-| Region | aws-us-west-2 |
+| Field              | Value                                               |
+| ------------------ | --------------------------------------------------- |
+| Neon project       | `FitSense AI Staging` (`snowy-truth-81855391`)      |
+| Branch             | `main` (`br-quiet-bread-a6iarl84`)                  |
+| Database           | `neondb`                                            |
+| Region             | aws-us-west-2                                       |
 | Migrations applied | `001` … `010_reservation_lifecycle_webhook_enc.sql` |
 
 Connection string is stored as GitHub secret `STAGING_DATABASE_URL` (never commit it).

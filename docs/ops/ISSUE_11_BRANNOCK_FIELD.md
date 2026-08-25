@@ -4,11 +4,11 @@ Software cannot complete this issue. Physical work only. Do **not** invent milli
 
 ## Status (repo)
 
-| Gate | Value |
-| --- | --- |
-| Certified | **NO** |
-| Synthetic/sample | **YES** |
-| n | 3 (sample JSONL only) |
+| Gate             | Value                 |
+| ---------------- | --------------------- |
+| Certified        | **NO**                |
+| Synthetic/sample | **YES**               |
+| n                | 3 (sample JSONL only) |
 
 Commercial accuracy claims are **blocked** until Certified = YES.
 

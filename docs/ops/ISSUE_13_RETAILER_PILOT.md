@@ -4,16 +4,16 @@ Cannot be completed from code. Operator outreach only. No fake signatures or inv
 
 ## Status
 
-| Step | State |
-| --- | --- |
-| Retailer identified | open — see pipeline |
-| Decision-maker contact | open |
-| Merchant workflow demo | blocked on staging web HTTPS + live staging API |
-| Pilot contract + POPIA operator agreement | open |
-| Real catalogue/inventory import | open |
-| Staff training | open |
-| Assisted vs control pilot | blocked on Certified Brannock study (#11) |
-| Fit success / conversion / returns / ROI | open |
+| Step                                      | State                                           |
+| ----------------------------------------- | ----------------------------------------------- |
+| Retailer identified                       | open — see pipeline                             |
+| Decision-maker contact                    | open                                            |
+| Merchant workflow demo                    | blocked on staging web HTTPS + live staging API |
+| Pilot contract + POPIA operator agreement | open                                            |
+| Real catalogue/inventory import           | open                                            |
+| Staff training                            | open                                            |
+| Assisted vs control pilot                 | blocked on Certified Brannock study (#11)       |
+| Fit success / conversion / returns / ROI  | open                                            |
 
 ## Tools
 
