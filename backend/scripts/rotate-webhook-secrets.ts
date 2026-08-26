@@ -60,7 +60,9 @@ async function main() {
     // Never log plaintext or sealed ciphertext.
     console.log(`rotated ${row.endpoint_id} org=${row.org_id}`);
   }
-  console.log(JSON.stringify({ rotated, already, keyVersion: config.webhookSealKeyVersion }));
+  console.log(
+    JSON.stringify({ rotated, already, keyVersion: config.webhookSealKeyVersion }),
+  );
   await pool.end();
 }
 
