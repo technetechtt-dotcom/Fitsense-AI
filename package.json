@@ -39,7 +39,7 @@
     "react-router-dom": "^6.26.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.3.3",
+    "@capacitor/cli": "^8.5.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.1",
     "@types/qrcode": "^1.5.6",
