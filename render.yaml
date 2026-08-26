@@ -7,11 +7,9 @@ services:
     runtime: node
     rootDir: backend
     plan: free
-    # Match CI: lockfile install including build-time TypeScript types.
     buildCommand: node -v && npm -v && npm ci --include=dev && npm run build
     startCommand: npm run migrate && npm start
     healthCheckPath: /health
-    # Keep off until branch protection + required CI checks are enforced on main.
     autoDeployTrigger: off
     envVars:
       - key: NODE_VERSION
@@ -34,6 +32,22 @@ services:
         sync: false
       - key: HANDOFF_SECRET
         sync: false
+      - key: WEBHOOK_SEAL_SECRET
+        sync: false
+      - key: WEBHOOK_SEAL_KEY_VERSION
+        value: "v1"
+      - key: WEBAUTHN_RP_ID
+        sync: false
+      - key: WEBAUTHN_ORIGIN
+        sync: false
+      - key: RETENTION_SCAN_DAYS
+        value: "730"
+      - key: RETENTION_EVENT_DAYS
+        value: "730"
+      - key: RETENTION_PROFILE_DAYS
+        value: "730"
+      - key: RETENTION_OUTCOME_DAYS
+        value: "730"
 
   - type: web
     name: fitsense-web
@@ -60,6 +74,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # Staging (dedicated Neon DB + secrets — never share prod DATABASE_URL)
+  # Neon staging project: snowy-truth-81855391 — NOT production weathered-mud-13816950
   # ---------------------------------------------------------------------------
   - type: web
     name: fitsense-api-staging
@@ -91,6 +106,24 @@ services:
         sync: false
       - key: HANDOFF_SECRET
         sync: false
+      - key: WEBHOOK_SEAL_SECRET
+        sync: false
+      - key: WEBHOOK_SEAL_KEY_VERSION
+        value: "v1"
+      - key: WEBAUTHN_RP_ID
+        sync: false
+      - key: WEBAUTHN_ORIGIN
+        sync: false
+      - key: WEBAUTHN_RP_NAME
+        value: FitSense Staging
+      - key: RETENTION_SCAN_DAYS
+        value: "730"
+      - key: RETENTION_EVENT_DAYS
+        value: "730"
+      - key: RETENTION_PROFILE_DAYS
+        value: "730"
+      - key: RETENTION_OUTCOME_DAYS
+        value: "730"
 
   - type: web
     name: fitsense-web-staging
@@ -115,7 +148,6 @@ services:
         source: /*
         destination: /index.html
 
-  # POPIA retention (staging) — monitor logs after each run. See docs/ops/RETENTION.md.
   - type: cron
     name: fitsense-retention-staging
     runtime: node
@@ -138,8 +170,98 @@ services:
         value: "true"
       - key: DATABASE_SSL_REJECT_UNAUTHORIZED
         value: "true"
+      - key: AUTH_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: AUTH_SECRET
+      - key: HANDOFF_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: HANDOFF_SECRET
+      - key: WEBHOOK_SEAL_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: WEBHOOK_SEAL_SECRET
 
-  # POPIA retention (production).
+  - type: cron
+    name: fitsense-webhooks-staging
+    runtime: node
+    rootDir: backend
+    plan: starter
+    schedule: "*/5 * * * *"
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run webhooks:process
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: DATABASE_URL
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: AUTH_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: AUTH_SECRET
+      - key: HANDOFF_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: HANDOFF_SECRET
+      - key: WEBHOOK_SEAL_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: WEBHOOK_SEAL_SECRET
+
+  - type: cron
+    name: fitsense-reservations-staging
+    runtime: node
+    rootDir: backend
+    plan: starter
+    schedule: "*/15 * * * *"
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run reservations:expire
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: DATABASE_URL
+      - key: DATABASE_SSL
+        value: "true"
+      - key: DATABASE_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: AUTH_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: AUTH_SECRET
+      - key: HANDOFF_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: HANDOFF_SECRET
+      - key: WEBHOOK_SEAL_SECRET
+        fromService:
+          name: fitsense-api-staging
+          type: web
+          envVarKey: WEBHOOK_SEAL_SECRET
+
   - type: cron
     name: fitsense-retention
     runtime: node
@@ -162,8 +284,22 @@ services:
         value: "true"
       - key: DATABASE_SSL_REJECT_UNAUTHORIZED
         value: "true"
+      - key: AUTH_SECRET
+        fromService:
+          name: fitsense-api
+          type: web
+          envVarKey: AUTH_SECRET
+      - key: HANDOFF_SECRET
+        fromService:
+          name: fitsense-api
+          type: web
+          envVarKey: HANDOFF_SECRET
+      - key: WEBHOOK_SEAL_SECRET
+        fromService:
+          name: fitsense-api
+          type: web
+          envVarKey: WEBHOOK_SEAL_SECRET
 
-  # Webhook delivery retries + DLQ drain.
   - type: cron
     name: fitsense-webhooks
     runtime: node
@@ -186,3 +322,18 @@ services:
         value: "true"
       - key: DATABASE_SSL_REJECT_UNAUTHORIZED
         value: "true"
+      - key: AUTH_SECRET
+        fromService:
+          name: fitsense-api
+          type: web
+          envVarKey: AUTH_SECRET
+      - key: HANDOFF_SECRET
+        fromService:
+          name: fitsense-api
+          type: web
+          envVarKey: HANDOFF_SECRET
+      - key: WEBHOOK_SEAL_SECRET
+        fromService:
+          name: fitsense-api
+          type: web
+          envVarKey: WEBHOOK_SEAL_SECRET

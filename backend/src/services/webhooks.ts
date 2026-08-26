@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { config } from "../config.js";
 import { getPostgresPool, isPostgresConfigured } from "./postgres.js";
 import { requireMigrationsApplied } from "./migrate.js";
 import { appendAudit, mintSecret, newPlatformId } from "./auditLog.js";
@@ -32,8 +33,8 @@ export async function createWebhookEndpoint(input: {
     `
       INSERT INTO merchant_webhook_endpoints (
         endpoint_id, org_id, url, secret_hash, secret_prefix,
-        signing_secret, signing_secret_enc, events, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, now())
+        signing_secret, signing_secret_enc, seal_key_version, events, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, now())
     `,
     [
       endpointId,
@@ -41,9 +42,9 @@ export async function createWebhookEndpoint(input: {
       input.url.trim(),
       secret.hash,
       secret.prefix,
-      // Do not store plaintext at rest; placeholder for legacy column NOT NULL constraints.
       "sealed",
       sealed,
+      config.webhookSealKeyVersion,
       JSON.stringify(input.events),
     ],
   );

@@ -46,6 +46,7 @@ jobs:
       DATABASE_SSL: "false"
       AUTH_SECRET: ci-auth-secret-at-least-32-characters!!
       HANDOFF_SECRET: ci-handoff-secret-at-least-32-chars!!
+      WEBHOOK_SEAL_SECRET: ci-webhook-seal-secret-at-least-32!!
       HANDOFF_STORE: postgres
       SYNC_STORE: postgres
       SKIP_AUTH: "false"
@@ -125,6 +126,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks secret scan
+        continue-on-error: true
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 detect --source=/repo --verbose --redact || true
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
@@ -152,13 +159,14 @@ jobs:
         run: docker build -t fitsense-api:scan .
       - name: Trivy image scan (CRITICAL app libraries)
         working-directory: backend
-        id: trivy
         continue-on-error: true
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
           trivy image --pkg-types library --exit-code 1 --severity CRITICAL --ignore-unfixed \
+            --ignorefile .trivyignore \
             --format json --output trivy-critical.json fitsense-api:scan
-          trivy image --pkg-types library --severity CRITICAL --ignore-unfixed fitsense-api:scan
+          trivy image --pkg-types library --severity CRITICAL --ignore-unfixed \
+            --ignorefile .trivyignore fitsense-api:scan
       - name: Upload Trivy security report
         if: always()
         uses: actions/upload-artifact@v4

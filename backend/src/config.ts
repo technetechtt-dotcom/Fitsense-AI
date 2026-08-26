@@ -123,6 +123,15 @@ export const config = {
     /** Merchant purchase/return/exchange rows (POPIA purpose limitation). */
     outcomeDays: parseNumber(process.env.RETENTION_OUTCOME_DAYS, 730),
   },
+  /** Dedicated seal key for webhook signing secrets (required in production). */
+  webhookSealSecret:
+    process.env.WEBHOOK_SEAL_SECRET?.trim() || (!isProduction ? authSecret : undefined),
+  webhookSealKeyVersion: process.env.WEBHOOK_SEAL_KEY_VERSION?.trim() || "v1",
+  webauthn: {
+    rpId: process.env.WEBAUTHN_RP_ID?.trim() || "localhost",
+    rpName: process.env.WEBAUTHN_RP_NAME?.trim() || "FitSense",
+    origin: process.env.WEBAUTHN_ORIGIN?.trim() || undefined,
+  },
 } as const;
 
 export function assertProductionConfig(): void {
@@ -155,6 +164,11 @@ export function assertProductionConfig(): void {
   }
   if (config.authSecret && handoffExplicit === config.authSecret) {
     throw new Error("HANDOFF_SECRET must be distinct from AUTH_SECRET in production.");
+  }
+  if (!process.env.WEBHOOK_SEAL_SECRET?.trim()) {
+    throw new Error(
+      "WEBHOOK_SEAL_SECRET is required in production to encrypt webhook signing secrets.",
+    );
   }
 }
 

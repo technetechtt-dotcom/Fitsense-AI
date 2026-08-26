@@ -455,7 +455,7 @@ export async function createReservation(input: {
 }): Promise<{
   reservationId: string;
   holdUntil: string;
-  availableAfter: number;
+  availableAfter: number | null;
   status: string;
   replayed?: boolean;
 }> {
@@ -491,7 +491,7 @@ export async function createReservation(input: {
         return {
           reservationId: row.reservation_id,
           holdUntil: row.hold_until.toISOString(),
-          availableAfter: -1,
+          availableAfter: null,
           status: row.status,
           replayed: true,
         };
@@ -613,15 +613,16 @@ export async function confirmReservation(input: {
   const result = await getPostgresPool().query<{
     reservation_id: string;
     status: string;
+    org_id: string;
   }>(
     `
       UPDATE store_reservations
-      SET status = 'ready', updated_at = now()
+      SET status = 'ready', updated_at = now(), last_transition_at = now()
       WHERE reservation_id = $1
         AND status = 'held'
         AND hold_until > now()
         ${scope}
-      RETURNING reservation_id, status
+      RETURNING reservation_id, status, org_id
     `,
     params,
   );
@@ -629,6 +630,12 @@ export async function confirmReservation(input: {
   if (!row) {
     throw Object.assign(new Error("reservation_not_confirmable"), { status: 409 });
   }
+  await appendAudit({
+    orgId: row.org_id,
+    actorId: input.accountId ?? input.deviceId ?? null,
+    action: "reservation.confirm",
+    resource: row.reservation_id,
+  });
   return { reservationId: row.reservation_id, status: row.status };
 }
 
@@ -656,14 +663,15 @@ export async function cancelReservation(input: {
   const result = await getPostgresPool().query<{
     reservation_id: string;
     status: string;
+    org_id: string;
   }>(
     `
       UPDATE store_reservations
-      SET status = 'cancelled', updated_at = now()
+      SET status = 'cancelled', updated_at = now(), last_transition_at = now()
       WHERE reservation_id = $1
         AND status IN ('held', 'ready')
         ${scope}
-      RETURNING reservation_id, status
+      RETURNING reservation_id, status, org_id
     `,
     params,
   );
@@ -671,6 +679,12 @@ export async function cancelReservation(input: {
   if (!row) {
     throw Object.assign(new Error("reservation_not_cancellable"), { status: 409 });
   }
+  await appendAudit({
+    orgId: row.org_id,
+    actorId: input.accountId ?? input.deviceId ?? null,
+    action: "reservation.cancel",
+    resource: row.reservation_id,
+  });
   return { reservationId: row.reservation_id, status: row.status };
 }
 
@@ -750,12 +764,18 @@ export async function collectReservation(input: {
     await client.query(
       `
         UPDATE store_reservations
-        SET status = 'collected', updated_at = now()
-        WHERE reservation_id = $1
+        SET status = 'collected', updated_at = now(), last_transition_at = now()
+        WHERE reservation_id = $1 AND status = 'ready'
       `,
       [input.reservationId],
     );
     await client.query("COMMIT");
+    await appendAudit({
+      orgId: input.orgId,
+      action: "reservation.collect",
+      resource: row.reservation_id,
+      detail: { quantitySold: row.quantity },
+    });
     return {
       reservationId: row.reservation_id,
       status: "collected",
@@ -832,6 +852,36 @@ export async function listLocalAvailability(input: {
       region: r.region,
       quantity: r.quantity,
     }));
+}
+
+/** Mark held/ready reservations past hold_until as expired (releases soft holds). */
+export async function expireHeldReservations(
+  limit = 500,
+): Promise<{ expired: number }> {
+  await ensure();
+  const result = await getPostgresPool().query(
+    `
+      UPDATE store_reservations
+      SET status = 'expired', updated_at = now(), last_transition_at = now()
+      WHERE reservation_id IN (
+        SELECT reservation_id FROM store_reservations
+        WHERE status IN ('held', 'ready')
+          AND hold_until < now()
+        ORDER BY hold_until ASC
+        LIMIT $1
+        FOR UPDATE SKIP LOCKED
+      )
+    `,
+    [limit],
+  );
+  const expired = result.rowCount ?? 0;
+  if (expired > 0) {
+    await appendAudit({
+      action: "reservation.expire_batch",
+      detail: { expired },
+    });
+  }
+  return { expired };
 }
 
 export { sha256 };

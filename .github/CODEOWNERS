@@ -1,18 +1,40 @@
-# Replace or extend these owners as the engineering team grows.
+# Replace with named humans as the team grows. Until then the sole owner
+# still cannot self-approve under enforce_admins — use emergency bypass
+# documented in docs/ops/EMERGENCY_BYPASS.md only when required.
+
 * @technetechtt-dotcom
 
-# Accuracy-critical code requires explicit review.
+# Measurement / algorithm (issue #11–#12 accuracy gates)
 /src/lib/realMeasurement.ts @technetechtt-dotcom
 /src/lib/homography.ts @technetechtt-dotcom
 /src/lib/cv/ @technetechtt-dotcom
 /src/lib/arSession.ts @technetechtt-dotcom
+/src/lib/supportedDevices.ts @technetechtt-dotcom
+/docs/supported-devices.json @technetechtt-dotcom
 /android/app/src/main/java/com/fitsense/ai/measurement/ @technetechtt-dotcom
 /android/app/src/main/java/com/fitsense/ai/ar/ @technetechtt-dotcom
 /ios/App/App/Plugins/ @technetechtt-dotcom
 
-# Data, identity, privacy, and public API contracts.
+# Auth, cryptography, webhook sealing (security owner)
+/backend/src/services/sessionAuth.ts @technetechtt-dotcom
+/backend/src/services/secretSeal.ts @technetechtt-dotcom
+/backend/src/services/deviceAuthStore.ts @technetechtt-dotcom
+/backend/src/middleware/auth.ts @technetechtt-dotcom
+/backend/src/routes/auth.ts @technetechtt-dotcom
+/backend/src/routes/accounts.ts @technetechtt-dotcom
+/backend/src/config.ts @technetechtt-dotcom
+
+# Database migrations (database owner)
+/backend/migrations/ @technetechtt-dotcom
+
+# Platform / merchant APIs
 /backend/ @technetechtt-dotcom
 /firestore.rules @technetechtt-dotcom
 /storage.rules @technetechtt-dotcom
 /src/lib/cloud/ @technetechtt-dotcom
 /src/embed/ @technetechtt-dotcom
+
+# Deploy / CI governance
+/render.yaml @technetechtt-dotcom
+/.github/ @technetechtt-dotcom
+/docs/branch-protection-payload.json @technetechtt-dotcom

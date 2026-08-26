@@ -14,6 +14,8 @@
     "pilot:begin": "node scripts/begin-kimberley-pilot.mjs",
     "migrate": "tsx --import ./test/env.ts scripts/run-migrate.ts",
     "retention:run": "node scripts/run-retention.mjs",
+    "reservations:expire": "tsx --import ./test/env.ts scripts/expire-reservations.ts",
+    "webhooks:rotate-secrets": "tsx --import ./test/env.ts scripts/rotate-webhook-secrets.ts",
     "render:build": "npm ci --include=dev && npm run build",
     "test": "tsx --import ./test/env.ts --test test/handoff.test.ts test/handoffPostgres.test.ts test/handoffSession.test.ts test/validation.test.ts test/sessionAuth.test.ts test/deviceAuth.test.ts test/fitIdentity.test.ts test/backupRestore.test.ts test/merchants.test.ts test/catalogueTokenSecurity.test.ts test/syncCrud.test.ts test/schemaMigration.test.ts test/authSecurity.test.ts test/platformCapabilities.test.ts test/platformSmoke.test.ts test/reservationConcurrency.test.ts test/reservationLifecycle.test.ts test/tenantIsolation.test.ts test/accountRecoveryPasskey.test.ts test/webhookSafety.test.ts",
     "sbom": "npm sbom --package-lock-only --omit=dev --sbom-format cyclonedx",
