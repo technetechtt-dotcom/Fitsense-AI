@@ -1,0 +1,3 @@
+# Time-limited exceptions for unfixed CRITICAL library CVEs.
+# Remove entries when upstream publishes a fix; prefer upgrading the package.
+# Format: https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/

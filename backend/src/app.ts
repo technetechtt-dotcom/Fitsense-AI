@@ -7,6 +7,7 @@ import { requestContext } from "./middleware/requestContext.js";
 import { securityHeaders } from "./middleware/securityHeaders.js";
 import { authRouter } from "./routes/auth.js";
 import { accountsRouter } from "./routes/accounts.js";
+import { devicesRouter } from "./routes/devices.js";
 import { fitIdentityRouter } from "./routes/fitIdentity.js";
 import { healthRouter } from "./routes/health.js";
 import { handoffRouter } from "./routes/handoff.js";
@@ -41,6 +42,7 @@ export function createApp() {
   app.use(healthRouter);
   app.use("/v1", authRouter);
   app.use("/v1", accountsRouter);
+  app.use("/v1", devicesRouter);
   app.use("/v1", handoffRouter);
   app.use("/v1", syncRouter);
   app.use("/v1", fitIdentityRouter);

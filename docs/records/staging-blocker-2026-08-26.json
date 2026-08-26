@@ -1,0 +1,18 @@
+{
+  "date": "2026-08-26",
+  "issue": 9,
+  "status": "blocked_on_render_api_key",
+  "mainSha": "baee6d6",
+  "neonStagingProjectId": "snowy-truth-81855391",
+  "stagingHealth": 404,
+  "STAGING_SMOKE_ENABLED": false,
+  "softwareReady": [
+    "render.yaml staging API/web/retention/webhooks/reservations crons",
+    "WEBHOOK_SEAL_SECRET required in production",
+    "migration 011 webhook plaintext placeholder + seal_key_version",
+    "GET /v1/devices/supported remote cohort config",
+    "reservation expire job + audit transitions",
+    "provision-render-staging.mjs"
+  ],
+  "operatorNext": "Sync Blueprint in Render dashboard; wire STAGING_* secrets; deploy; enable smoke"
+}
