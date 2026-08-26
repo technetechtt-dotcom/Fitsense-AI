@@ -29,12 +29,12 @@
   "dependencies": {
     "@simplewebauthn/server": "^13.3.2",
     "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.6",
     "@types/node": "^22.20.1",
     "@types/pg": "^8.20.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.0",
+    "express": "^5.2.1",
     "pg": "^8.22.0",
     "typescript": "^5.9.3",
     "zod": "^3.23.8"
