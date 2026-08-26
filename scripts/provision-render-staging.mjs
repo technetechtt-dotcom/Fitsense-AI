@@ -37,7 +37,9 @@ async function listServices() {
     throw new Error(`list services ${res.status}: ${await res.text()}`);
   }
   const data = await res.json();
-  return (Array.isArray(data) ? data : data.items ?? []).map((row) => row.service ?? row);
+  return (Array.isArray(data) ? data : (data.items ?? [])).map(
+    (row) => row.service ?? row,
+  );
 }
 
 function findByName(services, name) {
@@ -56,7 +58,11 @@ async function main() {
   for (const name of needed) {
     const svc = findByName(services, name);
     if (svc) {
-      report.found[name] = { id: svc.id, type: svc.type, url: svc.serviceDetails?.url ?? svc.url };
+      report.found[name] = {
+        id: svc.id,
+        type: svc.type,
+        url: svc.serviceDetails?.url ?? svc.url,
+      };
     } else {
       report.missing.push(name);
     }
@@ -81,9 +87,7 @@ async function main() {
   }
   const web = report.found["fitsense-web-staging"];
   if (web?.id) {
-    console.log(
-      `  gh secret set RENDER_STAGING_WEB_SERVICE_ID --body "${web.id}"`,
-    );
+    console.log(`  gh secret set RENDER_STAGING_WEB_SERVICE_ID --body "${web.id}"`);
   }
 }
 
