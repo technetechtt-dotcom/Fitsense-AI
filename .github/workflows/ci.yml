@@ -104,7 +104,7 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleDebug :app:test --no-daemon
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
@@ -112,7 +112,7 @@ jobs:
           retention-days: 14
       - name: Upload unit test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-unit-test-reports
           path: |
@@ -148,7 +148,7 @@ jobs:
         run: |
           npm sbom --package-lock-only --omit=dev --sbom-format cyclonedx > sbom.cdx.json
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-sbom
           path: backend/sbom.cdx.json
@@ -169,7 +169,7 @@ jobs:
             --ignorefile .trivyignore fitsense-api:scan
       - name: Upload Trivy security report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-security-report
           path: backend/trivy-critical.json
@@ -200,7 +200,7 @@ jobs:
         run: npm run staging:smoke
       - name: Upload staging smoke record
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: staging-smoke-record
           path: staging-smoke-record.json
